@@ -1,0 +1,33 @@
+# Folio Move-Actions Configuration
+# F.3 Schema-extensible für future Domains (Newsletter-Curator, CFO, Jobs, etc.)
+# UI hardcoded auf 4 Aktionen (siehe F.3-Mittelweg-Spec).
+# 'keep' ist implicit non-action (kein YAML-Entry; UI kennt es hardcoded als Fallback).
+
+move_actions:
+  - action_key: move_immo_portal
+    display_label: "Portal-Inserat"
+    target_folder: "Immo/Portal-Inserate"
+    domain_id: immo
+    active: true
+    sort_order: 1
+
+  - action_key: move_immo_privat
+    display_label: "Privat-Inserat"
+    target_folder: "Immo/Privat-Inserate"
+    domain_id: immo
+    active: true
+    sort_order: 2
+
+  - action_key: move_paketzustellung
+    display_label: "Paketzustellung"
+    target_folder: "Paketzustellung"
+    domain_id: paketzustellung
+    active: true
+    sort_order: 3
+
+  - action_key: move_zu_pruefen
+    display_label: "Zu prüfen"
+    target_folder: "Immo/Zu-Pruefen"
+    domain_id: immo
+    active: true
+    sort_order: 4

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#a7f3d0"/>
+      <stop offset="55%" stop-color="#10b981"/>
+      <stop offset="100%" stop-color="#064e3b"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <!-- river curve (Tavira's Gilão) -->
+  <path d="M0 420 Q 200 380 380 420 Q 560 460 800 410 L800 600 L0 600 Z" fill="#064e3b" opacity="0.4"/>
+  <path d="M0 470 Q 240 440 420 470 Q 600 500 800 460 L800 600 L0 600 Z" fill="#064e3b" opacity="0.55"/>
+  <!-- apartment block with terrace -->
+  <g transform="translate(540,150)" fill="#fef3c7" opacity="0.92">
+    <rect x="0" y="40" width="180" height="160" rx="4"/>
+    <rect x="-10" y="180" width="200" height="22"/>
+    <rect x="20" y="65" width="35" height="35" fill="#064e3b"/>
+    <rect x="73" y="65" width="35" height="35" fill="#064e3b"/>
+    <rect x="126" y="65" width="35" height="35" fill="#064e3b"/>
+    <rect x="20" y="120" width="35" height="35" fill="#064e3b"/>
+    <rect x="73" y="120" width="35" height="35" fill="#064e3b"/>
+    <rect x="126" y="120" width="35" height="35" fill="#064e3b"/>
+  </g>
+  <!-- pool ellipse on terrace -->
+  <ellipse cx="630" cy="365" rx="80" ry="10" fill="#22d3ee" opacity="0.85"/>
+  <!-- text -->
+  <text x="60" y="280" font-size="58" font-weight="700" fill="#fff" letter-spacing="-1">TAVIRA</text>
+  <text x="60" y="340" font-size="34" font-weight="500" fill="#ecfdf5">T3 · vista Rio Gilão · piscina</text>
+  <text x="60" y="520" font-size="42" font-weight="600" fill="#fef3c7">425.000 EUR · 110 m²</text>
+  <text x="60" y="555" font-size="20" fill="#a7f3d0" font-family="ui-monospace,'SF Mono',monospace">demo-tavira-t3 · immoscout24</text>
+</svg>

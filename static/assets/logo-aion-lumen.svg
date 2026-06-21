@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" aria-label="Aion Lumen">
+  
+  <defs>
+    <radialGradient id="al-corona" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="hsl(48 100% 92%)" stop-opacity="1"></stop>
+      <stop offset="25%" stop-color="hsl(36 100% 70%)" stop-opacity="0.85"></stop>
+      <stop offset="55%" stop-color="hsl(28 95% 55%)" stop-opacity="0.35"></stop>
+      <stop offset="100%" stop-color="hsl(22 85% 45%)" stop-opacity="0"></stop>
+    </radialGradient>
+    <radialGradient id="al-core" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0%" stop-color="hsl(55 100% 97%)"></stop>
+      <stop offset="60%" stop-color="hsl(38 100% 72%)"></stop>
+      <stop offset="100%" stop-color="hsl(28 95% 55%)"></stop>
+    </radialGradient>
+    <linearGradient id="al-ray" x1="0.5" y1="0" x2="0.5" y2="1">
+      <stop offset="0%" stop-color="hsl(38 100% 70%)" stop-opacity="0"></stop>
+      <stop offset="50%" stop-color="hsl(45 100% 92%)" stop-opacity="1"></stop>
+      <stop offset="100%" stop-color="hsl(38 100% 70%)" stop-opacity="0"></stop>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(128,128)">
+    
+    <g stroke="hsl(32 60% 45%)" stroke-width="0.4" fill="none" opacity="0.4">
+      <line x1="0" y1="-116" x2="0" y2="-96" stroke-dasharray="1 3"></line>
+      <line x1="0" y1="96" x2="0" y2="116" stroke-dasharray="1 3"></line>
+      <line x1="-116" y1="0" x2="-96" y2="0" stroke-dasharray="1 3"></line>
+      <line x1="96" y1="0" x2="116" y2="0" stroke-dasharray="1 3"></line>
+      <path d="M 0 -108 L 108 0 L 0 108 L -108 0 Z"></path>
+    </g>
+    
+    <g fill="hsl(32 80% 55%)">
+      <circle cx="0" cy="-116" r="1.2"></circle>
+      <circle cx="0" cy="116" r="1.2"></circle>
+      <circle cx="-116" cy="0" r="1.2"></circle>
+      <circle cx="116" cy="0" r="1.2"></circle>
+    </g>
+
+    
+    <circle r="72" fill="none" stroke="hsl(32 75% 52%)" stroke-width="1.1" opacity="0.9"></circle>
+    
+    <circle r="92" fill="none" stroke="hsl(32 50% 45%)" stroke-width="0.6" opacity="0.35" stroke-dasharray="2 5"></circle>
+
+    
+    <circle r="36" fill="url(#al-corona)" opacity="0.9"></circle>
+
+    
+    <g>
+      <rect x="-1" y="-96" width="2" height="192" fill="url(#al-ray)"></rect>
+      <rect x="-0.4" y="-72" width="0.8" height="144" fill="hsl(55 100% 96%)" opacity="0.85"></rect>
+      <rect x="-38" y="-0.5" width="76" height="1" fill="url(#al-ray)" opacity="0.7"></rect>
+      <g opacity="0.35">
+        <rect x="-0.3" y="-26" width="0.6" height="52" fill="url(#al-ray)" transform="rotate(45)"></rect>
+        <rect x="-0.3" y="-26" width="0.6" height="52" fill="url(#al-ray)" transform="rotate(-45)"></rect>
+      </g>
+    </g>
+
+    
+    <circle r="6.5" fill="url(#al-core)"></circle>
+    <circle r="2.6" fill="hsl(55 100% 97%)"></circle>
+  </g>
+</svg>

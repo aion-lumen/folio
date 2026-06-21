@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LIFE Dashboard — Shell Snapshot 2026-04-22</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+/* ── Design Tokens ── */
+:root {
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(222.2 84% 4.9%);
+  --color-card: hsl(0 0% 100%);
+  --color-border: hsl(214.3 31.8% 91.4%);
+  --color-muted: hsl(210 40% 96.1%);
+  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --color-primary: hsl(222.2 47.4% 11.2%);
+  --color-lumen: hsl(32 100% 60%);
+  --color-lumen-ember: hsl(20 80% 38%);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: var(--color-background); color: var(--color-foreground); font-size: 14px; line-height: 1.5; }
+button { font-family: inherit; cursor: pointer; }
+
+/* ── Shell Layout ── */
+.shell { display: flex; height: 100vh; overflow: hidden; background: var(--color-background); }
+.content { display: flex; flex: 1; flex-direction: column; overflow: hidden; min-width: 0; }
+.main-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 1.5rem; }
+.resize-handle { flex-shrink: 0; width: 4px; background: var(--color-border); }
+.chat-wrapper { flex-shrink: 0; width: 380px; height: 100%; display: flex; flex-direction: column; border-left: 1px solid var(--color-border); }
+
+/* ── Sidebar ── */
+.sidebar { width: 240px; height: 100%; display: flex; flex-direction: column; border-right: 1px solid var(--color-border); background: var(--color-card); flex-shrink: 0; overflow: hidden; }
+.sidebar-collapse-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 6px; }
+.sidebar-title { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--color-muted-foreground); text-transform: uppercase; padding-left: 4px; }
+.collapse-btn { background: none; border: none; color: var(--color-muted-foreground); padding: 4px; border-radius: 5px; display: flex; align-items: center; margin-left: auto; font-size: 13px; }
+.sb-section { padding: 4px 8px; border-top: 1px solid var(--color-border); }
+.sb-section.shortcuts { margin-top: auto; }
+.sb-header { font-size: 10px; font-weight: 600; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-muted-foreground); margin: 6px 4px 4px; opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-item { display: flex; align-items: center; gap: 8px; width: 100%; background: none; border: none; color: var(--color-muted-foreground); padding: 6px 8px; border-radius: 6px; font-size: 13px; text-align: left; }
+.nav-item.active { background: var(--color-lumen); color: hsl(0 0% 10%); font-weight: 500; }
+.chapter-item { display: flex; align-items: center; gap: 6px; width: 100%; background: none; border: none; color: var(--color-muted-foreground); padding: 5px 8px; border-radius: 5px; font-size: 12px; text-align: left; }
+.chapter-item.active { color: var(--color-lumen); font-weight: 500; }
+.chapter-ind { opacity: 0.4; font-size: 13px; }
+.chapter-item.active .chapter-ind { opacity: 1; }
+
+/* ── Top Bar ── */
+.topbar { display: flex; align-items: center; height: 56px; padding: 0 16px; border-bottom: 1px solid var(--color-border); background: var(--color-card); flex-shrink: 0; position: relative; gap: 0; }
+.brand { display: flex; align-items: center; gap: 8px; text-decoration: none; color: var(--color-foreground); flex-shrink: 0; }
+.mark-wrap { display: flex; align-items: center; color: var(--color-lumen); }
+.wordmark { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+.wordmark-sep { color: var(--color-lumen); }
+.breadcrumb { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; font-size: 13px; min-width: 0; overflow: hidden; }
+.crumb-user { color: var(--color-muted-foreground); white-space: nowrap; }
+.crumb-sep { color: var(--color-border); font-size: 12px; }
+.crumb-link { color: var(--color-foreground); text-decoration: none; white-space: nowrap; }
+.crumb-static { color: var(--color-muted-foreground); white-space: nowrap; }
+.actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.action-btn { display: flex; align-items: center; gap: 5px; background: none; border: none; color: var(--color-muted-foreground); font-size: 11px; font-weight: 500; letter-spacing: 0.04em; padding: 5px 8px; border-radius: 6px; }
+.sync-status { display: flex; align-items: center; gap: 5px; padding: 4px 8px; font-size: 11px; color: var(--color-muted-foreground); }
+.sync-dot { width: 7px; height: 7px; border-radius: 50%; background: hsl(142 71% 45%); flex-shrink: 0; }
+.sync-time { opacity: 0.7; }
+.kbd-hint { font-size: 11px; padding: 5px 8px; border-radius: 6px; background: none; border: none; color: var(--color-muted-foreground); }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--color-lumen); color: hsl(0 0% 10%); font-size: 11px; font-weight: 700; border: none; display: flex; align-items: center; justify-content: center; letter-spacing: 0.03em; }
+
+/* ── Campaign Timeline ── */
+.tl-wrap { padding: 12px 20px 10px; border-bottom: 1px solid var(--color-border); background: hsl(210 40% 99%); }
+.tl-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; font-weight: 500; color: var(--color-muted-foreground); }
+.tl-meta { font-family: var(--font-mono); color: var(--color-foreground); letter-spacing: 0.05em; text-transform: none; font-size: 11px; }
+.tl-range { margin-left: auto; font-family: var(--font-mono); font-size: 11px; text-transform: none; letter-spacing: 0.02em; }
+.tl-acts { display: flex; gap: 3px; position: relative; margin-bottom: 4px; }
+.tl-act { position: relative; padding-top: 26px; padding-bottom: 6px; border-radius: 6px; min-width: 0; background: none; border: none; text-align: left; }
+.tl-act.active .act-roman { color: var(--color-lumen); }
+.tl-act.active .act-label { color: var(--color-foreground); font-weight: 600; }
+.tl-act.selected:not(.active) { box-shadow: 0 0 0 1.5px var(--color-lumen); }
+.act-bar { position: absolute; top: 10px; left: 4px; right: 4px; height: 6px; background: var(--color-muted); border-radius: 3px; overflow: hidden; }
+.tl-act.active .act-bar { background: hsl(32 100% 60% / 0.18); box-shadow: 0 0 0 1px hsl(32 100% 60% / 0.35); }
+.act-fill { position: absolute; inset: 0; background: var(--color-primary); border-radius: 3px; }
+.tl-act.active .act-fill { background: var(--color-lumen); box-shadow: 0 0 8px hsl(32 100% 60% / 0.55); }
+.act-roman { font-family: var(--font-mono); font-size: 9px; color: var(--color-muted-foreground); letter-spacing: 0.1em; padding: 0 6px; margin-bottom: 2px; text-transform: uppercase; }
+.act-label { font-size: 11px; font-weight: 500; color: var(--color-muted-foreground); padding: 0 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tl-now { position: absolute; top: 2px; width: 2px; height: 22px; background: var(--color-lumen); border-radius: 1px; box-shadow: 0 0 6px hsl(32 100% 60% / 0.65); transform: translateX(-50%); pointer-events: none; }
+.tl-ticks { position: relative; height: 14px; }
+.tl-ticks span { position: absolute; font-family: var(--font-mono); font-size: 9px; color: var(--color-muted-foreground); transform: translateX(-50%); }
+
+/* ── Chapter Banner ── */
+.banner { position: relative; padding: 14px 20px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-card); }
+.banner-toggle { position: absolute; top: 10px; right: 16px; background: none; border: none; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--color-muted-foreground); padding: 2px 8px; border-radius: 4px; }
+.bar-head { display: flex; align-items: center; gap: 10px; padding-right: 100px; }
+.bar-crumb { font-family: var(--font-mono); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-lumen); white-space: nowrap; }
+.bar-motto { font-size: 12px; color: var(--color-muted-foreground); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.banner-body { display: grid; grid-template-columns: minmax(0,2fr) minmax(0,3fr); gap: 20px 32px; margin-top: 14px; align-items: start; }
+.banner-left { min-width: 0; }
+.breadcrumb-full { font-family: var(--font-mono); font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-lumen); margin-bottom: 6px; display: flex; align-items: center; gap: 4px; }
+.breadcrumb-full::before { content: ''; display: inline-block; width: 5px; height: 5px; border-radius: 50%; background: var(--color-lumen); box-shadow: 0 0 6px var(--color-lumen); flex-shrink: 0; }
+.chapter-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; margin: 0 0 4px; color: var(--color-foreground); }
+.chapter-motto { font-size: 13px; font-style: italic; color: var(--color-muted-foreground); line-height: 1.4; }
+.banner-right { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.paths-strip { display: flex; flex-direction: column; gap: 5px; }
+.p-row { display: grid; grid-template-columns: minmax(60px,1fr) 36px minmax(80px,2fr); align-items: center; gap: 8px; }
+.p-name { font-size: 11px; font-weight: 500; color: var(--color-foreground); text-transform: capitalize; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.p-count { font-family: var(--font-mono); font-size: 10px; color: var(--color-muted-foreground); text-align: right; }
+.p-bar { height: 4px; background: var(--color-muted); border-radius: 2px; overflow: hidden; }
+.p-bar-fill { display: block; height: 100%; background: var(--color-primary); border-radius: 2px; }
+.p-row.selected .p-name { color: var(--color-lumen-ember); font-weight: 700; }
+.p-row.selected .p-bar-fill { background: var(--color-lumen); }
+.kpis { display: flex; flex-direction: row; gap: 24px; padding-top: 8px; border-top: 1px solid var(--color-border); }
+.stat-k { font-size: 9px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-muted-foreground); margin-bottom: 2px; }
+.stat-v { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; color: var(--color-foreground); }
+.stat-v small { font-size: 12px; font-weight: 500; color: var(--color-muted-foreground); }
+
+/* ── Chapter Tabs ── */
+.chapter-tabs { display: flex; gap: 2px; padding: 8px 20px 0; border-bottom: 1px solid var(--color-border); background: var(--color-card); }
+.tab { padding: 6px 14px 8px; border: none; background: none; font-size: 12px; font-weight: 500; color: var(--color-muted-foreground); border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+.tab.active { color: var(--color-foreground); border-bottom-color: var(--color-lumen); }
+
+/* ── Kanban ── */
+.kanban { display: flex; gap: 12px; align-items: flex-start; padding-bottom: 2rem; }
+.kanban-col { flex: 1; min-width: 180px; background: var(--color-muted); border-radius: 8px; overflow: hidden; }
+.col-head { padding: 10px 12px 8px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid var(--color-border); }
+.col-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-muted-foreground); }
+.col-count { font-family: var(--font-mono); font-size: 10px; color: var(--color-muted-foreground); background: var(--color-card); padding: 1px 6px; border-radius: 10px; border: 1px solid var(--color-border); }
+.col-cards { padding: 8px; display: flex; flex-direction: column; gap: 6px; min-height: 60px; }
+.col-empty { padding: 8px 12px 12px; font-size: 12px; color: var(--color-muted-foreground); opacity: 0.6; font-style: italic; }
+
+/* ── Objective Cards ── */
+.card { background: var(--color-card); border-radius: 6px; border: 1px solid var(--color-border); padding: 10px 12px; cursor: pointer; }
+.card.selected { border-color: var(--color-lumen); box-shadow: 0 0 0 1px var(--color-lumen); }
+.card-id { font-family: var(--font-mono); font-size: 9px; color: var(--color-muted-foreground); letter-spacing: 0.08em; margin-bottom: 4px; display: flex; align-items: center; justify-content: space-between; }
+.star { color: var(--color-lumen); font-size: 11px; }
+.card-title { font-size: 12px; font-weight: 500; color: var(--color-foreground); line-height: 1.35; margin-bottom: 4px; }
+.card-note { font-size: 11px; color: var(--color-muted-foreground); line-height: 1.3; margin-bottom: 6px; }
+.card-goals { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 6px; }
+.goal-tag { font-size: 10px; padding: 1px 6px; border-radius: 10px; background: var(--color-muted); color: var(--color-muted-foreground); text-transform: capitalize; }
+.card-deadline { font-family: var(--font-mono); font-size: 10px; color: hsl(0 72% 55%); margin-bottom: 5px; }
+.card-progress { height: 3px; background: var(--color-muted); border-radius: 2px; overflow: hidden; }
+.card-progress-fill { height: 100%; background: var(--color-primary); border-radius: 2px; }
+.card.selected .card-progress-fill { background: var(--color-lumen); }
+
+/* ── Chat Panel ── */
+.chat-panel { display: flex; flex-direction: column; height: 100%; background: var(--color-card); }
+.chat-head { display: flex; align-items: center; gap: 8px; padding: 0 12px; height: 48px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
+.chat-head-info { flex: 1; min-width: 0; }
+.chat-head-title { font-size: 13px; font-weight: 600; color: var(--color-foreground); }
+.chat-head-sub { font-size: 11px; color: var(--color-muted-foreground); }
+.chat-icon-btn { background: none; border: none; color: var(--color-muted-foreground); padding: 4px; border-radius: 5px; display: flex; align-items: center; }
+.chat-messages { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 90%; }
+.msg-user { align-self: flex-end; }
+.msg-assistant { align-self: flex-start; }
+.msg-bubble { padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.45; }
+.msg-user .msg-bubble { background: var(--color-primary); color: hsl(210 40% 98%); border-radius: 10px 10px 2px 10px; }
+.msg-assistant .msg-bubble { background: var(--color-muted); color: var(--color-foreground); border-radius: 10px 10px 10px 2px; }
+.msg-tool { align-self: flex-start; font-family: var(--font-mono); font-size: 10px; color: var(--color-muted-foreground); background: var(--color-muted); padding: 3px 8px; border-radius: 4px; border-left: 2px solid var(--color-border); }
+.chat-selected-bar { padding: 6px 12px; border-top: 1px solid var(--color-border); background: hsl(32 100% 60% / 0.06); display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-lumen-ember); flex-shrink: 0; }
+.chat-input-wrap { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--color-border); flex-shrink: 0; }
+.chat-input { flex: 1; resize: none; border: 1px solid var(--color-border); border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: var(--font-sans); color: var(--color-foreground); background: var(--color-background); outline: none; line-height: 1.4; }
+.chat-send { background: var(--color-primary); color: hsl(210 40% 98%); border: none; border-radius: 7px; padding: 8px 12px; font-size: 12px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-collapse-row">
+      <span class="sidebar-title">Navigation</span>
+      <button class="collapse-btn">‹</button>
+    </div>
+
+    <!-- Kampagnen -->
+    <div class="sb-section">
+      <p class="sb-header">Kampagnen</p>
+      <button class="nav-item active">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 16l4.553 2.276A1 1 0 0021 24.382V8.618a1 1 0 00-1.447-.894L15 10m0 13V10M9 7l6-3"/></svg>
+        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">10-Jahres-Kampagne</span>
+      </button>
+    </div>
+
+    <!-- Kapitel -->
+    <div class="sb-section" style="flex:1;overflow-y:auto">
+      <p class="sb-header" title="Kapitel · Akt I · Fundament" style="letter-spacing:0.05em">Kapitel · Akt I · Fundament</p>
+      <button class="chapter-item active">
+        <span class="chapter-ind">›</span>
+        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Repositionierung</span>
+      </button>
+      <button class="chapter-item">
+        <span class="chapter-ind">›</span>
+        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">Durchbruch</span>
+      </button>
+    </div>
+
+    <!-- Shortcuts -->
+    <div class="sb-section shortcuts">
+      <p class="sb-header">Shortcuts</p>
+      <button class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+        <span style="flex:1">Leuchtfeuer</span>
+        <span style="background:var(--color-muted);color:var(--color-muted-foreground);font-size:10px;font-weight:600;padding:1px 5px;border-radius:10px">3</span>
+      </button>
+      <button class="nav-item">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+        <span>Vault</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ── Main Content ── -->
+  <div class="content">
+
+    <!-- Top Bar -->
+    <header class="topbar">
+      <a href="#" class="brand">
+        <span class="mark-wrap">
+          <svg width="20" height="20" viewBox="0 0 64 64" fill="none">
+            <path d="M32 4 L60 32 L32 60 L4 32 Z" stroke="currentColor" stroke-width="0.5" opacity="0.3"/>
+            <circle cx="32" cy="32" r="20" stroke="currentColor" stroke-width="1" fill="none" opacity="0.7"/>
+            <line x1="32" y1="6" x2="32" y2="58" stroke="currentColor" stroke-width="0.5" opacity="0.4"/>
+            <line x1="6" y1="32" x2="58" y2="32" stroke="currentColor" stroke-width="0.3" opacity="0.3"/>
+            <circle cx="32" cy="32" r="3" fill="currentColor"/>
+            <circle cx="32" cy="32" r="6" fill="currentColor" opacity="0.4"/>
+            <circle cx="32" cy="32" r="10" fill="currentColor" opacity="0.15"/>
+          </svg>
+        </span>
+        <span class="wordmark">LIFE <span class="wordmark-sep">•</span> Dashboard</span>
+      </a>
+
+      <nav class="breadcrumb">
+        <span class="crumb-user">Afschin</span>
+        <span class="crumb-sep">·</span>
+        <a href="#" class="crumb-link">10-Jahres-Kampagne</a>
+        <span class="crumb-sep">›</span>
+        <a href="#" class="crumb-link">Akt I</a>
+        <span class="crumb-sep">›</span>
+        <span class="crumb-static">Kapitel 1</span>
+      </nav>
+
+      <div class="actions">
+        <button class="action-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          FOKUS
+        </button>
+        <div class="sync-status">
+          <span class="sync-dot"></span>
+          <span>vault.local</span>
+          <span class="sync-time">synced 18:42</span>
+        </div>
+        <button class="kbd-hint"><kbd style="font-family:inherit;font-size:11px;font-weight:500">⌘K</kbd></button>
+        <button class="action-btn" style="padding:5px 6px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
+        </button>
+        <div class="avatar">AM</div>
+      </div>
+    </header>
+
+    <!-- Main scroll area -->
+    <main class="main-area" style="padding:0">
+
+      <!-- Campaign Timeline -->
+      <div class="tl-wrap">
+        <div class="tl-head">
+          <span>Kampagne</span>
+          <span class="tl-meta">120 Monate · Monat 4</span>
+          <span class="tl-range">2026 — 2036</span>
+        </div>
+        <div class="tl-acts">
+          <!-- Act I: months 0-24, active, 4 months in = 16.7% fill -->
+          <button class="tl-act active selected" style="flex:24 24 0">
+            <div class="act-bar"><div class="act-fill" style="width:16.7%"></div></div>
+            <div class="act-roman">AKT I</div>
+            <div class="act-label">Fundament</div>
+          </button>
+          <!-- Act II: months 24-48 -->
+          <button class="tl-act" style="flex:24 24 0">
+            <div class="act-bar"><div class="act-fill" style="width:0%"></div></div>
+            <div class="act-roman">AKT II</div>
+            <div class="act-label">Aufbau</div>
+          </button>
+          <!-- Act III: months 48-72 -->
+          <button class="tl-act" style="flex:24 24 0">
+            <div class="act-bar"><div class="act-fill" style="width:0%"></div></div>
+            <div class="act-roman">AKT III</div>
+            <div class="act-label">Verdichtung</div>
+          </button>
+          <!-- Act IV: months 72-96 -->
+          <button class="tl-act" style="flex:24 24 0">
+            <div class="act-bar"><div class="act-fill" style="width:0%"></div></div>
+            <div class="act-roman">AKT IV</div>
+            <div class="act-label">Skalierung</div>
+          </button>
+          <!-- Act V: months 96-120 -->
+          <button class="tl-act" style="flex:24 24 0">
+            <div class="act-bar"><div class="act-fill" style="width:0%"></div></div>
+            <div class="act-roman">AKT V</div>
+            <div class="act-label">Vollbild</div>
+          </button>
+          <div class="tl-now" style="left:3.33%"></div>
+        </div>
+        <div class="tl-ticks">
+          <span style="left:0%">2026</span>
+          <span style="left:20%">2028</span>
+          <span style="left:40%">2030</span>
+          <span style="left:60%">2032</span>
+          <span style="left:80%">2034</span>
+          <span style="left:100%">2036</span>
+        </div>
+      </div>
+
+      <!-- Chapter Banner -->
+      <div class="banner">
+        <button class="banner-toggle">▴ Kapitel</button>
+        <div class="bar-head">
+          <span class="bar-crumb">AKT I · KAP 1</span>
+          <span class="bar-motto">Repositionierung · Der Boden wird bereitet, bevor gebaut wird</span>
+        </div>
+        <div class="banner-body">
+          <div class="banner-left">
+            <div class="breadcrumb-full">AKT I · FUNDAMENT · KAPITEL 1</div>
+            <h2 class="chapter-title">Repositionierung</h2>
+            <p class="chapter-motto">Der Boden wird bereitet,<br>bevor gebaut wird</p>
+          </div>
+          <div class="banner-right">
+            <div class="paths-strip">
+              <div class="p-row selected">
+                <span class="p-name">Karriere</span>
+                <span class="p-count">1/4</span>
+                <div class="p-bar"><span class="p-bar-fill" style="width:25%"></span></div>
+              </div>
+              <div class="p-row">
+                <span class="p-name">Finanzen</span>
+                <span class="p-count">0/2</span>
+                <div class="p-bar"><span class="p-bar-fill" style="width:0%"></span></div>
+              </div>
+              <div class="p-row">
+                <span class="p-name">AI-Bauen</span>
+                <span class="p-count">1/2</span>
+                <div class="p-bar"><span class="p-bar-fill" style="width:50%"></span></div>
+              </div>
+              <div class="p-row">
+                <span class="p-name">Familie</span>
+                <span class="p-count">0/1</span>
+                <div class="p-bar"><span class="p-bar-fill" style="width:0%"></span></div>
+              </div>
+            </div>
+            <div class="kpis">
+              <div class="stat">
+                <div class="stat-k">Fortschritt</div>
+                <div class="stat-v">22<small>%</small></div>
+              </div>
+              <div class="stat">
+                <div class="stat-k">Aktive Ziele</div>
+                <div class="stat-v">5</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chapter Tabs -->
+      <div class="chapter-tabs">
+        <button class="tab active">Kapitel 1 · Repositionierung</button>
+        <button class="tab">Kapitel 2 · Durchbruch</button>
+      </div>
+
+      <!-- Kanban -->
+      <div style="padding:1.25rem 1.25rem 2rem;overflow-x:auto">
+        <div class="kanban">
+
+          <!-- Offen -->
+          <div class="kanban-col">
+            <div class="col-head">
+              <span class="col-label">Offen</span>
+              <span class="col-count">2</span>
+            </div>
+            <div class="col-cards">
+              <div class="card">
+                <div class="card-id">obj-01-01</div>
+                <div class="card-title">Netzwerk reaktivieren</div>
+                <div class="card-note">LinkedIn + 3 direkte Kontakte aus letzter Stelle...</div>
+                <div class="card-goals"><span class="goal-tag">Karriere</span></div>
+              </div>
+              <div class="card">
+                <div class="card-id">obj-01-03</div>
+                <div class="card-title">Remote-Profil aufbauen</div>
+                <div class="card-note">GitHub + Portfolio-Seite für remote-Bewerbungen</div>
+                <div class="card-goals"><span class="goal-tag">Karriere</span><span class="goal-tag">AI-Bauen</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- In Arbeit -->
+          <div class="kanban-col">
+            <div class="col-head">
+              <span class="col-label">In Arbeit</span>
+              <span class="col-count">2</span>
+            </div>
+            <div class="col-cards">
+              <div class="card selected">
+                <div class="card-id">obj-01-02 <span class="star">★</span></div>
+                <div class="card-title">Job-Suche starten</div>
+                <div class="card-note">4 von 12 Bewerbungen versendet</div>
+                <div class="card-goals"><span class="goal-tag">Karriere</span></div>
+                <div class="card-deadline">⏱ 2026-05-15</div>
+                <div class="card-progress"><div class="card-progress-fill" style="width:33%"></div></div>
+              </div>
+              <div class="card">
+                <div class="card-id">obj-01-06 <span class="star">★</span></div>
+                <div class="card-title">Partner's Weiterbildungsweg definiert</div>
+                <div class="card-note">Gespräch geführt, Optionen recherchiert</div>
+                <div class="card-goals"><span class="goal-tag">Familie</span></div>
+                <div class="card-progress"><div class="card-progress-fill" style="width:60%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blockiert -->
+          <div class="kanban-col">
+            <div class="col-head">
+              <span class="col-label">Blockiert</span>
+              <span class="col-count">1</span>
+            </div>
+            <div class="col-cards">
+              <div class="card">
+                <div class="card-id">obj-01-04</div>
+                <div class="card-title">Steueroptimierung 2026</div>
+                <div class="card-note">Wartet auf Treffen mit Steuerberater</div>
+                <div class="card-goals"><span class="goal-tag">Finanzen</span></div>
+                <div class="card-deadline" style="color:hsl(0 72% 55%)">⏱ 2026-06-01</div>
+                <div class="card-progress"><div class="card-progress-fill" style="width:10%"></div></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Erledigt -->
+          <div class="kanban-col">
+            <div class="col-head">
+              <span class="col-label">Erledigt</span>
+              <span class="col-count">1</span>
+            </div>
+            <div class="col-cards">
+              <div class="card" style="opacity:0.65">
+                <div class="card-id">obj-01-05</div>
+                <div class="card-title">LIFE-Vault aufsetzen</div>
+                <div class="card-goals"><span class="goal-tag">AI-Bauen</span></div>
+                <div class="card-progress"><div class="card-progress-fill" style="width:100%;background:hsl(142 71% 45%)"></div></div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </main>
+  </div><!-- /content -->
+
+  <!-- Resize handle -->
+  <div class="resize-handle"></div>
+
+  <!-- ── Chat Panel ── -->
+  <div class="chat-wrapper">
+    <div class="chat-panel">
+      <div class="chat-head">
+        <button class="chat-icon-btn" style="margin-right:2px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <div class="chat-head-info">
+          <div class="chat-head-title">Hermes</div>
+          <div class="chat-head-sub">Strategisch · Kapitel 1</div>
+        </div>
+        <div style="display:flex;gap:4px">
+          <button class="chat-icon-btn" title="Chat löschen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg>
+          </button>
+          <button class="chat-icon-btn" title="Schließen">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-messages">
+        <div class="msg msg-user">
+          <div class="msg-bubble">Was ist der nächste logische Schritt für obj-01-02?</div>
+        </div>
+        <div class="msg msg-tool">📂 file_read · _campaign/chapters/01-repositionierung.md</div>
+        <div class="msg msg-assistant">
+          <div class="msg-bubble">Du hast 4 von 12 Bewerbungen versendet und bis Mitte Mai noch 3 Wochen. Ich würde empfehlen, die nächsten 2 Bewerbungen diese Woche auf Firmen zu fokussieren, die Remote explizit ausschreiben — dein GitHub-Portfolio (obj-01-03) sollte dafür fertig sein. Soll ich die offenen Zielfirmen aus deiner Liste priorisieren?</div>
+        </div>
+        <div class="msg msg-user">
+          <div class="msg-bubble">Ja, zeig mir die Top 3</div>
+        </div>
+        <div class="msg msg-assistant">
+          <div class="msg-bubble">Basierend auf deinen Kriterien (Remote, AI-Fokus, CH/DE):<br><br>1. <strong>Deepmind Zürich</strong> — Deadline unbekannt, aber aktive Ausschreibung<br>2. <strong>Mistral AI</strong> — Remote-first, matches dein AI-Bauen-Ziel<br>3. <strong>Infomaniak</strong> — CH-basiert, Remote möglich nach 6 Monaten</div>
+        </div>
+      </div>
+
+      <div class="chat-selected-bar">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg>
+        1 Objective ausgewählt · obj-01-02
+      </div>
+
+      <div class="chat-input-wrap">
+        <textarea class="chat-input" rows="1" placeholder="Nachricht an Hermes…"></textarea>
+        <button class="chat-send">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          Senden
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /shell -->
+
+</body>
+</html>

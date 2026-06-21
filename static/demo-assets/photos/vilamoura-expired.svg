@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#94a3b8"/>
+      <stop offset="55%" stop-color="#475569"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <!-- desaturated golf+sea horizon -->
+  <rect x="0" y="400" width="800" height="200" fill="#1e293b" opacity="0.5"/>
+  <path d="M0 400 Q 200 380 400 395 T 800 390 L800 600 L0 600 Z" fill="#0f172a" opacity="0.55"/>
+  <!-- modern apartment block -->
+  <g transform="translate(540,170)" fill="#cbd5e1" opacity="0.85">
+    <rect x="0" y="40" width="160" height="160" rx="4"/>
+    <rect x="-10" y="180" width="180" height="22"/>
+    <rect x="20" y="60" width="30" height="30" fill="#0f172a"/>
+    <rect x="65" y="60" width="30" height="30" fill="#0f172a"/>
+    <rect x="110" y="60" width="30" height="30" fill="#0f172a"/>
+    <rect x="20" y="105" width="30" height="30" fill="#0f172a"/>
+    <rect x="65" y="105" width="30" height="30" fill="#0f172a"/>
+    <rect x="110" y="105" width="30" height="30" fill="#0f172a"/>
+  </g>
+  <!-- diagonal EXPIRED stamp -->
+  <g transform="translate(400,300) rotate(-18)">
+    <rect x="-260" y="-60" width="520" height="120" rx="8" fill="#dc2626" opacity="0.85" stroke="#7f1d1d" stroke-width="4"/>
+    <text x="0" y="22" font-size="78" font-weight="800" fill="#fff" text-anchor="middle" letter-spacing="6">EXPIRED</text>
+  </g>
+  <!-- text -->
+  <text x="60" y="200" font-size="52" font-weight="700" fill="#fff" letter-spacing="-1" opacity="0.85">VILAMOURA</text>
+  <text x="60" y="240" font-size="28" font-weight="500" fill="#cbd5e1" opacity="0.85">T2 · golf-side</text>
+  <text x="60" y="510" font-size="36" font-weight="600" fill="#cbd5e1" opacity="0.7">410.000 EUR · 80 m² · listing expired</text>
+  <text x="60" y="555" font-size="20" fill="#94a3b8" font-family="ui-monospace,'SF Mono',monospace">demo-vilamoura-expired · last seen 1 month ago</text>
+</svg>

@@ -1,0 +1,42 @@
+{
+	"name": "folio",
+	"homepage": "https://aion-lumen.ch/folio",
+	"private": true,
+	"version": "0.1.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.60.0",
+		"@sveltejs/adapter-auto": "^7.0.1",
+		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/vite-plugin-svelte": "^7.0.0",
+		"@tailwindcss/vite": "^4.2.2",
+		"@types/better-sqlite3": "^7.6.13",
+		"@types/node": "^25.6.0",
+		"svelte": "^5.55.2",
+		"svelte-check": "^4.4.6",
+		"tailwindcss": "^4.2.2",
+		"typescript": "^6.0.2",
+		"vite": "^8.0.7",
+		"vitest": "^3.2.4"
+	},
+	"dependencies": {
+		"@tanstack/svelte-virtual": "^3.13.24",
+		"better-sqlite3": "^12.9.0",
+		"chokidar": "^5.0.0",
+		"gray-matter": "^4.0.3",
+		"lucide-svelte": "^0.474.0",
+		"marked": "^18.0.1",
+		"svelte-dnd-action": "^0.9.69",
+		"yaml": "^2.8.4"
+	}
+}

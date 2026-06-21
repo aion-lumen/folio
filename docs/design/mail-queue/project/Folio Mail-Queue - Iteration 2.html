@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="de-CH">
+<head>
+  <meta charset="utf-8" />
+  <title>Folio Mail-Queue · Iteration 2 · Multi-Account Hi-Fi</title>
+  <link rel="stylesheet" href="colors_and_type.css" />
+  <style>
+    html, body { height: 100%; margin: 0; overflow: hidden; }
+    #root { height: 100vh; }
+    body { padding: 0; }
+
+    @keyframes pulse {
+      0%   { transform: scale(0.6); opacity: 0.9; }
+      70%  { transform: scale(1.6); opacity: 0; }
+      100% { transform: scale(1.6); opacity: 0; }
+    }
+
+    /* Scrollbar polish */
+    *::-webkit-scrollbar { width: 10px; height: 10px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb {
+      background: hsl(214 32% 86%); border-radius: 999px;
+      border: 2px solid var(--color-background);
+    }
+    *::-webkit-scrollbar-thumb:hover { background: hsl(215 20% 72%); }
+
+    /* Reset button defaults — we use buttons everywhere for click targets */
+    button { font: inherit; color: inherit; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+  <script src="sample-data-v2.js"></script>
+  <script type="text/babel" src="design-canvas.jsx"></script>
+  <script type="text/babel" src="mq-shared.jsx"></script>
+  <script type="text/babel" src="mq-list.jsx"></script>
+  <script type="text/babel" src="mq-main.jsx"></script>
+  <script type="text/babel" src="main-v2.jsx"></script>
+</body>
+</html>

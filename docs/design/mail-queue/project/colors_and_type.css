@@ -1,0 +1,337 @@
+/* Aion Lumen — Colors & Type
+ *
+ * Brand fonts:
+ *   · Inter           — UI / body / headings (400 500 600 700)
+ *   · JetBrains Mono  — IDs / code / timestamps (400 500)
+ * Both are OFL-licensed, self-hosted as woff2 in ./fonts/ — no external
+ * font-CDN requests (local-first philosophy).
+ */
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/Inter-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/Inter-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("fonts/Inter-SemiBold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("fonts/Inter-Bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("fonts/JetBrainsMono-Medium.woff2") format("woff2");
+}
+
+/*
+ * Ported from src/app.css (Tailwind v4 @theme block → CSS vars).
+ * Base tokens (fg/bg/card/primary/…) mirror the shadcn-style palette used in
+ * life-dashboard. Semantic aliases (--h1, --p, --code, …) sit on top so HTML
+ * artifacts can style headings/body without importing Tailwind.
+ *
+ * The product is local-first, Markdown-native, restrained grayscale UI with
+ * functional semantic colors. NO gradients, NO brand accent color in v0.1 —
+ * the "color" is primary = deep navy slate, and that's it.
+ */
+
+:root {
+  /* ── Base palette (hsl values; also exposed as composed color for convenience) ── */
+  --hsl-background:         0 0% 100%;
+  --hsl-foreground:         222.2 84% 4.9%;
+
+  --hsl-card:               0 0% 100%;
+  --hsl-card-foreground:    222.2 84% 4.9%;
+
+  --hsl-popover:            0 0% 100%;
+  --hsl-popover-foreground: 222.2 84% 4.9%;
+
+  --hsl-primary:            222.2 47.4% 11.2%;  /* near-black slate */
+  --hsl-primary-foreground: 210 40% 98%;
+
+  --hsl-secondary:          210 40% 96.1%;
+  --hsl-secondary-foreground: 222.2 47.4% 11.2%;
+
+  --hsl-muted:              210 40% 96.1%;
+  --hsl-muted-foreground:   215.4 16.3% 46.9%;
+
+  --hsl-accent:             210 40% 96.1%;
+  --hsl-accent-foreground:  222.2 47.4% 11.2%;
+
+  --hsl-destructive:        0 84.2% 60.2%;
+  --hsl-destructive-foreground: 210 40% 98%;
+
+  --hsl-border:             214.3 31.8% 91.4%;
+  --hsl-input:              214.3 31.8% 91.4%;
+  --hsl-ring:               222.2 84% 4.9%;
+
+  /* ── Composed colors (what you actually use in `background`, `color`, …) ── */
+  --color-background:         hsl(var(--hsl-background));
+  --color-foreground:         hsl(var(--hsl-foreground));
+  --color-card:               hsl(var(--hsl-card));
+  --color-card-foreground:    hsl(var(--hsl-card-foreground));
+  --color-popover:            hsl(var(--hsl-popover));
+  --color-popover-foreground: hsl(var(--hsl-popover-foreground));
+  --color-primary:            hsl(var(--hsl-primary));
+  --color-primary-foreground: hsl(var(--hsl-primary-foreground));
+  --color-secondary:          hsl(var(--hsl-secondary));
+  --color-secondary-foreground: hsl(var(--hsl-secondary-foreground));
+  --color-muted:              hsl(var(--hsl-muted));
+  --color-muted-foreground:   hsl(var(--hsl-muted-foreground));
+  --color-accent:             hsl(var(--hsl-accent));
+  --color-accent-foreground:  hsl(var(--hsl-accent-foreground));
+  --color-destructive:        hsl(var(--hsl-destructive));
+  --color-destructive-foreground: hsl(var(--hsl-destructive-foreground));
+  --color-border:             hsl(var(--hsl-border));
+  --color-input:              hsl(var(--hsl-input));
+  --color-ring:               hsl(var(--hsl-ring));
+
+  /* ── Semantic status colors (seen inline across Kanban, Gantt, icons) ──
+   * These are Tailwind palette refs used in the source (text-green-500,
+   * bg-blue-50, text-red-600 …). Captured as named tokens here so HTML
+   * artifacts can reuse them without pulling Tailwind in. */
+  --color-status-not-started-bg: hsl(210 40% 98%);   /* slate-50  */
+  --color-status-not-started-border: hsl(214 32% 91%); /* slate-200 */
+  --color-status-not-started-fg: hsl(215 20% 45%);   /* slate-600 */
+
+  --color-status-in-progress-bg: hsl(214 100% 97%);  /* blue-50   */
+  --color-status-in-progress-border: hsl(213 97% 87%); /* blue-200 */
+  --color-status-in-progress-fg: hsl(217 91% 45%);   /* blue-700  */
+  --color-status-in-progress-icon: hsl(217 91% 60%); /* blue-500  */
+
+  --color-status-blocked-bg: hsl(0 86% 97%);          /* red-50    */
+  --color-status-blocked-border: hsl(0 96% 89%);      /* red-200   */
+  --color-status-blocked-fg: hsl(0 74% 42%);          /* red-700   */
+  --color-status-blocked-icon: hsl(0 84% 60%);        /* red-500   */
+
+  --color-status-done-bg: hsl(138 76% 97%);           /* green-50  */
+  --color-status-done-border: hsl(141 79% 85%);       /* green-200 */
+  --color-status-done-fg: hsl(142 72% 29%);           /* green-700 */
+  --color-status-done-icon: hsl(142 71% 45%);         /* green-500 */
+
+  --color-status-deadline: hsl(25 95% 45%);           /* orange-600 — used on AlarmClock rows */
+  --color-status-overdue:  hsl(0 74% 50%);            /* red-600 */
+
+  /* Path / act accent tints (for ActCard fallbacks & path tags) */
+  --color-path-a: hsl(262 83% 58%);                   /* violet-500 */
+  --color-path-b: hsl(14  91% 55%);                   /* orange-500 */
+  --color-path-c: hsl(172 66% 45%);                   /* teal-500   */
+
+  /* ── LUMEN — the one warm color ──
+   * Frostpunk metaphor: in the cold slate world of life-planning, the
+   * LUMEN is the only source of warmth — the generator glow, the lit
+   * window, the candle. Used SPARINGLY: a single accent point, never a
+   * surface fill. Reserve for: brand marks, the "alive / active" state
+   * indicator, heat/urgency on critical deadlines. */
+  --color-lumen:        hsl(32 100% 60%);   /* core: amber/orange glow */
+  --color-lumen-bright: hsl(45 100% 88%);   /* hottest center (highlight) */
+  --color-lumen-warm:   hsl(22 95% 52%);    /* darker edge of the glow */
+  --color-lumen-ember:  hsl(20 80% 38%);    /* muted ember, for deep-bg text */
+
+  /* Corona background — radial, pre-composed for quick use:
+   *   background: var(--color-lumen-corona);  (apply to a circular element) */
+  --color-lumen-corona: radial-gradient(circle,
+    hsl(48 100% 85% / 0.95) 0%,
+    hsl(32 100% 62% / 0.75) 30%,
+    hsl(22 95% 52% / 0.35) 60%,
+    hsl(20 90% 45% / 0) 100%
+  );
+
+  /* ── Shape ── */
+  --radius-sm: 0.25rem;   /* 4px  — inner chips */
+  --radius-md: 0.375rem;  /* 6px  — inputs */
+  --radius-lg: 0.5rem;    /* 8px  — buttons, tiles (= --radius) */
+  --radius-xl: 0.75rem;   /* 12px — cards, panels */
+  --radius-2xl: 1rem;     /* 16px — rare, large hero */
+  --radius-full: 9999px;
+  --radius: var(--radius-lg);
+
+  /* ── Elevation — shadcn-ish, very restrained ── */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+
+  /* ── Spacing scale (Tailwind default rem-based) ── */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  /* ── Type stack ── */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+               "Helvetica Neue", Arial, "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+               "Liberation Mono", monospace;
+
+  /* ── Type scale — matches tailwind text-{xs|sm|base|…} used across the app ── */
+  --text-xs:   0.75rem;   /* 12px — meta, chips, counters, tags */
+  --text-sm:   0.875rem;  /* 14px — body default in dense UI    */
+  --text-base: 1rem;      /* 16px — base                        */
+  --text-lg:   1.125rem;  /* 18px — h3, panel titles            */
+  --text-xl:   1.25rem;   /* 20px — rare                        */
+  --text-2xl:  1.5rem;    /* 24px — stat numerals, page h2      */
+  --text-3xl:  1.875rem;  /* 30px — setup hero                  */
+
+  --leading-tight:  1.2;
+  --leading-snug:   1.35;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  --tracking-tight:    -0.02em;
+  --tracking-normal:    0;
+  --tracking-wide:      0.025em;
+  --tracking-wider:     0.05em;
+  --tracking-widest:    0.1em;
+
+  --weight-regular: 400;
+  --weight-medium:  500;
+  --weight-semibold: 600;
+  --weight-bold:    700;
+
+  /* ── Durations / easing — CSS transitions used throughout are the default
+   * Tailwind `transition-colors` (150ms, ease). `transition-all` used on
+   * ActCard's scale is also 150ms. ── */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast:   100ms;
+  --duration-normal: 150ms;
+  --duration-slow:   300ms;
+}
+
+/* ───────────────────── Semantic element styles ─────────────────────
+ * Applied implicitly to bare HTML so design artifacts can skip utility
+ * classes. Use `.h1`, `.p-muted`, `.code` etc. on arbitrary elements.
+ */
+
+html, body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  font-feature-settings: "rlig" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.h1, h1 {
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+.h2, h2 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  letter-spacing: var(--tracking-tight);
+  line-height: var(--leading-tight);
+  margin: 0;
+}
+.h3 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+}
+.stat-numeral {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  line-height: 1;
+}
+
+.eyebrow,
+.label-caps {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wider);
+  color: var(--color-muted-foreground);
+}
+
+.p {
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  color: var(--color-foreground);
+}
+.p-muted {
+  font-size: var(--text-sm);
+  color: var(--color-muted-foreground);
+}
+.meta {
+  font-size: var(--text-xs);
+  color: var(--color-muted-foreground);
+}
+
+.code, code, kbd, pre, .mono, .id-mono {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.id-mono {
+  font-size: var(--text-xs);
+  color: var(--color-muted-foreground);
+}
+
+.atmosphere,
+.italic-note {
+  font-style: italic;
+  color: var(--color-muted-foreground);
+}
+
+/* ── Primitives ── */
+.card-surface {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  border-radius: var(--radius-full);
+  padding: 0.125rem 0.5rem;
+  font-size: var(--text-xs);
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+}
+
+.kbd {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-muted);
+}

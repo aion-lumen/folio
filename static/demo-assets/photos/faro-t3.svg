@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" font-family="-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="60%" stop-color="#0ea5e9"/>
+      <stop offset="100%" stop-color="#0369a1"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#bg)"/>
+  <!-- abstract coast horizon -->
+  <rect x="0" y="380" width="800" height="220" fill="#0c4a6e" opacity="0.35"/>
+  <path d="M0 380 L120 360 L260 372 L420 358 L560 370 L720 354 L800 372 L800 600 L0 600 Z" fill="#0c4a6e" opacity="0.5"/>
+  <!-- house silhouette -->
+  <g transform="translate(560,170)" fill="#fef3c7" opacity="0.92">
+    <rect x="0" y="50" width="160" height="120" rx="4"/>
+    <polygon points="0,50 80,0 160,50"/>
+    <rect x="60" y="100" width="40" height="70" fill="#0c4a6e"/>
+    <rect x="20" y="75" width="30" height="30" fill="#0c4a6e"/>
+    <rect x="110" y="75" width="30" height="30" fill="#0c4a6e"/>
+  </g>
+  <!-- text -->
+  <text x="60" y="280" font-size="58" font-weight="700" fill="#ffffff" letter-spacing="-1">FARO</text>
+  <text x="60" y="340" font-size="34" font-weight="500" fill="#e0f2fe">Apartamento T3 · centro histórico</text>
+  <text x="60" y="520" font-size="42" font-weight="600" fill="#fef3c7">380.000 EUR · 92 m²</text>
+  <text x="60" y="555" font-size="20" fill="#bae6fd" font-family="ui-monospace,'SF Mono',monospace">demo-faro-t3 · idealista</text>
+</svg>

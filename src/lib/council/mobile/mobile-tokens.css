@@ -1,0 +1,58 @@
+/*
+ * Mobile 1a (2026-05-30): scoped tokens for Council-Mobile-UI.
+ * Imported only by the mobile +layout.svelte so the rest of the app keeps
+ * its existing palette untouched. Mirrors the design HTML's wireframe
+ * variables ("Folio Council Mobile - Vier-Tab.html").
+ */
+:where(.council-mobile-root) {
+	--wf-bg: hsl(210 25% 98.5%);
+	--wf-line: hsl(214 20% 88%);
+	--wf-line-strong: hsl(214 25% 78%);
+	--wf-fg: hsl(222 30% 22%);
+	--wf-muted: hsl(215 16% 50%);
+	--wf-fill: hsl(214 24% 94%);
+	--wf-fill-strong: hsl(214 24% 88%);
+
+	--ember-bg: hsl(28 95% 94%);
+	--ember-bg-strong: hsl(28 95% 90%);
+	--ember-fg: hsl(28 80% 38%);
+	--ember-border: hsl(28 80% 80%);
+
+	--verdict-kaufen: hsl(142 60% 42%);
+	--verdict-beobachten: hsl(32 90% 52%);
+	--verdict-verwerfen: hsl(0 65% 52%);
+
+	--verdict-kaufen-bg: hsl(142 50% 95%);
+	--verdict-kaufen-bd: hsl(142 40% 80%);
+	--verdict-kaufen-fg: hsl(142 65% 25%);
+	--verdict-beobachten-bg: hsl(32 90% 95%);
+	--verdict-beobachten-bd: hsl(32 80% 78%);
+	--verdict-beobachten-fg: hsl(32 80% 32%);
+	--verdict-verwerfen-bg: hsl(0 70% 96%);
+	--verdict-verwerfen-bd: hsl(0 60% 84%);
+	--verdict-verwerfen-fg: hsl(0 65% 38%);
+
+	--st-neu-bg: hsl(265 60% 96%);
+	--st-neu-fg: hsl(265 50% 42%);
+	--st-neu-bd: hsl(265 45% 84%);
+	--st-offen-bg: hsl(214 20% 95%);
+	--st-offen-fg: hsl(215 25% 38%);
+	--st-offen-bd: hsl(214 20% 84%);
+	--st-termin-bg: hsl(214 80% 96%);
+	--st-termin-fg: hsl(217 70% 38%);
+	--st-termin-bd: hsl(214 60% 82%);
+	--st-besichtigt-bg: hsl(142 50% 95%);
+	--st-besichtigt-fg: hsl(142 55% 28%);
+	--st-besichtigt-bd: hsl(142 40% 78%);
+
+	/* Mobile-Aufraeumen (2026-05-31): typo scale, Pixel-readability-driven.
+	 * ~15–20% larger than the pre-fix hardcoded values across the four mobile
+	 * components. Scope stays inside :where(.council-mobile-root) so Desktop
+	 * routes keep their pre-existing sizing. */
+	--text-xs: 10.5px;
+	--text-sm: 12px;
+	--text-base: 14px;
+	--text-md: 15px;
+	--font-weight-medium: 500;
+	--font-weight-bold: 600;
+}

@@ -1,0 +1,153 @@
+@import 'tailwindcss';
+
+/* Brand Fonts */
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/Inter-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@theme {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(222.2 84% 4.9%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222.2 84% 4.9%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(222.2 84% 4.9%);
+  --color-primary: hsl(222.2 47.4% 11.2%);
+  --color-primary-foreground: hsl(210 40% 98%);
+  --color-secondary: hsl(210 40% 96.1%);
+  --color-secondary-foreground: hsl(222.2 47.4% 11.2%);
+  --color-muted: hsl(210 40% 96.1%);
+  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
+  --color-accent: hsl(210 40% 96.1%);
+  --color-accent-foreground: hsl(222.2 47.4% 11.2%);
+  --color-destructive: hsl(0 84.2% 60.2%);
+  --color-destructive-foreground: hsl(210 40% 98%);
+  --color-border: hsl(214.3 31.8% 91.4%);
+  --color-input: hsl(214.3 31.8% 91.4%);
+  --color-ring: hsl(222.2 84% 4.9%);
+  --radius: 0.5rem;
+
+  /* Lumen — warmer Bernstein-Akzent */
+  --color-lumen: hsl(32 100% 60%);
+  --color-lumen-bright: hsl(45 100% 88%);
+  --color-lumen-warm: hsl(22 95% 52%);
+  --color-lumen-ember: hsl(20 80% 38%);
+
+  /* Pfad-Akzente */
+  --color-path-a: hsl(262 83% 58%);
+  --color-path-b: hsl(14 91% 55%);
+  --color-path-c: hsl(172 66% 45%);
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.04);
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 2px 4px -1px rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.08), 0 4px 6px -4px rgb(0 0 0 / 0.05);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.10), 0 8px 10px -6px rgb(0 0 0 / 0.08);
+
+  /* ────────────────────────────────────────────────────────────────────
+   * F.4 Mail-Queue Tokens (Bundle: docs/f4-design-handoff/)
+   * Source: mq-shared.jsx Z.6-23 (actionColor), Z.32-34 (ACCOUNT_COLOR),
+   *         Z.85-87 (TIER), Z.64 (confidence-pip).
+   * Token-Mapping: docs/f4-token-mapping.md (Architekt-Sign-off T1-T8 approved 2026-05-17)
+   * ──────────────────────────────────────────────────────────────────── */
+
+  /* ── Account-Colors (Multi-Account-UI gmail/yahoo/mirhamed.ch) ── */
+  --color-account-gmail:           hsl(215 80% 50%);
+  --color-account-gmail-soft:      hsl(215 80% 96%);
+  --color-account-gmail-deep:      hsl(215 80% 30%);
+  --color-account-yahoo:           hsl(280 60% 54%);
+  --color-account-yahoo-soft:      hsl(280 50% 96%);
+  --color-account-yahoo-deep:      hsl(280 65% 32%);
+  --color-account-mirhamed:        hsl(158 62% 38%);
+  --color-account-mirhamed-soft:   hsl(158 40% 95%);
+  --color-account-mirhamed-deep:   hsl(160 75% 22%);
+
+  /* ── Mail-Action-Colors (5 final_action-Semantik-Farben) ── */
+  --color-action-keep-bg:                hsl(210 40% 96%);
+  --color-action-keep-fg:                hsl(215 25% 35%);
+  --color-action-keep-border:            hsl(214 32% 86%);
+  --color-action-keep-dot:               hsl(215 20% 55%);
+
+  --color-action-immo-portal-bg:         hsl(214 100% 97%);
+  --color-action-immo-portal-fg:         hsl(217 91% 30%);
+  --color-action-immo-portal-border:     hsl(213 97% 84%);
+  --color-action-immo-portal-dot:        hsl(217 91% 60%);
+
+  --color-action-immo-privat-bg:         hsl(217 91% 95%);
+  --color-action-immo-privat-fg:         hsl(217 91% 22%);
+  --color-action-immo-privat-border:     hsl(213 97% 80%);
+  --color-action-immo-privat-dot:        hsl(217 91% 38%);
+
+  --color-action-paketzustellung-bg:     hsl(38 100% 96%);
+  --color-action-paketzustellung-fg:     hsl(22 85% 35%);
+  --color-action-paketzustellung-border: hsl(38 90% 80%);
+  --color-action-paketzustellung-dot:    hsl(32 100% 52%);
+
+  --color-action-zu-pruefen-bg:          hsl(0 86% 97%);
+  --color-action-zu-pruefen-fg:          hsl(0 74% 32%);
+  --color-action-zu-pruefen-border:      hsl(0 96% 88%);
+  --color-action-zu-pruefen-dot:         hsl(0 74% 52%);
+
+  /* ── Tier-Badges (T1/T2/T3; T0 share-T1 per Sign-off T4) ── */
+  --color-tier-1-bg: hsl(214 32% 94%);
+  --color-tier-1-fg: hsl(222 47% 18%);
+  --color-tier-2-bg: hsl(214 32% 94%);
+  --color-tier-2-fg: hsl(215 16% 47%);
+  --color-tier-3-bg: hsl(0 86% 97%);
+  --color-tier-3-fg: hsl(0 74% 38%);
+
+  /* ── Confidence-Pip ── */
+  --color-conf-low:    hsl(0 74% 50%);
+  --color-conf-mid:    hsl(32 95% 48%);
+  --color-conf-high:   hsl(222 47% 18%);
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}

@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pipeline · Cascade &amp; Validator · 2026-06-11</title>
+<style>
+  :root {
+    --bg: hsl(210 30% 99%);
+    --bg-card: white;
+    --text: hsl(222 47% 11%);
+    --muted: hsl(215 16% 47%);
+    --border: hsl(214 25% 88%);
+    --code-bg: hsl(210 25% 96%);
+    --gemma: hsl(214 70% 50%);
+    --qwen: hsl(173 60% 38%);
+    --qwen-thinking: hsl(22 90% 48%);
+    --silent: hsl(28 95% 52%);
+    --silent-bg: hsl(28 95% 95%);
+    --validator: hsl(214 70% 50%);
+    --validator-bg: hsl(214 60% 95%);
+    --green: hsl(142 64% 42%);
+    --red: hsl(0 65% 48%);
+    --warn-bg: hsl(45 80% 96%);
+    --warn-border: hsl(45 60% 70%);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  main {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 48px 24px 120px;
+    display: flex;
+    flex-direction: column;
+    gap: 44px;
+  }
+  /* HEADER */
+  header.doc-header { display: flex; flex-direction: column; gap: 10px; }
+  header.doc-header .meta {
+    color: var(--muted);
+    font-size: 13px;
+    font-family: ui-monospace, SF Mono, monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  header.doc-header h1 {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  header.doc-header .sub {
+    color: var(--muted);
+    font-size: 16px;
+  }
+  .big-callout {
+    margin-top: 16px;
+    padding: 22px 26px;
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--silent);
+    border-radius: 10px;
+    display: flex;
+    gap: 22px;
+    align-items: center;
+  }
+  .big-callout .glyph {
+    font-size: 36px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .big-callout .text { font-size: 16px; }
+  .big-callout strong { font-size: 18px; display: block; margin-bottom: 4px; }
+
+  /* SECTION */
+  section { display: flex; flex-direction: column; gap: 12px; }
+  .eyebrow {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+  h2 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  h3 {
+    margin: 12px 0 4px;
+    font-size: 15px;
+    font-weight: 600;
+  }
+  p { margin: 0 0 6px; }
+  code {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 13px;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+  pre.code-block {
+    margin: 0;
+    padding: 12px 16px;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow-x: auto;
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 12.5px;
+    line-height: 1.55;
+    white-space: pre;
+  }
+  ul { margin: 4px 0; padding-left: 22px; }
+  li { margin-bottom: 2px; }
+
+  /* SVG */
+  svg.diag { display: block; max-width: 100%; height: auto; background: white; border: 1px solid var(--border); border-radius: 10px; }
+
+  /* COMPARISON CARDS */
+  .compare-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+  @media (max-width: 760px) { .compare-grid { grid-template-columns: 1fr; } }
+  .compare-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .compare-card.same { border-top: 3px solid var(--green); }
+  .compare-card.diff { border-top: 3px solid var(--red); }
+  .compare-card h3 {
+    margin: 0 0 4px;
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .compare-card h3 .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    color: white;
+    margin-right: 8px;
+  }
+  .compare-card.same .badge { background: var(--green); }
+  .compare-card.diff .badge { background: var(--red); }
+  .compare-row {
+    display: grid;
+    grid-template-columns: 110px 1fr;
+    gap: 10px;
+    padding: 8px 0;
+    border-top: 1px solid var(--border);
+    font-size: 13.5px;
+  }
+  .compare-row:first-of-type { border-top: none; padding-top: 0; }
+  .compare-row .key { color: var(--muted); font-family: ui-monospace, SF Mono, monospace; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.04em; padding-top: 2px; }
+  .compare-row .val { display: flex; flex-direction: column; gap: 2px; }
+  .compare-row .val .split {
+    display: flex;
+    gap: 8px;
+    align-items: baseline;
+  }
+  .compare-row .val .tag-mini {
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .tag-mini.cascade-tag { background: var(--silent); }
+  .tag-mini.validator-tag { background: var(--validator); }
+
+  /* CALLOUT */
+  .callout {
+    padding: 12px 16px;
+    background: var(--warn-bg);
+    border-left: 3px solid var(--warn-border);
+    border-radius: 4px;
+    font-size: 14px;
+  }
+  .callout.warn {
+    background: hsl(0 80% 96%);
+    border-left-color: var(--red);
+  }
+  .callout.info {
+    background: hsl(210 60% 96%);
+    border-left-color: var(--gemma);
+  }
+
+  /* VOICE CHIPS */
+  .voice-chip {
+    display: inline-block;
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  .voice-chip.gemma { background: var(--gemma); }
+  .voice-chip.qwen { background: var(--qwen); }
+  .voice-chip.qwen-thinking { background: var(--qwen-thinking); }
+  .voice-strip {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+  }
+  .voice-tile {
+    flex: 1 1 200px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    border-top: 3px solid;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .voice-tile.gemma { border-top-color: var(--gemma); }
+  .voice-tile.qwen { border-top-color: var(--qwen); }
+  .voice-tile.qwen-thinking { border-top-color: var(--qwen-thinking); }
+  .voice-tile .name { font-family: ui-monospace, SF Mono, monospace; font-size: 12px; font-weight: 600; }
+  .voice-tile .model { font-family: ui-monospace, SF Mono, monospace; font-size: 11px; color: var(--muted); }
+  .voice-tile .role { font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+
+  /* DETAILS (collapsible) */
+  details.collapsed {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+  }
+  details.collapsed summary {
+    cursor: pointer;
+    font-family: ui-monospace, SF Mono, monospace;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  details.collapsed[open] summary { margin-bottom: 12px; }
+  pre.prompt {
+    background: var(--warn-bg);
+    border-color: var(--warn-border);
+  }
+
+  /* REF */
+  .ref { font-family: ui-monospace, SF Mono, monospace; font-size: 11px; color: var(--muted); }
+  .footnote {
+    margin-top: 60px;
+    padding-top: 14px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div style="background:#fef3c7;border:1px solid #f59e0b;padding:12px 20px;margin:0;font-family:system-ui,sans-serif;font-size:14px;">
+  <strong>Superseded (2026-06-10):</strong> This document describes the pre–Direktive D cascade architecture.
+  Current design: folio <code>manager.ts</code> orchestrates separate worker + validator runs.
+  See <code>docs/fieldnotes/fieldnote-direktive-d-pipeline-refactor-2026-06-10.md</code>.
+</div>
+<main>
+
+<!-- ============================================================ -->
+<!-- HEADER                                                         -->
+<!-- ============================================================ -->
+<header class="doc-header">
+  <div class="meta">PIPELINE-ARCHITEKTUR · 2026-06-11</div>
+  <h1>Cascade &amp; Validator</h1>
+  <div class="sub">folio mail-pipeline — was zwischen Worker-Klick und <code>uebernommen</code>-Mail wirklich passiert.</div>
+
+  <div class="big-callout">
+    <div class="glyph">↻↻</div>
+    <div class="text">
+      <strong>Die Kernerkenntnis: derselbe Validator läuft ZWEIMAL.</strong>
+      Erst als Subprocess im Worker (Cascade), dann gleich danach als eigenständiger Auto-Validator-Run. Selbe 5 Mails, selbe 3 Modelle, selber Prompt. Doppelter Compute, identisches Endergebnis (UPSERT-idempotent).
+    </div>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<!-- §1 TIMELINE (the big visual)                                   -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§1 · DER VOLLE LAUF · ZWEI RUNS HINTEREINANDER</div>
+  <h2>Was in 23 Minuten passiert</h2>
+
+  <svg class="diag" viewBox="0 0 940 420" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="t-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 16% 50%)"/>
+      </marker>
+      <marker id="t-arr-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(0 65% 48%)"/>
+      </marker>
+    </defs>
+    <style>
+      .t-lbl { font: 11px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); text-transform: uppercase; letter-spacing: 0.05em; }
+      .t-title { font: 13px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); font-weight: 600; }
+      .t-sub { font: 11px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); }
+      .t-axis { stroke: hsl(214 25% 80%); stroke-width: 1; }
+      .t-tick { font: 10px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 60%); }
+      .t-voice { font: 11px ui-monospace, SF Mono, monospace; font-weight: 600; }
+      .t-mail-count { font: 10.5px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); }
+    </style>
+
+    <!-- TIME AXIS -->
+    <line class="t-axis" x1="40" y1="395" x2="900" y2="395"/>
+    <line class="t-axis" x1="40" y1="390" x2="40" y2="400"/>
+    <line class="t-axis" x1="470" y1="390" x2="470" y2="400"/>
+    <line class="t-axis" x1="900" y1="390" x2="900" y2="400"/>
+    <text class="t-tick" x="40" y="412">t=0</text>
+    <text class="t-tick" x="470" y="412" text-anchor="middle">12 min</text>
+    <text class="t-tick" x="900" y="412" text-anchor="end">23 min</text>
+
+    <!-- RUN 1 — SILENT WORKER (orange) -->
+    <text class="t-lbl" x="40" y="30">Run 1</text>
+    <text class="t-title" x="40" y="50">silent worker · run_uuid=e9e8b71c…</text>
+
+    <!-- silent run frame -->
+    <rect x="40" y="65" width="430" height="160" rx="8" fill="hsl(28 95% 96%)" stroke="hsl(28 90% 65%)" stroke-width="1.5"/>
+
+    <!-- phase 1: heuristik -->
+    <rect x="50" y="80" width="40" height="58" rx="4" fill="white" stroke="hsl(142 50% 60%)" stroke-width="1.2"/>
+    <text class="t-voice" x="70" y="100" text-anchor="middle" fill="hsl(142 60% 30%)">heuristik</text>
+    <text class="t-mail-count" x="70" y="115" text-anchor="middle">5 mails</text>
+    <text class="t-sub" x="70" y="130" text-anchor="middle">~30s</text>
+
+    <!-- phase 2: cascade-subprocess -->
+    <rect x="100" y="80" width="340" height="115" rx="4" fill="white" stroke="hsl(45 80% 55%)" stroke-width="1.2" stroke-dasharray="6 3"/>
+    <text class="t-voice" x="270" y="100" text-anchor="middle" fill="hsl(45 80% 30%)">cascade-subprocess</text>
+    <text class="t-sub" x="270" y="115" text-anchor="middle">production_worker.py spawnt validator_batch.py</text>
+
+    <!-- inner voice bars: gemma / qwen / qwen-thinking -->
+    <rect x="110" y="135" width="108" height="50" rx="4" fill="hsl(214 70% 92%)" stroke="hsl(214 70% 50%)"/>
+    <text class="t-voice" x="164" y="153" text-anchor="middle" fill="hsl(214 70% 32%)">gemma</text>
+    <text class="t-mail-count" x="164" y="170" text-anchor="middle">5 / 5 mails</text>
+    <text class="t-sub" x="164" y="182" text-anchor="middle">~3 min</text>
+
+    <rect x="222" y="135" width="108" height="50" rx="4" fill="hsl(173 60% 92%)" stroke="hsl(173 60% 38%)"/>
+    <text class="t-voice" x="276" y="153" text-anchor="middle" fill="hsl(173 60% 25%)">qwen</text>
+    <text class="t-mail-count" x="276" y="170" text-anchor="middle">5 / 5 mails</text>
+    <text class="t-sub" x="276" y="182" text-anchor="middle">~3 min</text>
+
+    <rect x="334" y="135" width="100" height="50" rx="4" fill="hsl(22 90% 92%)" stroke="hsl(22 90% 48%)"/>
+    <text class="t-voice" x="384" y="153" text-anchor="middle" fill="hsl(22 90% 32%)">qwen-thinking</text>
+    <text class="t-mail-count" x="384" y="170" text-anchor="middle">3 / 5 mails</text>
+    <text class="t-sub" x="384" y="182" text-anchor="middle">~3 min</text>
+
+    <!-- phase 3: cleanup -->
+    <rect x="445" y="80" width="20" height="58" rx="4" fill="white" stroke="hsl(214 25% 70%)" stroke-width="1.2"/>
+    <text class="t-sub" x="455" y="100" text-anchor="middle">imap</text>
+    <text class="t-sub" x="455" y="112" text-anchor="middle">cleanup</text>
+
+    <!-- silent run annotations -->
+    <text class="t-sub" x="50" y="218">Logs &amp; Opinions landen alle unter run_uuid=e9e8b71c…</text>
+
+    <!-- AUTO-TRIGGER ARROW -->
+    <path d="M 470 145 L 490 145" stroke="hsl(0 65% 48%)" stroke-width="2.5" fill="none" marker-end="url(#t-arr-red)"/>
+    <text class="t-sub" x="480" y="135" text-anchor="middle" fill="hsl(0 65% 48%)" font-weight="700">↻ auto</text>
+
+    <!-- RUN 2 — AUTO VALIDATOR (blue) -->
+    <text class="t-lbl" x="500" y="30">Run 2</text>
+    <text class="t-title" x="500" y="50">auto validator · run_uuid=0772096c…</text>
+
+    <rect x="500" y="65" width="400" height="160" rx="8" fill="hsl(214 60% 96%)" stroke="hsl(214 70% 60%)" stroke-width="1.5"/>
+
+    <!-- validator: whole box is validator_batch round 2 -->
+    <text class="t-voice" x="700" y="100" text-anchor="middle" fill="hsl(214 70% 32%)">validator_batch.py — Runde 2</text>
+    <text class="t-sub" x="700" y="116" text-anchor="middle">folio worker-runner spawnt direkt nach silent-Ende</text>
+
+    <!-- inner voice bars -->
+    <rect x="510" y="135" width="125" height="50" rx="4" fill="hsl(214 70% 92%)" stroke="hsl(214 70% 50%)"/>
+    <text class="t-voice" x="572" y="153" text-anchor="middle" fill="hsl(214 70% 32%)">gemma</text>
+    <text class="t-mail-count" x="572" y="170" text-anchor="middle">5 / 5 mails</text>
+    <text class="t-sub" x="572" y="182" text-anchor="middle">DIESELBEN!</text>
+
+    <rect x="640" y="135" width="125" height="50" rx="4" fill="hsl(173 60% 92%)" stroke="hsl(173 60% 38%)"/>
+    <text class="t-voice" x="702" y="153" text-anchor="middle" fill="hsl(173 60% 25%)">qwen</text>
+    <text class="t-mail-count" x="702" y="170" text-anchor="middle">5 / 5 mails</text>
+    <text class="t-sub" x="702" y="182" text-anchor="middle">DIESELBEN!</text>
+
+    <rect x="770" y="135" width="120" height="50" rx="4" fill="hsl(22 90% 92%)" stroke="hsl(22 90% 48%)"/>
+    <text class="t-voice" x="830" y="153" text-anchor="middle" fill="hsl(22 90% 32%)">qwen-thinking</text>
+    <text class="t-mail-count" x="830" y="170" text-anchor="middle">3 / 5 mails</text>
+    <text class="t-sub" x="830" y="182" text-anchor="middle">DIESELBEN!</text>
+
+    <text class="t-sub" x="510" y="218">Logs &amp; Opinions landen unter run_uuid=0772096c… (separat)</text>
+
+    <!-- MAIL-IDs BAR (bottom) -->
+    <rect x="40" y="250" width="860" height="60" rx="6" fill="white" stroke="hsl(214 25% 80%)" stroke-width="1"/>
+    <text class="t-lbl" x="55" y="270">Verarbeitete Mails (identisch in beiden Runs)</text>
+    <text x="55" y="295" style="font: 14px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); font-weight: 600;">
+      #1222 · #1223 · #1224 · #1225 · #1226
+    </text>
+
+    <!-- arrows from both runs to mail-bar -->
+    <path d="M 250 225 Q 250 240 250 250" stroke="hsl(28 90% 60%)" stroke-width="1.5" fill="none" stroke-dasharray="3 3"/>
+    <path d="M 700 225 Q 700 240 700 250" stroke="hsl(214 70% 60%)" stroke-width="1.5" fill="none" stroke-dasharray="3 3"/>
+
+    <!-- LM Studio total calls -->
+    <text x="40" y="350" class="t-lbl">LLM-Calls insgesamt</text>
+    <text x="40" y="370" style="font: 13px -apple-system, BlinkMacSystemFont, sans-serif; fill: hsl(222 47% 11%);">
+      <tspan font-weight="700">26 LLM-Calls für 5 Mails</tspan> · 13 in Cascade + 13 in Auto-Validator · UPSERT macht das Endergebnis identisch.
+    </text>
+  </svg>
+
+  <div class="callout warn">
+    <strong>↻↻ Doppelte Ausführung — bewiesen aus folio.db:</strong> beide Runs haben identische
+    <code>validated</code>-Logs für dieselben Mail-IDs (1222–1226) mit denselben Voice-Counts (5 gemma + 5 qwen + 3 qwen-thinking).
+    Architektonisches Artefakt: die Cascade (commit cf7b1dd, 2026-06-09) wurde NACH der Auto-Validator-Trigger-Logik eingebaut, beide laufen seither parallel-redundant.
+    Endergebnis bleibt korrekt (UPSERT idempotent), aber ~50% des LLM-Computes ist Doppelarbeit.
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §2 IDENTISCH vs UNTERSCHIEDLICH                                -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§2 · DER UNTERSCHIED · ZUSAMMENGEFASST</div>
+  <h2>Was ist gleich, was ist anders?</h2>
+
+  <div class="compare-grid">
+    <div class="compare-card same">
+      <h3><span class="badge">=</span> IDENTISCH in Cascade &amp; Validator</h3>
+      <div class="compare-row"><div class="key">Skript</div><div class="val"><code>validator_batch.py</code></div></div>
+      <div class="compare-row"><div class="key">Modelle</div><div class="val">
+        <span><span class="voice-chip gemma"></span>gemma · <span class="voice-chip qwen"></span>qwen · <span class="voice-chip qwen-thinking"></span>qwen-thinking</span>
+      </div></div>
+      <div class="compare-row"><div class="key">Prompt</div><div class="val"><code>LENS_PROMPT</code> (Delphi-blind)</div></div>
+      <div class="compare-row"><div class="key">Mails</div><div class="val">dieselben — <code>last-tranche</code></div></div>
+      <div class="compare-row"><div class="key">Opinions</div><div class="val">landen in <code>validator_opinions</code><br><span class="ref">UNIQUE(feedback_id, validator_model) → UPSERT</span></div></div>
+    </div>
+
+    <div class="compare-card diff">
+      <h3><span class="badge">≠</span> UNTERSCHIEDLICH zwischen den beiden Läufen</h3>
+      <div class="compare-row">
+        <div class="key">Wer startet</div>
+        <div class="val">
+          <div class="split"><span class="tag-mini cascade-tag">cascade</span><span>production_worker.py</span></div>
+          <div class="split"><span class="tag-mini validator-tag">auto</span><span>folio worker-runner manager</span></div>
+        </div>
+      </div>
+      <div class="compare-row">
+        <div class="key">run_uuid</div>
+        <div class="val">
+          <div class="split"><span class="tag-mini cascade-tag">cascade</span><span>silent run's UUID</span></div>
+          <div class="split"><span class="tag-mini validator-tag">auto</span><span>neue UUID, mode='validator'</span></div>
+        </div>
+      </div>
+      <div class="compare-row">
+        <div class="key">Mail-Wahl</div>
+        <div class="val">
+          <div class="split"><span class="tag-mini cascade-tag">cascade</span><code>--mail-ids 1222,…,1226</code></div>
+          <div class="split"><span class="tag-mini validator-tag">auto</span><code>--scope last-tranche</code></div>
+        </div>
+      </div>
+      <div class="compare-row">
+        <div class="key">Logs in</div>
+        <div class="val">
+          <div class="split"><span class="tag-mini cascade-tag">cascade</span><span>silent-Run's <code>worker_run_logs</code></span></div>
+          <div class="split"><span class="tag-mini validator-tag">auto</span><span>eigene <code>worker_run_logs</code></span></div>
+        </div>
+      </div>
+      <div class="compare-row">
+        <div class="key">UI zeigt</div>
+        <div class="val">
+          <div class="split"><span class="tag-mini cascade-tag">cascade</span><span>„Validator-Kaskade" in silent</span></div>
+          <div class="split"><span class="tag-mini validator-tag">auto</span><span>„Validator läuft" separat</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<!-- §3 DREI STIMMEN                                                -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§3 · DIE DREI STIMMEN</div>
+  <h2>Drei blinde Klassifikatoren</h2>
+
+  <div class="voice-strip">
+    <div class="voice-tile gemma">
+      <div class="name"><span class="voice-chip gemma"></span>gemma-control</div>
+      <div class="model">gemma-4-26b-a4b-it-mlx</div>
+      <div class="role">Lens 1 · control_llm · response_strip: code_fence</div>
+    </div>
+    <div class="voice-tile qwen">
+      <div class="name"><span class="voice-chip qwen"></span>qwen35b-lens</div>
+      <div class="model">qwen3.6-35b-a3b-ud-mlx</div>
+      <div class="role">Lens 2 · control_llm · response_strip: code_fence</div>
+    </div>
+    <div class="voice-tile qwen-thinking">
+      <div class="name"><span class="voice-chip qwen-thinking"></span>qwen-validator</div>
+      <div class="model">qwen3-30b-a3b-thinking-2507</div>
+      <div class="role">Lens 3 · primary_llm · response_strip: think + code_fence</div>
+    </div>
+  </div>
+
+  <div class="callout info">
+    <strong>Delphi-Prinzip.</strong> Jede Stimme sieht dieselbe rohe Mail blind — kein Wissen über das Urteil der anderen, keine Heuristik-Erwähnung, kein Plugin-Hint. Sequenziell ausgeführt (LM-Studio kann nur ein Modell gleichzeitig im RAM halten — ~30s Swap zwischen Stimmen).
+  </div>
+  <p class="ref">Konfiguration: <code>aion-lumen/multi-agent/config/regelwerk.yaml:367–388</code></p>
+</section>
+
+<!-- ============================================================ -->
+<!-- §4 PER-MAIL LOOP                                               -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§4 · DER INNERE LOOP</div>
+  <h2>Was pro (Mail × Stimme) passiert</h2>
+
+  <svg class="diag" viewBox="0 0 940 320" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="p-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 16% 50%)"/>
+      </marker>
+    </defs>
+    <style>
+      .p-node { fill: white; stroke: hsl(214 25% 75%); stroke-width: 1.3; }
+      .p-llm { fill: hsl(45 80% 95%); stroke: hsl(45 60% 60%); }
+      .p-db { fill: hsl(173 60% 95%); stroke: hsl(173 60% 50%); }
+      .p-input { fill: hsl(28 95% 95%); stroke: hsl(28 90% 60%); }
+      .p-lbl { font: 12px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); font-weight: 600; }
+      .p-sub { font: 10.5px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); }
+      .p-edge { stroke: hsl(215 16% 50%); stroke-width: 1.4; fill: none; }
+      .p-eyebrow { font: 10px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 60%); text-transform: uppercase; letter-spacing: 0.05em; }
+    </style>
+
+    <!-- Step labels along the top -->
+    <text class="p-eyebrow" x="80" y="25">1 · QUELLE</text>
+    <text class="p-eyebrow" x="280" y="25">2 · LLM-CALL</text>
+    <text class="p-eyebrow" x="510" y="25">3 · PARSE</text>
+    <text class="p-eyebrow" x="730" y="25">4 · SCHREIBEN</text>
+
+    <!-- Step 1: mail row -->
+    <rect class="p-node p-input" x="30" y="120" width="140" height="80" rx="6"/>
+    <text class="p-lbl" x="100" y="148" text-anchor="middle">mail row</text>
+    <text class="p-sub" x="100" y="166" text-anchor="middle">id, sender,</text>
+    <text class="p-sub" x="100" y="180" text-anchor="middle">subject, body</text>
+    <text class="p-sub" x="100" y="194" text-anchor="middle" font-weight="600">feedback.db</text>
+
+    <!-- prompt rendering arrow -->
+    <path class="p-edge" d="M 170 160 L 220 160" marker-end="url(#p-arr)"/>
+    <text class="p-sub" x="195" y="150" text-anchor="middle">+ LENS_PROMPT</text>
+
+    <!-- Step 2: LLM call -->
+    <rect class="p-node p-llm" x="220" y="120" width="170" height="80" rx="6"/>
+    <text class="p-lbl" x="305" y="148" text-anchor="middle">LM Studio</text>
+    <text class="p-sub" x="305" y="166" text-anchor="middle">localhost:1234</text>
+    <text class="p-sub" x="305" y="180" text-anchor="middle">/v1/chat/completions</text>
+    <text class="p-sub" x="305" y="196" text-anchor="middle" font-weight="600">temperature=0</text>
+
+    <path class="p-edge" d="M 390 160 L 440 160" marker-end="url(#p-arr)"/>
+    <text class="p-sub" x="415" y="150" text-anchor="middle">JSON-Text</text>
+
+    <!-- Step 3: parse -->
+    <rect class="p-node" x="440" y="120" width="170" height="80" rx="6"/>
+    <text class="p-lbl" x="525" y="148" text-anchor="middle">strip + parse</text>
+    <text class="p-sub" x="525" y="166" text-anchor="middle">strip ```fences```</text>
+    <text class="p-sub" x="525" y="180" text-anchor="middle">strip &lt;think&gt;…&lt;/think&gt;</text>
+    <text class="p-sub" x="525" y="194" text-anchor="middle">JSON.parse + validate</text>
+
+    <!-- Split arrows to two destinations -->
+    <path class="p-edge" d="M 610 150 Q 640 150 660 100" marker-end="url(#p-arr)"/>
+    <path class="p-edge" d="M 610 170 Q 640 170 660 220" marker-end="url(#p-arr)"/>
+
+    <!-- Step 4a: opinion -->
+    <rect class="p-node p-db" x="660" y="60" width="250" height="70" rx="6"/>
+    <text class="p-lbl" x="785" y="88" text-anchor="middle">write_opinion (UPSERT)</text>
+    <text class="p-sub" x="785" y="105" text-anchor="middle">feedback_id, model, domain, actionability,</text>
+    <text class="p-sub" x="785" y="119" text-anchor="middle">confidence, reasoning → folio.db.validator_opinions</text>
+
+    <!-- Step 4b: log -->
+    <rect class="p-node p-db" x="660" y="190" width="250" height="70" rx="6"/>
+    <text class="p-lbl" x="785" y="218" text-anchor="middle">write_log</text>
+    <text class="p-sub" x="785" y="235" text-anchor="middle">run_uuid, voice, event_type='validated',</text>
+    <text class="p-sub" x="785" y="249" text-anchor="middle">message → folio.db.worker_run_logs (Live-UI!)</text>
+
+    <!-- bottom note -->
+    <text class="p-sub" x="30" y="295" font-weight="600" fill="hsl(222 47% 11%)">Loop:</text>
+    <text class="p-sub" x="70" y="295">äußere Schleife = Voice (3×) · innere Schleife = Mail (N×) · Modell-Swap zwischen Voices ~30s</text>
+  </svg>
+
+  <details class="collapsed">
+    <summary>Pseudocode — der echte Loop</summary>
+<pre class="code-block">for voice in regelwerk.voices:           # heuristik wird übersprungen
+    swap_to(voice.lm_studio_model)         # LM Studio Modell laden ~30s
+    for row in target_mails:               # alle Mails in der Tranche
+        opinion = call_lens_lm_studio(
+            row, prompt_template, voice
+        )
+        if opinion is None:
+            continue                       # JSON-Fehler → kein Eintrag
+        write_opinion(row, opinion, voice.model_id)   # UPSERT
+        write_log(run_uuid, voice_short, 'validated',
+                  f"#{row.id} → {opinion.domain}/{opinion.actionability}",
+                  mail_id=row.id)
+</pre>
+    <p class="ref">validator_batch.py:536–603</p>
+  </details>
+</section>
+
+<!-- ============================================================ -->
+<!-- §5 WO LANDET WAS                                               -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§5 · OUTPUT-WEGE</div>
+  <h2>Eine Meinung — zwei Ziele</h2>
+
+  <svg class="diag" viewBox="0 0 940 280" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="d-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 16% 50%)"/>
+      </marker>
+    </defs>
+    <style>
+      .d-lbl { font: 12px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); font-weight: 600; }
+      .d-sub { font: 10.5px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); }
+      .d-edge { stroke: hsl(215 16% 50%); stroke-width: 1.5; fill: none; }
+    </style>
+
+    <!-- source: LLM opinion -->
+    <rect x="40" y="100" width="180" height="80" rx="8" fill="hsl(45 80% 95%)" stroke="hsl(45 60% 60%)" stroke-width="1.5"/>
+    <text class="d-lbl" x="130" y="128" text-anchor="middle">LLM-Antwort</text>
+    <text class="d-sub" x="130" y="146" text-anchor="middle">JSON-Object pro</text>
+    <text class="d-sub" x="130" y="160" text-anchor="middle">(mail × voice)</text>
+
+    <!-- two outputs -->
+    <path class="d-edge" d="M 220 130 L 320 70" marker-end="url(#d-arr)"/>
+    <path class="d-edge" d="M 220 150 L 320 200" marker-end="url(#d-arr)"/>
+
+    <!-- Output 1: validator_opinions (truth) -->
+    <rect x="320" y="30" width="280" height="90" rx="8" fill="white" stroke="hsl(214 25% 75%)" stroke-width="1.5"/>
+    <text class="d-lbl" x="460" y="55" text-anchor="middle">validator_opinions</text>
+    <text class="d-sub" x="460" y="72" text-anchor="middle" font-weight="600">die volle Meinung</text>
+    <text class="d-sub" x="460" y="90" text-anchor="middle">domain + actionability + confidence + reasoning</text>
+    <text class="d-sub" x="460" y="106" text-anchor="middle">UNIQUE(feedback_id, validator_model) → UPSERT</text>
+
+    <!-- Output 2: worker_run_logs (live signal) -->
+    <rect x="320" y="170" width="280" height="80" rx="8" fill="white" stroke="hsl(214 25% 75%)" stroke-width="1.5"/>
+    <text class="d-lbl" x="460" y="195" text-anchor="middle">worker_run_logs</text>
+    <text class="d-sub" x="460" y="212" text-anchor="middle" font-weight="600">das kompakte Live-Signal</text>
+    <text class="d-sub" x="460" y="228" text-anchor="middle">run_uuid + voice + mail_id +</text>
+    <text class="d-sub" x="460" y="242" text-anchor="middle">event_type='validated' + message</text>
+
+    <!-- consumers from validator_opinions -->
+    <path class="d-edge" d="M 600 60 L 680 60" marker-end="url(#d-arr)"/>
+    <path class="d-edge" d="M 600 90 L 680 110" marker-end="url(#d-arr)"/>
+    <rect x="680" y="35" width="240" height="50" rx="6" fill="hsl(210 60% 96%)" stroke="hsl(214 70% 60%)"/>
+    <text class="d-lbl" x="800" y="55" text-anchor="middle">Mail-Queue UI</text>
+    <text class="d-sub" x="800" y="72" text-anchor="middle">Stimmen-Streifen (live + history)</text>
+    <rect x="680" y="92" width="240" height="50" rx="6" fill="hsl(28 95% 95%)" stroke="hsl(22 90% 60%)"/>
+    <text class="d-lbl" x="800" y="112" text-anchor="middle">auto_uebernahme</text>
+    <text class="d-sub" x="800" y="129" text-anchor="middle">prüft 4/4-Konsens nach Run-Ende</text>
+
+    <!-- consumers from worker_run_logs -->
+    <path class="d-edge" d="M 600 210 L 680 210" marker-end="url(#d-arr)"/>
+    <rect x="680" y="185" width="240" height="50" rx="6" fill="hsl(173 60% 95%)" stroke="hsl(173 60% 50%)"/>
+    <text class="d-lbl" x="800" y="205" text-anchor="middle">Pipeline-UI (live)</text>
+    <text class="d-sub" x="800" y="222" text-anchor="middle">stationLabel, Progress-Bar, ModelCards</text>
+  </svg>
+</section>
+
+<!-- ============================================================ -->
+<!-- §6 KONSENS                                                     -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§6 · 4/4-KONSENS</div>
+  <h2>Wann wird eine Mail übernommen?</h2>
+
+  <svg class="diag" viewBox="0 0 940 360" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="k-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 16% 50%)"/>
+      </marker>
+      <marker id="k-arr-g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(142 64% 42%)"/>
+      </marker>
+      <marker id="k-arr-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(0 65% 48%)"/>
+      </marker>
+    </defs>
+    <style>
+      .k-vote { fill: white; stroke: hsl(214 25% 75%); stroke-width: 1.4; }
+      .k-vote-yes { fill: hsl(142 50% 92%); stroke: hsl(142 64% 50%); }
+      .k-vote-no { fill: hsl(0 65% 95%); stroke: hsl(0 65% 60%); }
+      .k-lbl { font: 12px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); font-weight: 600; }
+      .k-sub { font: 11px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); }
+      .k-result { font: 13px ui-monospace, SF Mono, monospace; font-weight: 700; }
+    </style>
+
+    <!-- 4 voices vertically -->
+    <rect class="k-vote k-vote-yes" x="40" y="40" width="240" height="48" rx="6"/>
+    <text class="k-lbl" x="55" y="63">heuristik</text>
+    <text class="k-sub" x="55" y="79">→ immo + actionable ✓</text>
+    <text class="k-result" x="265" y="71" text-anchor="end" fill="hsl(142 64% 35%)">JA</text>
+
+    <rect class="k-vote k-vote-yes" x="40" y="100" width="240" height="48" rx="6"/>
+    <text class="k-lbl" x="55" y="123"><tspan>● </tspan>gemma</text>
+    <text class="k-sub" x="55" y="139">→ immo + actionable ✓</text>
+    <text class="k-result" x="265" y="131" text-anchor="end" fill="hsl(142 64% 35%)">JA</text>
+
+    <rect class="k-vote k-vote-yes" x="40" y="160" width="240" height="48" rx="6"/>
+    <text class="k-lbl" x="55" y="183"><tspan>● </tspan>qwen</text>
+    <text class="k-sub" x="55" y="199">→ immo + actionable ✓</text>
+    <text class="k-result" x="265" y="191" text-anchor="end" fill="hsl(142 64% 35%)">JA</text>
+
+    <rect class="k-vote k-vote-yes" x="40" y="220" width="240" height="48" rx="6"/>
+    <text class="k-lbl" x="55" y="243"><tspan>● </tspan>qwen-thinking</text>
+    <text class="k-sub" x="55" y="259">→ immo + actionable ✓</text>
+    <text class="k-result" x="265" y="251" text-anchor="end" fill="hsl(142 64% 35%)">JA</text>
+
+    <!-- AND-Gate / block marker check -->
+    <rect class="k-vote" x="350" y="100" width="180" height="148" rx="6" fill="hsl(210 25% 96%)"/>
+    <text class="k-lbl" x="440" y="135" text-anchor="middle">+ kein Block-Marker</text>
+    <text class="k-sub" x="440" y="155" text-anchor="middle">out_of_corridor</text>
+    <text class="k-sub" x="440" y="170" text-anchor="middle">projektiert</text>
+    <text class="k-sub" x="440" y="185" text-anchor="middle">zwangsversteigerung</text>
+    <text class="k-sub" x="440" y="200" text-anchor="middle">price_on_request</text>
+    <text class="k-sub" x="440" y="225" text-anchor="middle" font-weight="600">(aus feedback.heuristic_markers)</text>
+
+    <!-- arrows from voices to AND-gate -->
+    <path d="M 280 64 L 350 130" stroke="hsl(142 64% 50%)" stroke-width="1.4" fill="none" marker-end="url(#k-arr-g)"/>
+    <path d="M 280 124 L 350 150" stroke="hsl(142 64% 50%)" stroke-width="1.4" fill="none" marker-end="url(#k-arr-g)"/>
+    <path d="M 280 184 L 350 190" stroke="hsl(142 64% 50%)" stroke-width="1.4" fill="none" marker-end="url(#k-arr-g)"/>
+    <path d="M 280 244 L 350 220" stroke="hsl(142 64% 50%)" stroke-width="1.4" fill="none" marker-end="url(#k-arr-g)"/>
+
+    <!-- arrow from gate to result -->
+    <path d="M 530 175 L 600 175" stroke="hsl(142 64% 50%)" stroke-width="2" fill="none" marker-end="url(#k-arr-g)"/>
+
+    <!-- promotion result -->
+    <rect x="600" y="130" width="300" height="90" rx="8" fill="hsl(142 50% 92%)" stroke="hsl(142 64% 42%)" stroke-width="2"/>
+    <text class="k-lbl" x="750" y="160" text-anchor="middle" fill="hsl(142 64% 25%)" font-size="14">✓ UEBERNOMMEN</text>
+    <text class="k-sub" x="750" y="180" text-anchor="middle">UPDATE feedback SET actionability='uebernommen'</text>
+    <text class="k-sub" x="750" y="196" text-anchor="middle">+ Log: voice='auto' event_type='promoted'</text>
+    <text class="k-sub" x="750" y="212" text-anchor="middle" font-weight="600">→ Eintritt in Council-Pool</text>
+
+    <!-- alternative path: no consensus -->
+    <text class="k-sub" x="440" y="295" text-anchor="middle" font-weight="600" fill="hsl(0 65% 48%)">Wenn auch nur EINER nein sagt oder ein Block-Marker dabei ist:</text>
+    <rect x="600" y="280" width="300" height="60" rx="8" fill="hsl(0 65% 95%)" stroke="hsl(0 65% 60%)" stroke-width="1.5"/>
+    <text class="k-lbl" x="750" y="305" text-anchor="middle" fill="hsl(0 65% 35%)">✗ NO_CONSENSUS</text>
+    <text class="k-sub" x="750" y="325" text-anchor="middle">Mail bleibt actionable · Log mit Begründung</text>
+
+    <path d="M 530 320 L 600 310" stroke="hsl(0 65% 48%)" stroke-width="1.5" fill="none" stroke-dasharray="4 3" marker-end="url(#k-arr-r)"/>
+  </svg>
+
+  <p class="ref">Code: <code>auto_uebernahme.py:75–90</code> (Eligibility) · <code>:148–187</code> (Promotion-UPDATE)</p>
+</section>
+
+<!-- ============================================================ -->
+<!-- §7 KONSUMENTEN                                                 -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§7 · WER LIEST WAS WANN</div>
+  <h2>Vier Konsumenten — eine Quelle</h2>
+
+  <svg class="diag" viewBox="0 0 940 320" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="c-arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(215 16% 50%)"/>
+      </marker>
+      <marker id="c-arr-x" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+        <path d="M0,0 L10,5 L0,10 z" fill="hsl(0 65% 60%)"/>
+      </marker>
+    </defs>
+    <style>
+      .c-lbl { font: 12px ui-monospace, SF Mono, monospace; fill: hsl(222 47% 11%); font-weight: 600; }
+      .c-sub { font: 11px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); }
+      .c-when { font: 10.5px ui-monospace, SF Mono, monospace; fill: hsl(215 16% 47%); font-style: italic; }
+    </style>
+
+    <!-- two sources in center -->
+    <rect x="350" y="40" width="240" height="60" rx="8" fill="white" stroke="hsl(214 25% 75%)" stroke-width="1.5"/>
+    <text class="c-lbl" x="470" y="64" text-anchor="middle">validator_opinions</text>
+    <text class="c-sub" x="470" y="82" text-anchor="middle">die volle Meinung pro (mail × voice)</text>
+
+    <rect x="350" y="200" width="240" height="60" rx="8" fill="white" stroke="hsl(214 25% 75%)" stroke-width="1.5"/>
+    <text class="c-lbl" x="470" y="224" text-anchor="middle">worker_run_logs</text>
+    <text class="c-sub" x="470" y="242" text-anchor="middle">Live-Events während des Runs</text>
+
+    <!-- Consumer 1: Mail-Queue UI (live, async) — from opinions -->
+    <path d="M 590 60 Q 700 60 720 60" stroke="hsl(215 16% 50%)" stroke-width="1.4" fill="none" marker-end="url(#c-arr)"/>
+    <rect x="720" y="35" width="200" height="60" rx="6" fill="hsl(210 60% 96%)" stroke="hsl(214 70% 60%)"/>
+    <text class="c-lbl" x="820" y="58" text-anchor="middle">Mail-Queue UI</text>
+    <text class="c-sub" x="820" y="74" text-anchor="middle">Stimmen-Streifen, History</text>
+    <text class="c-when" x="820" y="88" text-anchor="middle">bei jedem Page-Load</text>
+
+    <!-- Consumer 2: auto_uebernahme — from opinions -->
+    <path d="M 590 90 Q 700 130 720 130" stroke="hsl(215 16% 50%)" stroke-width="1.4" fill="none" marker-end="url(#c-arr)"/>
+    <rect x="720" y="105" width="200" height="60" rx="6" fill="hsl(28 95% 95%)" stroke="hsl(22 90% 60%)"/>
+    <text class="c-lbl" x="820" y="128" text-anchor="middle">auto_uebernahme</text>
+    <text class="c-sub" x="820" y="144" text-anchor="middle">prüft 4/4-Konsens</text>
+    <text class="c-when" x="820" y="158" text-anchor="middle">in-process post-run</text>
+
+    <!-- Consumer 3: Pipeline-UI live — from logs -->
+    <path d="M 590 230 Q 700 220 720 220" stroke="hsl(215 16% 50%)" stroke-width="1.4" fill="none" marker-end="url(#c-arr)"/>
+    <rect x="720" y="195" width="200" height="60" rx="6" fill="hsl(173 60% 95%)" stroke="hsl(173 60% 50%)"/>
+    <text class="c-lbl" x="820" y="218" text-anchor="middle">Pipeline-UI (live)</text>
+    <text class="c-sub" x="820" y="234" text-anchor="middle">Progress-Bar, Cards, LiveLog</text>
+    <text class="c-when" x="820" y="248" text-anchor="middle">5s-Polling während Run</text>
+
+    <!-- Crossed-out: Council-Lens does NOT read -->
+    <rect x="720" y="265" width="200" height="50" rx="6" fill="white" stroke="hsl(0 65% 70%)" stroke-width="1.5" stroke-dasharray="5 3"/>
+    <text class="c-lbl" x="820" y="288" text-anchor="middle" fill="hsl(0 65% 50%)">Council-Lens</text>
+    <text class="c-sub" x="820" y="303" text-anchor="middle" fill="hsl(0 65% 50%)">liest dies NICHT (eigene DB)</text>
+    <line x1="720" y1="265" x2="920" y2="315" stroke="hsl(0 65% 60%)" stroke-width="1.5"/>
+
+    <!-- Connection label: auto_uebernahme → feedback.actionability -->
+    <text class="c-sub" x="50" y="135" font-style="italic">auto_uebernahme schreibt zurück nach</text>
+    <text class="c-sub" x="50" y="150" font-style="italic">feedback.actionability='uebernommen',</text>
+    <text class="c-sub" x="50" y="165" font-style="italic">was später die Council-Ingest-Pipeline</text>
+    <text class="c-sub" x="50" y="180" font-style="italic">aufnimmt — DAS ist der indirekte</text>
+    <text class="c-sub" x="50" y="195" font-style="italic">Brückenschlag zu Council.</text>
+  </svg>
+</section>
+
+<!-- ============================================================ -->
+<!-- §8 ANHANG                                                      -->
+<!-- ============================================================ -->
+<section>
+  <div class="eyebrow">§8 · ANHANG</div>
+  <h2>Volltext &amp; Bar-Fix</h2>
+
+  <details class="collapsed">
+    <summary>Voller LENS_PROMPT — die Schablone für alle drei Stimmen</summary>
+<pre class="code-block prompt">Du bist ein blinder Klassifikator für E-Mail-Triage. Du arbeitest unabhängig —
+es gibt keine vorherigen Urteile, kein Plugin-Hint, keine Heuristik-Vorgabe.
+Klassifiziere die E-Mail nur aus dem, was du selbst siehst, auf 2 Achsen:
+domain × actionability.
+
+Domain (genau EINE):
+  - immo            (Immobilien: Portale, Privat, Inserate)
+  - job             (Job-Suche: LinkedIn, Indeed, Karriere)
+  - shopping        (Bestellungen, Paketzustellung, Lieferungen, Versand)
+  - finance         (Rechnungen, Versicherungen, Steuern, Banken, Abos)
+  - kontakt         (private Personen, direkte berufliche Kommunikation, kein Bulk-Sender)
+  - werbung         (Newsletter, Marketing, Promo, Aktionen, Rabatte)
+  - system          (Security-Alerts, 2FA, Account-Verifizierung)
+  - unsorted        (kein klares Match)
+
+WICHTIG — Substanz-Definition für domain=immo (Bauteil 8):
+Eine Mail ist nur dann domain=immo, wenn sie sich auf EIN KONKRETES
+OBJEKT bezieht — erkennbar an mindestens ZWEI der folgenden Stammdaten:
+  - Adresse oder PLZ
+  - Preis (€/CHF)
+  - qm (Wohnfläche)
+  - Inserat-URL mit /expose/, /Expose/, /Detail/ oder ähnlichem Pattern
+
+Actionability (genau EINE — Definitionen aus zentralem Regelwerk):
+{actionability_block}
+
+User-Context (relevant für Priorisierung):
+{user_context_block}
+
+E-Mail:
+  Sender:  {sender}
+  Subject: {subject}
+  Body (erste 1000 Zeichen):
+{body}
+
+Antworte AUSSCHLIESSLICH als JSON:
+{"domain": "&lt;domain&gt;", "actionability": "&lt;actionability&gt;", "confidence": &lt;0.0-1.0&gt;, "reasoning": "&lt;max 200 Zeichen&gt;"}</pre>
+    <p class="ref">aion-lumen/multi-agent/scripts/validator_batch.py:112–169</p>
+  </details>
+
+  <details class="collapsed">
+    <summary>Bar-Fix · warum die Bar bei 5/5 stehen blieb · was jetzt anders ist</summary>
+    <h3>Diagnose</h3>
+    <p>Distinct mail_ids saturieren nach der ersten Voice (gemma) bei <code>tranche_size</code>. Voice 2 + 3 bringen keine neuen mail_ids — die Bar steht.</p>
+<pre class="code-block">// vorher
+const done = new Set(
+  logs.filter(l =&gt; l.event_type === 'validated').map(l =&gt; l.mail_id)
+).size;
+const total = data.activeRun.tranche_size;        // = 5
+return { done, total, unit: 'Mails' };</pre>
+
+    <h3>Fix (Variante A · heute aktiv)</h3>
+    <p>Bar zählt Log-Zeilen (mail × voice combos). Bei 5 Mails × 3 Voices: 0 → 15. Unit „Stimmen" — wie LiveDetail.progressUnit es schon machte.</p>
+<pre class="code-block">// jetzt
+const done = logs.filter(l =&gt; l.event_type === 'validated').length;
+const tSize = data.activeRun.tranche_size;
+const total = tSize &gt; 0 ? tSize * 3 : done;       // 3 Voices
+return { done, total, unit: 'Stimmen' };</pre>
+    <p class="ref">+page.svelte:254–291 · LiveDetail.svelte:73</p>
+  </details>
+
+  <details class="collapsed">
+    <summary>Resolved · ehemalige offene Frage zur Cascade-Doppelung</summary>
+    <p><strong>Resolved 2026-06-10 via Direktive D.</strong> Architekt hat den dritten Pfad gewählt: Cascade-Subprocess komplett aus <code>production_worker.py</code> entfernt. Worker macht ab jetzt nur noch Heuristik, der Validator-Run wird vom folio worker-runner als eigener Prozess gespawnt — race-frei via explizitem <code>--mail-ids</code>-Handoff aus den heuristik-Logs, verknüpft via neuer <code>parent_run_uuid</code>-Spalte. Decision-Doc: <code>cascade-validator-cleanup-decision-2026-06-11.md</code>, Implementation: <code>fieldnote-direktive-d-pipeline-refactor-2026-06-10.md</code>.</p>
+    <p>Historischer Stand (vor Direktive D) folgt unten als Archiv-Referenz.</p>
+    <hr style="border: none; border-top: 1px dashed var(--border); margin: 12px 0;">
+    <p><strong>Heutiger Zustand (vor D):</strong> Worker-Cascade läuft, beendet sich, dann läuft Auto-Validator nochmal über dieselben Mails. UPSERT macht das Ergebnis korrekt, aber 50% LLM-Compute ist Doppelarbeit (~10 min extra pro 5er-Tranche).</p>
+    <p><strong>Mögliche Lösung (nicht in diesem Patch):</strong> in <code>worker-runner/manager.ts:212</code> den Auto-Trigger überspringen, wenn <code>cascade_ok</code> im silent run vorkommt (oder generell skippen bei <code>silent + cascade=true</code>). Dazu müsste der Worker bei Cascade-Erfolg ein Signal hinterlassen, das der Manager liest.</p>
+    <p><strong>Alternativ:</strong> die Cascade abschaffen und nur den Auto-Validator behalten — dann verliert man aber das „same run_uuid"-Pattern, das die Cascade in der UI klar als Worker-Teilphase erkennbar macht.</p>
+    <p>Architekten-Entscheidung. Datei: <code>worker-runner/manager.ts:208–224</code> · <code>production_worker.py:1086–1152</code>.</p>
+  </details>
+</section>
+
+<div class="footnote">
+  Stand: 2026-06-11 · zugehörige Direktive: <code>directive-pipeline-findings-2026-06-11.md</code> · Field-Note: <code>fieldnote-pipeline-findings-2026-06-11.md</code> (F1–F9).
+</div>
+
+</main>
+</body>
+</html>

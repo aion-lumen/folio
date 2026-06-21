@@ -1,0 +1,32 @@
+node_modules
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.*
+!.env.example
+!.env.test
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# State — folio.db now lives in ~/.folio/. Defensive ignore in case anything
+# writes back here (was the source of vite-watcher full-reload bug).
+/state/
+src/lib/server/folio-db/.test-tmp/
+/folio.db
+
+# Vitest local output
+test-results/
