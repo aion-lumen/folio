@@ -52,6 +52,45 @@ HERMES_API_KEY=your-key-here
 
 For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and [docs/MAIL.md](docs/MAIL.md).
 
+## Demo (mock data)
+
+Bundled demo of the full pipeline against isolated `*-demo.db` files on port `5174` — your real `~/.folio` is untouched. Prerequisites: seed the demo state from multi-agent-lab first (see [Demo (full stack)](#demo-full-stack) below).
+
+```bash
+bash scripts/demo-server.sh
+```
+
+Then open `http://localhost:5174/pipeline` (Pipeline page) or `http://localhost:5174/council` (Council list).
+
+## Demo (full stack)
+
+Full pipeline demo (folio UI + multi-agent worker simulation) — no IMAP, no LLM, no real data. Reproducible end-to-end against a fictional Alex + Maya household in the Algarve.
+
+1. **Clone both repos** side-by-side:
+   ```bash
+   git clone https://github.com/aion-lumen/folio.git
+   git clone https://github.com/aion-lumen/multi-agent-lab.git
+   ```
+2. **Seed the demo DBs** in multi-agent-lab. This populates the isolated `*-demo.db` files (folio + council + feedback) with the demo content — Council is NOT required, an empty `~/.council/` works:
+   ```bash
+   cd multi-agent-lab
+   python3 -m venv .venv && source .venv/bin/activate
+   pip install -r requirements.txt
+   cp config/user_context.example.yaml config/user_context.yaml
+   cp config/immo_whitelist.example.yaml config/immo_whitelist.yaml
+   cp config/regelwerk.example.yaml config/regelwerk.yaml
+   make demo
+   ```
+3. **Start the folio demo server** (isolated `*-demo.db`, port 5174):
+   ```bash
+   cd ../folio
+   npm install
+   bash scripts/demo-server.sh
+   ```
+4. **Open** `http://localhost:5174/pipeline` — Pipeline page should render with seeded worker runs, validator opinions, and a populated Hauskauf kanban.
+
+See [docs/quickstart.md](docs/quickstart.md) for the demo's environment variables and what each `*-demo.db` file holds.
+
 ## Screenshots
 
 Captured against the bundled demo state (fictional Alex + Maya household in Algarve, no real data). Reproducible end-to-end — see [multi-agent quickstart](https://github.com/aion-lumen/multi-agent-lab/blob/main/docs/quickstart.md) for the `make demo` workflow.
