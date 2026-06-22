@@ -30,7 +30,9 @@ Cloud AI forgets you at the end of every session. You start over. Every time. Fo
 
 ## Quick Start
 
-**Prerequisites:** Node.js 20+, [Hermes Agent](https://github.com/NousResearch/hermes-agent) installed and running.
+**Prerequisites:** Node.js 20+. The demo vault runs fully self-contained — no
+Hermes needed. A running [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+is only required for the AI chat / full operation (see below).
 
 ```bash
 git clone https://github.com/aion-lumen/folio.git

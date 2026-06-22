@@ -4,7 +4,11 @@ import { homedir } from 'os';
 import { join } from 'path';
 
 export function getVaultPath(): string {
-	const p = env.VAULT_PATH;
+	// Read process.env first (live), falling back to $env/dynamic/private (a
+	// startup snapshot from .env). The setup wizard sets process.env.VAULT_PATH
+	// at runtime, so the freshly created/linked vault is reachable without a
+	// server restart; the snapshot still covers a normal restart where .env holds it.
+	const p = process.env.VAULT_PATH ?? env.VAULT_PATH;
 	if (!p) throw new Error('VAULT_PATH not set');
 	return p;
 }

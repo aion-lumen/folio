@@ -30,6 +30,9 @@ export const POST: RequestHandler = async ({ request }) => {
 		envContent += `\nVAULT_PATH=${vaultPath}`;
 	}
 	await writeFile(ENV_PATH, envContent, 'utf-8');
+	// Make the vault visible to the running process without a restart
+	// (vite preview does not reload .env; getVaultPath() reads process.env).
+	process.env.VAULT_PATH = vaultPath;
 
 	throw redirect(302, '/?setup=existing');
 };

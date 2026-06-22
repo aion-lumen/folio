@@ -1,27 +1,9 @@
 <script lang="ts">
 	import { Loader2 } from 'lucide-svelte';
+	import { enhance } from '$app/forms';
 
+	let { form } = $props();
 	let loading = $state(false);
-	let errorMsg = $state('');
-
-	async function startDemo() {
-		loading = true;
-		errorMsg = '';
-		try {
-			const res = await fetch('/setup/demo', { method: 'POST' });
-			if (res.redirected) {
-				window.location.href = res.url;
-				return;
-			}
-			if (!res.ok) {
-				errorMsg = await res.text();
-			}
-		} catch (e) {
-			errorMsg = e instanceof Error ? e.message : 'Unbekannter Fehler';
-		} finally {
-			loading = false;
-		}
-	}
 </script>
 
 <div class="min-h-screen bg-background flex items-center justify-center p-4">
@@ -43,9 +25,9 @@
 			</ul>
 		</div>
 
-		{#if errorMsg}
+		{#if form?.message}
 			<div class="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
-				{errorMsg}
+				{form.message}
 			</div>
 		{/if}
 
@@ -56,15 +38,27 @@
 			>
 				Zurück
 			</a>
-			<button
-				onclick={startDemo}
-				disabled={loading}
-				class="flex-1 rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground
-					hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+			<form
+				method="POST"
+				class="flex-1"
+				use:enhance={() => {
+					loading = true;
+					return async ({ update }) => {
+						await update();
+						loading = false;
+					};
+				}}
 			>
-				{#if loading}<Loader2 size={14} class="animate-spin" />{/if}
-				{loading ? 'Erstelle...' : 'Demo starten'}
-			</button>
+				<button
+					type="submit"
+					disabled={loading}
+					class="w-full rounded-md bg-primary px-4 py-2 text-sm text-primary-foreground
+						hover:bg-primary/90 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+				>
+					{#if loading}<Loader2 size={14} class="animate-spin" />{/if}
+					{loading ? 'Erstelle...' : 'Demo starten'}
+				</button>
+			</form>
 		</div>
 	</div>
 </div>
