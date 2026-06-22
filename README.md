@@ -24,7 +24,7 @@ Cloud AI forgets you at the end of every session. You start over. Every time. Fo
 ## Stack
 
 - SvelteKit 2 + Svelte 5 (Runes), Tailwind CSS 4
-- Drizzle ORM + PostgreSQL (optional, for session persistence)
+- SQLite (local, file-based) via better-sqlite3 — no DB server
 - Local LLMs via Hermes Agent (Nous Research)
 - Cytoscape.js for graph visualisations
 

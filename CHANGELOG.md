@@ -56,7 +56,7 @@ companion (Hermes Agent) as backend.
 
 - SvelteKit 2 + Svelte 5 (Runes)
 - Tailwind CSS 4
-- Drizzle ORM for setup state
+- SQLite (local, file-based) via better-sqlite3 for setup state
 - Local-first: no telemetry, no cloud dependencies
 - Designed to run alongside a Hermes Agent gateway on the user's machine (default `http://localhost:8642`)
 
