@@ -1,5 +1,5 @@
 export interface ChatEvent {
-	type: 'text' | 'tool_call' | 'tool_result' | 'error';
+	type: 'text' | 'tool_call' | 'tool_result' | 'error' | 'system_notice';
 	content?: string;
 	name?: string;
 	args?: Record<string, unknown>;

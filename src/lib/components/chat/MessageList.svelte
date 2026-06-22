@@ -62,6 +62,10 @@
 						<div class="rounded-lg px-3 py-2 text-sm bg-destructive/10 text-destructive border border-destructive/20">
 							⚠ {event.content}
 						</div>
+					{:else if event.type === 'system_notice'}
+						<div class="px-2 py-1 text-xs italic text-muted-foreground/80">
+							ℹ {event.content}
+						</div>
 					{/if}
 				{/each}
 				{#if msg.streaming}

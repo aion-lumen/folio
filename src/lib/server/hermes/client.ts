@@ -1,5 +1,7 @@
 import { readFile } from 'fs/promises';
+import { homedir } from 'os';
 import { join } from 'path';
+import Database from 'better-sqlite3';
 import { getHermesApiUrl, getHermesApiKey } from '../env.js';
 import { loadCampaign, loadActiveChapter, loadAllChapters } from '../vault/reader.js';
 import { getLeuchtfeuer } from '../vault/leuchtfeuer.js';
@@ -11,7 +13,7 @@ export interface ChatContext {
 }
 
 export interface HermesEvent {
-	type: 'tool_call' | 'tool_result' | 'text' | 'error';
+	type: 'tool_call' | 'tool_result' | 'text' | 'error' | 'system_notice';
 	content?: string;
 	name?: string;
 	args?: Record<string, unknown>;
@@ -225,27 +227,90 @@ export async function sendMessage(
 		? `${instructions}${selectedContext}`
 		: instructions;
 
+	const body = {
+		model: 'default',
+		input: message,
+		instructions: fullInstructions,
+		conversation: 'folio-vault-chat',
+		store: true
+	};
+
 	const response = await fetch(`${getHermesApiUrl()}/v1/responses`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
 			Authorization: `Bearer ${getHermesApiKey()}`
 		},
-		body: JSON.stringify({
-			model: 'default',
-			input: message,
-			instructions: fullInstructions,
-			conversation: 'folio-vault-chat',
-			store: true
-		})
+		body: JSON.stringify(body)
 	});
 
 	if (!response.ok) {
 		const errText = await response.text().catch(() => response.statusText);
-		throw new Error(`Hermes error: ${response.status} — ${errText}`);
+		const isStaleChain =
+			response.status === 404 && errText.includes('Previous response not found');
+		if (!isStaleChain) {
+			throw new Error(`Hermes error: ${response.status} — ${errText}`);
+		}
+
+		// Hermes' conversation pointer (`response_store.db:conversations`) references
+		// a response_id that's no longer in the responses table — happens when the
+		// response TTL prunes the row but the pointer is left behind. Clear the orphan
+		// pointer (surgical DELETE on the row Hermes just told us is broken), then
+		// retry with the original body. Hermes then treats the conversation name as
+		// fresh, stores the new response, and self-heals the pointer. Prepend a
+		// system_notice so the user sees the chain was reset.
+		console.warn(
+			'[hermes/client] orphan previous_response_id detected, clearing pointer + retrying'
+		);
+		clearHermesConversationPointer(body.conversation);
+
+		const retry = await fetch(`${getHermesApiUrl()}/v1/responses`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${getHermesApiKey()}`
+			},
+			body: JSON.stringify(body)
+		});
+
+		if (!retry.ok) {
+			const retryErr = await retry.text().catch(() => retry.statusText);
+			throw new Error(
+				`Hermes error (after orphan clear + retry): ${retry.status} — ${retryErr}`
+			);
+		}
+
+		const retryEvents: HermesEvent[] = [
+			{
+				type: 'system_notice',
+				content:
+					'Chat-Verlauf zurückgesetzt (Hermes Response Chain unterbrochen). Antwort folgt als neuer Thread.'
+			}
+		];
+		retryEvents.push(...parseHermesOutput(await retry.json()));
+		return retryEvents;
 	}
 
-	const data = await response.json();
+	return parseHermesOutput(await response.json());
+}
+
+function clearHermesConversationPointer(name: string): void {
+	// Hermes' response_store.db is shared state. Hermes runs WAL-mode sqlite, so a
+	// concurrent DELETE from another process is safe. The DELETE is a no-op if the
+	// row is already gone.
+	try {
+		const dbPath = join(homedir(), '.hermes', 'response_store.db');
+		const db = new Database(dbPath);
+		db.prepare('DELETE FROM conversations WHERE name = ?').run(name);
+		db.close();
+	} catch (e) {
+		// Non-fatal: the retry still happens; the next call may show system_notice
+		// again, but the user-facing error stays a system_notice rather than a 404.
+		console.warn('[hermes/client] could not clear orphan conversation pointer:', e);
+	}
+}
+
+function parseHermesOutput(data: { output?: unknown[] }): HermesEvent[] {
 	const output: unknown[] = data.output ?? [];
 	const events: HermesEvent[] = [];
 
