@@ -23,11 +23,11 @@
   // Accounts ───────────────────────────────────────────────────────────────
   const ACCOUNTS = [
     { id: "gmail", label: "gmail", addr: "you@example.com",
-      hue: 8,  desc: "Privat · langjährig" },
+      hue: 8,  desc: "Personal · primary" },
     { id: "yahoo", label: "yahoo", addr: "you@example.net",
-      hue: 280, desc: "Tranche 1 (aktiv im Refactor)" },
+      hue: 280, desc: "Secondary" },
     { id: "mirhamed_ch", label: "mirhamed.ch", addr: "you@example.org",
-      hue: 200, desc: "Behörden + Bewerbung" },
+      hue: 200, desc: "Custom domain" },
   ];
 
   const rows = [];

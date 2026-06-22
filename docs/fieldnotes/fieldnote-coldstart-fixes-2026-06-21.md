@@ -4,7 +4,7 @@
 
 ## What was broken
 
-A cold-start test (one session prior) cloned both public repos into a throwaway dir and followed the docs literally. Ten divergences came out (D1–D10). Owner triaged them. While reading the divergence report this session, the engineer found an **eleventh, more serious leak**: the author/committer fields of the orphan commits on both public repos still carried `redacted@example.com`. The Route B PII grep in the previous session had only checked file contents, not git metadata.
+A cold-start test (one session prior) cloned both public repos into a throwaway dir and followed the docs literally. Ten divergences came out (D1–D10). Owner triaged them. While reading the divergence report this session, the engineer found an **eleventh, more serious leak**: the author/committer fields of the orphan commits on both public repos still carried a private e-mail address (now redacted). The Route B PII grep in the previous session had only checked file contents, not git metadata.
 
 | # | Item | Severity | Owner-Decision |
 |---|---|---|---|

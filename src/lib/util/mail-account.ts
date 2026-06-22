@@ -12,24 +12,26 @@ export interface AccountMeta {
 	desc: string;
 }
 
+// NOTE: `addr`/`desc` are placeholder display metadata only — never put real
+// e-mail addresses here. Account config (IMAP creds) lives outside this repo.
 export const ACCOUNTS: Record<AccountId, AccountMeta> = {
 	gmail: {
 		id: 'gmail',
 		label: 'gmail',
 		addr: 'you@example.com',
-		desc: 'Privat · langjährig'
+		desc: 'Personal · primary'
 	},
 	yahoo: {
 		id: 'yahoo',
 		label: 'yahoo',
 		addr: 'you@example.net',
-		desc: 'Tranche 1 (aktiv im Refactor)'
+		desc: 'Secondary'
 	},
 	mirhamed_ch: {
 		id: 'mirhamed_ch',
 		label: 'mirhamed.ch',
 		addr: 'you@example.org',
-		desc: 'Behörden + Bewerbung'
+		desc: 'Custom domain'
 	}
 };
 
