@@ -119,6 +119,17 @@ class ChatStore {
 				})
 			});
 
+			if (!res.ok) {
+				let detail = `Request failed (${res.status})`;
+				try {
+					const j = await res.json();
+					if (j?.message) detail = j.message;
+				} catch {
+					// non-JSON error body — keep the status-based message
+				}
+				throw new Error(detail);
+			}
+
 			const reader = res.body!.getReader();
 			const decoder = new TextDecoder();
 			let buffer = '';

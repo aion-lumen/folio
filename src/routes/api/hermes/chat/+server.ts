@@ -3,6 +3,12 @@ import { sendMessage } from '$lib/server/hermes/client.js';
 import type { ChatContext, HistoryMessage } from '$lib/server/hermes/client.js';
 import type { RequestHandler } from './$types.js';
 
+// Single-user, local app: only one chat request may be in flight at a time.
+// A 2nd concurrent POST (a race / double-send) is rejected cleanly instead of
+// opening a parallel agent stream to the gateway — overlapping streams were
+// what drove the model-reload / token-burn loop.
+let chatInFlight = false;
+
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json();
 	const { message, context, history, selectedObjectiveIds } = body as {
@@ -13,6 +19,11 @@ export const POST: RequestHandler = async ({ request }) => {
 	};
 
 	if (!message) throw error(400, 'message required');
+
+	if (chatInFlight) {
+		throw error(409, 'A chat request is already in progress. Wait for it to finish.');
+	}
+	chatInFlight = true;
 
 	const encoder = new TextEncoder();
 
@@ -38,7 +49,13 @@ export const POST: RequestHandler = async ({ request }) => {
 				controller.enqueue(encoder.encode('data: [DONE]\n\n'));
 			} finally {
 				controller.close();
+				chatInFlight = false;
 			}
+		},
+		// Client disconnected before the stream finished — release the guard so
+		// the next message isn't blocked by a stuck in-flight flag.
+		cancel() {
+			chatInFlight = false;
 		}
 	});
 

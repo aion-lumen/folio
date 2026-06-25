@@ -213,6 +213,30 @@ async function buildSelectedContext(selectedObjectiveIds: string[]): Promise<str
 	return `\n## Vom Nutzer ausgewählte Objectives (${selected.length})\n${lines.join('\n')}\n\nWenn der Nutzer "das", "diese", "diesen Task" o.ä. ohne weitere Spezifikation sagt, bezieht er sich auf diese Auswahl. Bei Aktionen auf mehrere Items arbeite sie der Reihe nach ab.`;
 }
 
+const HERMES_TIMEOUT_MS = 30_000;
+
+// Wrap the gateway call with a timeout + clean error messages. Without this a
+// hung/reloading model leaves the request open indefinitely and a dropped
+// connection surfaces as a bare "fetch failed" in the chat UI.
+async function hermesFetch(url: string, init: RequestInit): Promise<Response> {
+	const controller = new AbortController();
+	const timer = setTimeout(() => controller.abort(), HERMES_TIMEOUT_MS);
+	try {
+		return await fetch(url, { ...init, signal: controller.signal });
+	} catch (e) {
+		if (e instanceof Error && e.name === 'AbortError') {
+			throw new Error(
+				`Hermes did not respond within ${HERMES_TIMEOUT_MS / 1000}s — the model may be loading or unavailable. Check that LM Studio has the model loaded.`
+			);
+		}
+		throw new Error(
+			`Could not reach the Hermes gateway at ${getHermesApiUrl()} — is it running?`
+		);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
 export async function sendMessage(
 	message: string,
 	context: ChatContext,
@@ -235,7 +259,7 @@ export async function sendMessage(
 		store: true
 	};
 
-	const response = await fetch(`${getHermesApiUrl()}/v1/responses`, {
+	const response = await hermesFetch(`${getHermesApiUrl()}/v1/responses`, {
 		method: 'POST',
 		headers: {
 			'Content-Type': 'application/json',
@@ -264,7 +288,7 @@ export async function sendMessage(
 		);
 		clearHermesConversationPointer(body.conversation);
 
-		const retry = await fetch(`${getHermesApiUrl()}/v1/responses`, {
+		const retry = await hermesFetch(`${getHermesApiUrl()}/v1/responses`, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/json',

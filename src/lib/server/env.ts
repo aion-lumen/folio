@@ -14,7 +14,9 @@ export function getVaultPath(): string {
 }
 
 export function getHermesApiUrl(): string {
-	return env.HERMES_API_URL ?? 'http://localhost:8642';
+	// 127.0.0.1, not localhost: the gateway binds IPv4 only, and Node may resolve
+	// `localhost` to ::1 (IPv6) first → intermittent ECONNREFUSED / "fetch failed".
+	return env.HERMES_API_URL ?? 'http://127.0.0.1:8642';
 }
 
 // F.9 — Lazy-Read ~/.hermes/.env wenn API_SERVER_KEY nicht im Vite-Process-Env steht.
