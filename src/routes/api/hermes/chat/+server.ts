@@ -26,6 +26,8 @@ export const POST: RequestHandler = async ({ request }) => {
 	chatInFlight = true;
 
 	const encoder = new TextEncoder();
+	// Aborts the gateway stream if the browser disconnects mid-response.
+	const ac = new AbortController();
 
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -33,13 +35,15 @@ export const POST: RequestHandler = async ({ request }) => {
 				controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`));
 
 			try {
-				const events = await sendMessage(
+				// sendMessage streams events as they arrive — enqueue each immediately
+				// so the UI renders progressively instead of waiting for the full turn.
+				for await (const event of sendMessage(
 					message,
 					context ?? { view: 'unknown' },
 					history ?? [],
-					selectedObjectiveIds ?? []
-				);
-				for (const event of events) {
+					selectedObjectiveIds ?? [],
+					ac.signal
+				)) {
 					enqueue(event);
 				}
 				controller.enqueue(encoder.encode('data: [DONE]\n\n'));
@@ -52,9 +56,10 @@ export const POST: RequestHandler = async ({ request }) => {
 				chatInFlight = false;
 			}
 		},
-		// Client disconnected before the stream finished — release the guard so
-		// the next message isn't blocked by a stuck in-flight flag.
+		// Client disconnected before the stream finished — abort the gateway stream
+		// and release the guard so the next message isn't blocked.
 		cancel() {
+			ac.abort();
 			chatInFlight = false;
 		}
 	});

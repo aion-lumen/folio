@@ -213,109 +213,212 @@ async function buildSelectedContext(selectedObjectiveIds: string[]): Promise<str
 	return `\n## Vom Nutzer ausgewählte Objectives (${selected.length})\n${lines.join('\n')}\n\nWenn der Nutzer "das", "diese", "diesen Task" o.ä. ohne weitere Spezifikation sagt, bezieht er sich auf diese Auswahl. Bei Aktionen auf mehrere Items arbeite sie der Reihe nach ab.`;
 }
 
-const HERMES_TIMEOUT_MS = 30_000;
+// Idle-timeout (replaces the old fixed 30s total timeout): the gateway emits
+// `: keepalive` every 30s even during silent phases (e.g. ~67s context
+// compression), so a per-chunk idle timer lets legitimate long turns stream on
+// while a true stall (no token AND no keepalive) is caught fast.
+const IDLE_TIMEOUT_MS = 45_000;
 
-// Wrap the gateway call with a timeout + clean error messages. Without this a
-// hung/reloading model leaves the request open indefinitely and a dropped
-// connection surfaces as a bare "fetch failed" in the chat UI.
-async function hermesFetch(url: string, init: RequestInit): Promise<Response> {
-	const controller = new AbortController();
-	const timer = setTimeout(() => controller.abort(), HERMES_TIMEOUT_MS);
-	try {
-		return await fetch(url, { ...init, signal: controller.signal });
-	} catch (e) {
-		if (e instanceof Error && e.name === 'AbortError') {
-			throw new Error(
-				`Hermes did not respond within ${HERMES_TIMEOUT_MS / 1000}s — the model may be loading or unavailable. Check that LM Studio has the model loaded.`
-			);
-		}
-		throw new Error(
-			`Could not reach the Hermes gateway at ${getHermesApiUrl()} — is it running?`
+// Marker: the gateway's conversation pointer is orphaned (HTTP 404 before the
+// stream starts) → caller clears it and retries once.
+class StaleChainError extends Error {}
+
+function connectionError(e: unknown): Error {
+	if (e instanceof Error && e.name === 'AbortError') {
+		return new Error(
+			`Hermes stalled — no output for ${IDLE_TIMEOUT_MS / 1000}s. The model or gateway may be stuck.`
 		);
-	} finally {
-		clearTimeout(timer);
+	}
+	return new Error(`Could not reach the Hermes gateway at ${getHermesApiUrl()} — is it running?`);
+}
+
+// Map one parsed OpenAI-Responses SSE event object to a folio HermesEvent.
+// Text arrives as deltas (the chat store merges consecutive text events).
+function mapStreamEvent(
+	obj: Record<string, unknown>,
+	toolNames: Map<string, string>
+): HermesEvent | null {
+	const t = obj.type as string;
+	if (t === 'response.output_text.delta') {
+		const delta = obj.delta;
+		return delta ? { type: 'text', content: String(delta) } : null;
+	}
+	if (t === 'response.output_item.done') {
+		const item = obj.item as Record<string, unknown> | undefined;
+		if (!item) return null;
+		if (item.type === 'function_call') {
+			if (item.call_id && item.name) toolNames.set(item.call_id as string, item.name as string);
+			let args: Record<string, unknown> = {};
+			try {
+				args = JSON.parse((item.arguments as string) ?? '{}');
+			} catch {
+				args = { raw: item.arguments };
+			}
+			return { type: 'tool_call', name: item.name as string, args };
+		}
+		if (item.type === 'function_call_output') {
+			const outStr =
+				typeof item.output === 'string' ? item.output : JSON.stringify(item.output);
+			return {
+				type: 'tool_result',
+				name: toolNames.get(item.call_id as string) ?? 'tool',
+				output: outStr.slice(0, 1000)
+			};
+		}
+		return null; // message item.done — text already streamed via deltas
+	}
+	if (t === 'response.failed' || t === 'error') {
+		const resp = obj.response as { error?: { message?: string } } | undefined;
+		const err = obj.error as { message?: string } | undefined;
+		return {
+			type: 'error',
+			content: String(resp?.error?.message ?? err?.message ?? obj.message ?? 'Hermes stream failed')
+		};
+	}
+	return null; // response.created / output_item.added / output_text.done / response.completed
+}
+
+// Extract the JSON payload from one SSE frame (lines until a blank line).
+// Comment frames (`: keepalive`) and event-only frames yield no payload.
+function parseSseFrame(frame: string): Record<string, unknown> | null {
+	const dataLines = frame
+		.split('\n')
+		.filter((l) => l.startsWith('data:'))
+		.map((l) => l.slice(5).replace(/^ /, ''));
+	if (dataLines.length === 0) return null;
+	const payload = dataLines.join('\n');
+	if (payload === '[DONE]') return null;
+	try {
+		return JSON.parse(payload);
+	} catch {
+		return null;
 	}
 }
 
-export async function sendMessage(
+// Open a streaming /v1/responses request and yield mapped events as they arrive.
+// externalSignal (from the SSE route) aborts the gateway stream if the browser
+// disconnects.
+async function* openResponseStream(
+	body: object,
+	externalSignal?: AbortSignal
+): AsyncGenerator<HermesEvent> {
+	const controller = new AbortController();
+	if (externalSignal) {
+		if (externalSignal.aborted) controller.abort();
+		else externalSignal.addEventListener('abort', () => controller.abort(), { once: true });
+	}
+	let idle: ReturnType<typeof setTimeout> | undefined;
+	const armIdle = () => {
+		if (idle) clearTimeout(idle);
+		idle = setTimeout(() => controller.abort(), IDLE_TIMEOUT_MS);
+	};
+
+	armIdle();
+	let response: Response;
+	try {
+		response = await fetch(`${getHermesApiUrl()}/v1/responses`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Accept: 'text/event-stream',
+				Authorization: `Bearer ${getHermesApiKey()}`
+			},
+			body: JSON.stringify(body),
+			signal: controller.signal
+		});
+	} catch (e) {
+		if (idle) clearTimeout(idle);
+		throw connectionError(e);
+	}
+
+	if (!response.ok || !response.body) {
+		if (idle) clearTimeout(idle);
+		const errText = await response.text().catch(() => response.statusText);
+		if (response.status === 404 && errText.includes('Previous response not found')) {
+			throw new StaleChainError();
+		}
+		throw new Error(`Hermes error: ${response.status} — ${errText}`);
+	}
+
+	const reader = response.body.getReader();
+	const decoder = new TextDecoder();
+	const toolNames = new Map<string, string>();
+	let buffer = '';
+	let sawAny = false;
+	let done = false;
+
+	try {
+		while (!done) {
+			let chunk: ReadableStreamReadResult<Uint8Array>;
+			try {
+				chunk = await reader.read();
+			} catch (e) {
+				if (controller.signal.aborted) throw connectionError(e);
+				throw connectionError(e);
+			}
+			armIdle(); // reset on ANY bytes — data event OR `: keepalive` comment
+			if (chunk.done) break;
+			buffer += decoder.decode(chunk.value, { stream: true });
+			let sep: number;
+			while ((sep = buffer.indexOf('\n\n')) !== -1) {
+				const frame = buffer.slice(0, sep);
+				buffer = buffer.slice(sep + 2);
+				const obj = parseSseFrame(frame);
+				if (!obj) continue;
+				const ev = mapStreamEvent(obj, toolNames);
+				if (ev) {
+					sawAny = true;
+					yield ev;
+				}
+				if (obj.type === 'response.completed' || obj.type === 'response.failed') done = true;
+			}
+		}
+	} finally {
+		if (idle) clearTimeout(idle);
+		reader.cancel().catch(() => {});
+	}
+
+	if (!sawAny) yield { type: 'text', content: '(keine Antwort)' };
+}
+
+export async function* sendMessage(
 	message: string,
 	context: ChatContext,
-	history: HistoryMessage[] = [],
-	selectedObjectiveIds: string[] = []
-): Promise<HermesEvent[]> {
+	// history is tracked server-side via the named conversation (+ store), so it
+	// is not sent in the body; kept in the signature for call-site compatibility.
+	_history: HistoryMessage[] = [],
+	selectedObjectiveIds: string[] = [],
+	signal?: AbortSignal
+): AsyncGenerator<HermesEvent> {
 	const [instructions, selectedContext] = await Promise.all([
 		buildSystemPrompt(context),
 		buildSelectedContext(selectedObjectiveIds)
 	]);
-	const fullInstructions = selectedContext
-		? `${instructions}${selectedContext}`
-		: instructions;
+	const fullInstructions = selectedContext ? `${instructions}${selectedContext}` : instructions;
 
 	const body = {
 		model: 'default',
 		input: message,
 		instructions: fullInstructions,
 		conversation: 'folio-vault-chat',
-		store: true
+		store: true,
+		stream: true
 	};
 
-	const response = await hermesFetch(`${getHermesApiUrl()}/v1/responses`, {
-		method: 'POST',
-		headers: {
-			'Content-Type': 'application/json',
-			Authorization: `Bearer ${getHermesApiKey()}`
-		},
-		body: JSON.stringify(body)
-	});
-
-	if (!response.ok) {
-		const errText = await response.text().catch(() => response.statusText);
-		const isStaleChain =
-			response.status === 404 && errText.includes('Previous response not found');
-		if (!isStaleChain) {
-			throw new Error(`Hermes error: ${response.status} — ${errText}`);
-		}
-
-		// Hermes' conversation pointer (`response_store.db:conversations`) references
-		// a response_id that's no longer in the responses table — happens when the
-		// response TTL prunes the row but the pointer is left behind. Clear the orphan
-		// pointer (surgical DELETE on the row Hermes just told us is broken), then
-		// retry with the original body. Hermes then treats the conversation name as
-		// fresh, stores the new response, and self-heals the pointer. Prepend a
-		// system_notice so the user sees the chain was reset.
-		console.warn(
-			'[hermes/client] orphan previous_response_id detected, clearing pointer + retrying'
-		);
+	try {
+		yield* openResponseStream(body, signal);
+	} catch (e) {
+		if (!(e instanceof StaleChainError)) throw e;
+		// Orphan conversation pointer: clear it and retry once as a fresh thread.
+		console.warn('[hermes/client] orphan previous_response_id detected, clearing pointer + retrying');
 		clearHermesConversationPointer(body.conversation);
-
-		const retry = await hermesFetch(`${getHermesApiUrl()}/v1/responses`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${getHermesApiKey()}`
-			},
-			body: JSON.stringify(body)
-		});
-
-		if (!retry.ok) {
-			const retryErr = await retry.text().catch(() => retry.statusText);
-			throw new Error(
-				`Hermes error (after orphan clear + retry): ${retry.status} — ${retryErr}`
-			);
-		}
-
-		const retryEvents: HermesEvent[] = [
-			{
-				type: 'system_notice',
-				content:
-					'Chat-Verlauf zurückgesetzt (Hermes Response Chain unterbrochen). Antwort folgt als neuer Thread.'
-			}
-		];
-		retryEvents.push(...parseHermesOutput(await retry.json()));
-		return retryEvents;
+		yield {
+			type: 'system_notice',
+			content:
+				'Chat-Verlauf zurückgesetzt (Hermes Response Chain unterbrochen). Antwort folgt als neuer Thread.'
+		};
+		yield* openResponseStream(body, signal);
 	}
-
-	return parseHermesOutput(await response.json());
 }
 
 function clearHermesConversationPointer(name: string): void {
@@ -332,47 +435,4 @@ function clearHermesConversationPointer(name: string): void {
 		// again, but the user-facing error stays a system_notice rather than a 404.
 		console.warn('[hermes/client] could not clear orphan conversation pointer:', e);
 	}
-}
-
-function parseHermesOutput(data: { output?: unknown[] }): HermesEvent[] {
-	const output: unknown[] = data.output ?? [];
-	const events: HermesEvent[] = [];
-
-	for (const item of output) {
-		const it = item as Record<string, unknown>;
-		if (it.type === 'function_call') {
-			let args: Record<string, unknown> = {};
-			try {
-				args = JSON.parse(it.arguments as string);
-			} catch {
-				args = { raw: it.arguments };
-			}
-			events.push({ type: 'tool_call', name: it.name as string, args });
-		} else if (it.type === 'function_call_output') {
-			// find matching tool_call name
-			const callId = it.call_id as string;
-			const matchingCall = (output as Record<string, unknown>[]).find(
-				(o) => o.type === 'function_call' && o.call_id === callId
-			);
-			const outputStr =
-				typeof it.output === 'string' ? it.output : JSON.stringify(it.output);
-			events.push({
-				type: 'tool_result',
-				name: (matchingCall?.name as string) ?? 'tool',
-				output: outputStr.slice(0, 1000)
-			});
-		} else if (it.type === 'message') {
-			const contents = (it.content as { type: string; text?: string }[]) ?? [];
-			const text = contents
-				.filter((c) => c.type === 'output_text')
-				.map((c) => c.text ?? '')
-				.join('');
-			if (text) events.push({ type: 'text', content: text });
-		}
-	}
-
-	if (events.length === 0) {
-		events.push({ type: 'text', content: '(keine Antwort)' });
-	}
-	return events;
 }
