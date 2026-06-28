@@ -47,10 +47,16 @@ Eine Blacklist (`disabled_toolsets`) müsste jedes nach-außen-Tool aufzählen u
   ist ungejailt, die Whitelist entzieht real).
 - folio Type-Check 0 Errors; keine casual-Namen mehr im Prompt.
 - Gateway-Diff (2 Dateien, +24 Z.) appliziert sauber auf Live (`git apply --check`).
-- **Ausstehend (nach Live-Apply + Gateway-Neustart, auf Freigabe):** echter
-  `/v1/responses`-Request „führe eine Shell aus" → das Modell hat **kein**
-  terminal-Tool (fehlt, wird nicht abgefangen); `/etc/passwd` weder via file_tools
-  (Jail) noch Terminal (entzogen). CLI-Session: Toolset unverändert.
+- **Live verifiziert (Gateway PID 53132, Patch committet 1ab43dd9c):** echter
+  `/v1/responses`-Request mit `vault_root`=Demo, der zur Shell drängt → das Modell
+  löste **0** terminal/execute_code-Calls aus und antwortete *„I don't have a
+  terminal/shell tool available in my current toolset — only read_file, write_file,
+  and patch."* Sein Ausweich-`read_file("/etc/passwd")` wurde vom Jail abgelehnt
+  (sandboxed to active vault); **kein** `/etc/passwd`-Inhalt geleakt. → weder via
+  Terminal (entzogen) noch via file_tools (Jail) erreichbar.
+- **CLI/Council unverändert** (by construction): die Beschränkung greift nur im
+  `if session_cwd_override()`-Zweig; ohne gepinnten Vault-Root bleibt
+  `enabled_toolsets` der volle api_server-Satz (inkl. terminal/execute_code).
 
 ## Vendored-Fragilität + Persistenz
 `toolsets.py` + `api_server.py` sind upstream git-tracked → fragil bei Hermes-Upgrade.
