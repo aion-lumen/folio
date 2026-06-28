@@ -58,8 +58,8 @@
 			</div>
 			<div class="head-actions">
 				<button
-					onclick={() => chatStore.clear()}
-					title="Chat löschen"
+					onclick={() => chatStore.newChat()}
+					title="Neuer Chat (setzt auch den Server-Verlauf zurück)"
 					class="icon-btn"
 				>
 					<Trash2 size={14} />

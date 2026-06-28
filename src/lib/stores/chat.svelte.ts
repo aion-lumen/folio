@@ -80,6 +80,18 @@ class ChatStore {
 		}
 	}
 
+	/** Start a fresh conversation: reset the gateway pointer (server-side history)
+	 *  AND clear the local messages. Clearing only locally would leave the gateway
+	 *  replaying the old thread. */
+	async newChat() {
+		try {
+			await fetch('/api/hermes/reset', { method: 'POST' });
+		} catch {
+			// non-fatal: still clear locally; a stale pointer self-heals on next orphan
+		}
+		this.clear();
+	}
+
 	/** Build conversation history for Hermes (excludes the latest user message). */
 	private buildHistory() {
 		return this.messages

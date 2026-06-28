@@ -1,8 +1,18 @@
 import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
+import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
 import { getHermesApiUrl, getHermesApiKey, getVaultPath } from '../env.js';
+
+// Per-vault conversation identity. The gateway keys stored history by this name;
+// deriving it from the ACTIVE vault root means the demo vault and a private vault
+// can NEVER share a conversation (and thus never replay each other's history).
+// A fixed name was the root cause of the cross-vault history leak.
+function vaultConversationName(): string {
+	const h = createHash('sha256').update(getVaultPath()).digest('hex').slice(0, 12);
+	return `folio-vault-${h}`;
+}
 import { loadCampaign, loadActiveChapter, loadAllChapters } from '../vault/reader.js';
 import { getLeuchtfeuer } from '../vault/leuchtfeuer.js';
 
@@ -405,7 +415,7 @@ export async function* sendMessage(
 		model: 'default',
 		input: message,
 		instructions: fullInstructions,
-		conversation: 'folio-vault-chat',
+		conversation: vaultConversationName(),
 		store: true,
 		stream: true,
 		// Scope the gateway's file tools to the ACTIVE vault. The gateway pins this
@@ -429,6 +439,12 @@ export async function* sendMessage(
 		};
 		yield* openResponseStream(body, signal);
 	}
+}
+
+// Reset the active vault's conversation: drop the gateway pointer so the next
+// turn starts a fresh thread (no replayed history). Used by "New chat".
+export function resetConversation(): void {
+	clearHermesConversationPointer(vaultConversationName());
 }
 
 function clearHermesConversationPointer(name: string): void {
