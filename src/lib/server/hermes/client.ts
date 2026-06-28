@@ -77,9 +77,9 @@ async function buildSystemPrompt(context: ChatContext): Promise<string> {
 
 ## Was du NICHT tun sollst
 
-- KEIN execute_code für Vault-Operationen — nutze direkt file_read, file_write, patch, list_files
+- KEIN execute_code für Vault-Operationen — nutze direkt read_file, write_file, patch, search_files
 - KEIN todo-Tool für LIFE-Objectives (nur für deine internen Arbeitsschritte)
-- KEIN Erfinden von Pfaden — wenn du den Pfad nicht kennst, nutze list_files
+- KEIN Erfinden von Pfaden — wenn du den Pfad nicht kennst, nutze search_files
 - KEIN session_search — antworte direkt basierend auf Kontext und Vault-Dateien
 
 ## Datei-Struktur des LIFE-Vaults
@@ -125,11 +125,11 @@ Innerhalb der Datei sehen Objectives so aus:
 Status-Werte (NUR diese): todo | not_started | in_progress | blocked | done | archived
 
 1. Kapitel-Datei ableiten: obj-XX-YY → chapters/XX-*.md
-   (Unbekannter Dateiname: list_files auf ${vaultRoot}/_campaign/chapters/)
-2. file_read auf die Kapitel-Datei
+   (Unbekannter Dateiname: search_files auf ${vaultRoot}/_campaign/chapters/)
+2. read_file auf die Kapitel-Datei
 3. patch mit EINDEUTIGEM old_string (siehe unten)
 4. Frontmatter "updated:" auf heute setzen (eigener patch)
-5. file_read zur Validierung
+5. read_file zur Validierung
 
 WICHTIG — patch verlangt EINDEUTIGE old_string-Matches. Die Status-Zeile
 "- **status:** in_progress" kommt mehrfach in der Datei vor (mehrere Objectives).
@@ -150,12 +150,12 @@ new_string:
 
 Regeln:
 - old_string MUSS die ### Header-Zeile enthalten (macht Match eindeutig)
-- threshold-Zeile ZEICHENGENAU aus file_read übernehmen
+- threshold-Zeile ZEICHENGENAU aus read_file übernehmen
 - completed_at VOR -weight- einfügen
 - NICHT replace_all=True nutzen (gefährlich bei mehreren Objectives)
 - Wenn patch scheitert mit "Found N matches": old_string um mehr Zeilen nach oben erweitern
 
-Fallback (nur wenn patch nicht klappt): file_read → im Kopf ändern → file_write komplett zurück
+Fallback (nur wenn patch nicht klappt): read_file → im Kopf ändern → write_file komplett zurück
 
 Bei reinen Beratungs-Fragen: Lies die relevante Vault-Datei bevor du antwortest.
 Verlasse dich nicht auf Memory allein — der aktuelle Stand steht im Vault.
