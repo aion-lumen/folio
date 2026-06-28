@@ -46,7 +46,9 @@
 	function handleCopyPath() {
 		if (!objective) return;
 		const num = String(objective.chapter_number).padStart(2, '0');
-		const path = `~/Projects/life/_campaign/chapters/${num}-*.md  §  ${objective.id}`;
+		// Vault-relative hint — no home/clear-name or private path in the copied
+		// string (screenshot hygiene). Resolve against the active vault root.
+		const path = `_campaign/chapters/${num}-*.md  §  ${objective.id}`;
 		navigator.clipboard?.writeText(path).catch(() => {});
 	}
 

@@ -11,7 +11,7 @@
 		<div class="text-center">
 			<h1 class="text-2xl font-bold">Demo-Vault</h1>
 			<p class="text-muted-foreground mt-2 text-sm">
-				Erstellt <code class="text-xs bg-muted px-1 rounded">~/Projects/life-demo/</code> mit
+				Erstellt <code class="text-xs bg-muted px-1 rounded">/Users/Shared/folio-demo/</code> mit
 				einer Beispiel-Kampagne.
 			</p>
 		</div>

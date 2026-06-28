@@ -3,7 +3,10 @@ import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
 import { join } from 'path';
 import type { Actions } from './$types.js';
 
-const DEMO_VAULT_TARGET = join(process.env.HOME!, 'Projects', 'life-demo');
+// Neutral path (no home dir / clear name): keeps the absolute path out of
+// Hermes tool-call screenshots. /Users/Shared is a standard, writable macOS
+// location with no username in the path.
+const DEMO_VAULT_TARGET = '/Users/Shared/folio-demo';
 const ENV_PATH = join(process.cwd(), '.env');
 
 async function copyDir(src: string, dest: string): Promise<void> {
