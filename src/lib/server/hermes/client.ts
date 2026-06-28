@@ -2,7 +2,7 @@ import { readFile } from 'fs/promises';
 import { homedir } from 'os';
 import { join } from 'path';
 import Database from 'better-sqlite3';
-import { getHermesApiUrl, getHermesApiKey } from '../env.js';
+import { getHermesApiUrl, getHermesApiKey, getVaultPath } from '../env.js';
 import { loadCampaign, loadActiveChapter, loadAllChapters } from '../vault/reader.js';
 import { getLeuchtfeuer } from '../vault/leuchtfeuer.js';
 
@@ -39,6 +39,11 @@ async function loadMemory(): Promise<string> {
 }
 
 async function buildSystemPrompt(context: ChatContext): Promise<string> {
+	// Active vault root (demo or the user's own) — NEVER hardcode a private path
+	// here. The gateway scopes the file tools to exactly this root (see the
+	// `vault_root` field below + the gateway-side jail), so prompt and tool
+	// surface must agree on the SAME active vault.
+	const vaultRoot = getVaultPath();
 	const [campaign, memory, leuchtfeuer] = await Promise.all([
 		loadCampaign(),
 		loadMemory(),
@@ -79,33 +84,33 @@ async function buildSystemPrompt(context: ChatContext): Promise<string> {
 
 ## Datei-Struktur des LIFE-Vaults
 
-ROOT: ~/Projects/life/
+ROOT: ${vaultRoot}/
 
 Kapitel-Dateien (HIER leben die Objectives):
-~/Projects/life/_campaign/chapters/01-repositionierung.md
-~/Projects/life/_campaign/chapters/02-durchbruch.md
-~/Projects/life/_campaign/chapters/03a-angestellt-etablierung.md
-~/Projects/life/_campaign/chapters/03b-consultant-geschaeftsgrundlage.md
-~/Projects/life/_campaign/chapters/03c-iran-orientierung.md
-~/Projects/life/_campaign/chapters/04-hauskauf.md
-~/Projects/life/_campaign/chapters/05-partner-weg.md
-~/Projects/life/_campaign/chapters/06-zweites-einkommensfeld.md
-~/Projects/life/_campaign/chapters/07-vermoegensstruktur.md
-~/Projects/life/_campaign/chapters/08-unternehmerische-praesenz.md
-~/Projects/life/_campaign/chapters/09-familienbasis.md
-~/Projects/life/_campaign/chapters/10-produkt.md
+${vaultRoot}/_campaign/chapters/01-repositionierung.md
+${vaultRoot}/_campaign/chapters/02-durchbruch.md
+${vaultRoot}/_campaign/chapters/03a-angestellt-etablierung.md
+${vaultRoot}/_campaign/chapters/03b-consultant-geschaeftsgrundlage.md
+${vaultRoot}/_campaign/chapters/03c-iran-orientierung.md
+${vaultRoot}/_campaign/chapters/04-hauskauf.md
+${vaultRoot}/_campaign/chapters/05-partner-weg.md
+${vaultRoot}/_campaign/chapters/06-zweites-einkommensfeld.md
+${vaultRoot}/_campaign/chapters/07-vermoegensstruktur.md
+${vaultRoot}/_campaign/chapters/08-unternehmerische-praesenz.md
+${vaultRoot}/_campaign/chapters/09-familienbasis.md
+${vaultRoot}/_campaign/chapters/10-produkt.md
 
-Akt-Dateien: ~/Projects/life/_campaign/acts/01-fundament.md ... 05-vollbild.md
-Master: ~/Projects/life/_campaign/campaign.md
+Akt-Dateien: ${vaultRoot}/_campaign/acts/01-fundament.md ... 05-vollbild.md
+Master: ${vaultRoot}/_campaign/campaign.md
 
 ## WICHTIG: Objectives sind KEINE eigenen Dateien
 
 Objectives (obj-01-06 etc.) sind SEKTIONEN INNERHALB der Kapitel-Dateien.
 
 Die erste Zahl im Objective-ID gibt die Kapitel-Nummer an:
-- obj-01-XX → ~/Projects/life/_campaign/chapters/01-repositionierung.md
-- obj-02-XX → ~/Projects/life/_campaign/chapters/02-durchbruch.md
-- obj-04-XX → ~/Projects/life/_campaign/chapters/04-hauskauf.md
+- obj-01-XX → ${vaultRoot}/_campaign/chapters/01-repositionierung.md
+- obj-02-XX → ${vaultRoot}/_campaign/chapters/02-durchbruch.md
+- obj-04-XX → ${vaultRoot}/_campaign/chapters/04-hauskauf.md
 - usw.
 
 Innerhalb der Datei sehen Objectives so aus:
@@ -120,7 +125,7 @@ Innerhalb der Datei sehen Objectives so aus:
 Status-Werte (NUR diese): todo | not_started | in_progress | blocked | done | archived
 
 1. Kapitel-Datei ableiten: obj-XX-YY → chapters/XX-*.md
-   (Unbekannter Dateiname: list_files auf ~/Projects/life/_campaign/chapters/)
+   (Unbekannter Dateiname: list_files auf ${vaultRoot}/_campaign/chapters/)
 2. file_read auf die Kapitel-Datei
 3. patch mit EINDEUTIGEM old_string (siehe unten)
 4. Frontmatter "updated:" auf heute setzen (eigener patch)
@@ -183,7 +188,7 @@ ${inProgress || '(keine in_progress)'}
 ${todo || '(keine)'}
 
 ## Vault-Pfad
-~/Projects/life/ — wenn du Details zu einem Objective brauchst, lies ~/Projects/life/_campaign/chapters/`;
+${vaultRoot}/ — wenn du Details zu einem Objective brauchst, lies ${vaultRoot}/_campaign/chapters/`;
 
 	const full = memory ? `${memory}\n\n${dashboardContext}` : dashboardContext;
 	if (full.length > MAX_SYSTEM_PROMPT_CHARS) {
@@ -402,7 +407,12 @@ export async function* sendMessage(
 		instructions: fullInstructions,
 		conversation: 'folio-vault-chat',
 		store: true,
-		stream: true
+		stream: true,
+		// Scope the gateway's file tools to the ACTIVE vault. The gateway pins this
+		// as the per-request working root and jails read_file/write_file to it, so
+		// the agent cannot read or write outside the active (e.g. demo) vault — even
+		// if a prompt, the user, or an injection names an absolute/~ path elsewhere.
+		vault_root: getVaultPath()
 	};
 
 	try {
