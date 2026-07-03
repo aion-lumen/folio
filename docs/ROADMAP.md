@@ -6,7 +6,6 @@
   Liste der vier etablierten Schreibpunkte (validator_opinions,
   worker_runs, worker_run_logs, worker_run_summary) ist gepflegt in
   [`aion-lumen/multi-agent/docs/cross-db-write-ausnahmen.md`](https://github.com/aion-lumen/multi-agent-lab/blob/main/docs/cross-db-write-ausnahmen.md).
-  Council schreibt nicht in folio.db; Folio liest cross-DB read-only.
 
 ## v0.1 — Current release
 

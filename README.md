@@ -62,7 +62,7 @@ Bundled demo of the full pipeline against isolated `*-demo.db` files on port `51
 bash scripts/demo-server.sh
 ```
 
-Then open `http://localhost:5174/pipeline` (Pipeline page) or `http://localhost:5174/council` (Council list).
+Then open `http://localhost:5174/pipeline` (Pipeline page).
 
 ## Demo (full stack)
 
@@ -73,13 +73,12 @@ Full pipeline demo (folio UI + multi-agent worker simulation) — no IMAP, no LL
    git clone https://github.com/aion-lumen/folio.git
    git clone https://github.com/aion-lumen/multi-agent-lab.git
    ```
-2. **Seed the demo DBs** in multi-agent-lab. This populates the isolated `*-demo.db` files (folio + council + feedback) with the demo content — Council is NOT required, an empty `~/.council/` works:
+2. **Seed the demo DBs** in multi-agent-lab. This populates the isolated `*-demo.db` files (folio + feedback) with the demo content:
    ```bash
    cd multi-agent-lab
    python3 -m venv .venv && source .venv/bin/activate
    pip install -r requirements.txt
    cp config/user_context.example.yaml config/user_context.yaml
-   cp config/immo_whitelist.example.yaml config/immo_whitelist.yaml
    cp config/regelwerk.example.yaml config/regelwerk.yaml
    make demo
    ```
@@ -89,7 +88,7 @@ Full pipeline demo (folio UI + multi-agent worker simulation) — no IMAP, no LL
    npm install
    bash scripts/demo-server.sh
    ```
-4. **Open** `http://localhost:5174/pipeline` — Pipeline page should render with seeded worker runs, validator opinions, and a populated Hauskauf kanban.
+4. **Open** `http://localhost:5174/pipeline` — Pipeline page should render with seeded worker runs and validator opinions.
 
 See [docs/quickstart.md](docs/quickstart.md) for the demo's environment variables and what each `*-demo.db` file holds.
 
@@ -100,36 +99,6 @@ Captured against the bundled demo state (fictional Alex + Maya household in Alga
 <p align="center">
   <img src="docs/screenshots/release/08-heute-20260611.png" width="720" alt="Heute dashboard — entry view with vault/mail/pipeline/hermes cards" />
   <br><sub><em>Heute dashboard — four cards as entry points (vault, mail-queue, pipeline, hermes chat).</em></sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/release/06-council-20260611.png" width="720" alt="Council — Algarve property list with cluster + Borda rank" />
-  <br><sub><em>Council — properties ranked by three lens personas (Borda-aggregated), cluster-aware (cross-portal same-address detection).</em></sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/release/02-pipeline-idle-20260611.png" width="720" alt="Pipeline overview — idle state" />
-  <br><sub><em>Pipeline overview — data-flow diagram (IMAP → Worker → Validator → Auto-Übernahme → Council-Ingest).</em></sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/release/03-pipeline-validator-20260611.png" width="720" alt="Pipeline mid-validator-run — three voice cards in WARTET/LÄUFT/FERTIG transition" />
-  <br><sub><em>Validator mid-run — three blind LLM voices (gemma · qwen · qwen-thinking), 13 / 15 Stimmen geprüft. Delphi-Prinzip: each voice classifies independently.</em></sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/release/04-pipeline-lens-20260611.png" width="720" alt="Pipeline lens run — three persona cards (baumeister/rechner/ortskundige)" />
-  <br><sub><em>Council-Lens mid-run — three personas evaluate property candidates (Borda voting → consolidated Top-10).</em></sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/release/05-verlauf-detail-20260611.png" width="720" alt="Verlauf detail — Block-Gründe bars + Worker-Imports sample" />
-  <br><sub><em>Verlauf detail — per-run Lauf-Spur with Block-Gründe breakdown and a sample of imported mails.</em></sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshots/release/07-hauskauf-20260611.png" width="720" alt="Hauskauf kanban — offen / in_arbeit / erledigt" />
-  <br><sub><em>Hauskauf campaign — kanban over the candidates that passed the 4/4 consensus (heuristik + 3 LLM voices).</em></sub>
 </p>
 
 <p align="center">
