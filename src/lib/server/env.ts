@@ -94,6 +94,13 @@ export function getCouncilConfigPath(): string {
 	return env.COUNCIL_CONFIG_PATH ?? join(homedir(), 'Projects/aion-lumen/council/config');
 }
 
+// Demo/presentation flag: when HIDE_COUNCIL is set, the pipeline page hides all
+// Council-specific UI (dataflow lane, lens panel/progress, campaign track, council
+// run rows) so a Council-free mail-only screenshot can be taken. Off by default.
+export function getHideCouncil(): boolean {
+	return env.HIDE_COUNCIL === '1' || env.HIDE_COUNCIL === 'true';
+}
+
 export function getLifeMailPath(): string {
 	return env.LIFE_MAIL_PATH ?? join(homedir(), 'Projects/life-mail');
 }

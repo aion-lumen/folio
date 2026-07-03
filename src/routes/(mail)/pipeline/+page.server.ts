@@ -19,6 +19,7 @@ import {
 } from '$lib/server/council-db/reader.js';
 import { getLensRunStatus } from '$lib/server/lens-runner/status.js';
 import { COUNCIL_LENS_CONFIG } from '$lib/council/lens-config.server.js';
+import { getHideCouncil } from '$lib/server/env.js';
 import type { PageServerLoad } from './$types.js';
 
 // 2026-06-10 Bauteil Model-Status-Panel: idle persistence shapes.
@@ -126,6 +127,7 @@ export const load: PageServerLoad = async () => {
 		lastValidatorRun,
 		lastLensRun,
 		personas,
-		workflows: workflowsWithObjects
+		workflows: workflowsWithObjects,
+		hideCouncil: getHideCouncil()
 	};
 };

@@ -20,10 +20,12 @@
 
 	let {
 		activeStage = null,
-		summary = null
+		summary = null,
+		hideCouncil = false
 	}: {
 		activeStage?: StageId | null;
 		summary?: WorkerRunSummaryRow | null;
+		hideCouncil?: boolean;
 	} = $props();
 
 	const mailStages = $derived(STAGES.filter((s) => s.lane === 'mail'));
@@ -88,18 +90,20 @@
 <div class="flow2">
 	<Lane stages={mailStages} caption="Mail-Klassifikation" tone="mail" {state} {counts} />
 
-	<div class="handoff">
-		<div class="ho-lbl">übernommen</div>
-		<div class="ho-line" class:lit={handoffLit}>
-			<svg viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true">
-				<path d="M0 6 H50" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
-				<path d="M48 2 L54 6 L48 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-			</svg>
+	{#if !hideCouncil}
+		<div class="handoff">
+			<div class="ho-lbl">übernommen</div>
+			<div class="ho-line" class:lit={handoffLit}>
+				<svg viewBox="0 0 56 12" preserveAspectRatio="none" aria-hidden="true">
+					<path d="M0 6 H50" stroke="currentColor" stroke-width="1.5" stroke-dasharray="4 3" />
+					<path d="M48 2 L54 6 L48 10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+				</svg>
+			</div>
+			<div class="ho-lbl muted">:25 stündlich</div>
 		</div>
-		<div class="ho-lbl muted">:25 stündlich</div>
-	</div>
 
-	<Lane stages={councilStages} caption="Council" tone="council" {state} {counts} />
+		<Lane stages={councilStages} caption="Council" tone="council" {state} {counts} />
+	{/if}
 </div>
 
 <style>

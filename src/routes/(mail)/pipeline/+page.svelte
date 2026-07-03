@@ -110,6 +110,7 @@
 	const lensIsActive = $derived(lensRunning);
 
 	const panelStack = $derived.by<PanelStack>(() => {
+		if (data.hideCouncil) return 'validator';
 		if (validatorIsActive) return 'validator';
 		if (lensIsActive) return 'lens';
 		// Idle: pick whichever last run ended most recently.
@@ -295,7 +296,7 @@
 		<div class="pl-head-text">
 			<h1>Pipeline</h1>
 			<p class="pl-sub">
-				Mail-Klassifikation und Council-Bewertung. Sequenziell — ein Run gleichzeitig
+				Mail-Klassifikation{#if !data.hideCouncil} und Council-Bewertung{/if}. Sequenziell — ein Run gleichzeitig
 				(geteilte LLMs).
 			</p>
 		</div>
@@ -346,7 +347,7 @@
 		<div class="eyebrow">
 			<span>DATENFLUSS{!isIdle ? ' · LIVE' : ''}</span>
 		</div>
-		<FlowDiagram {activeStage} summary={latestSummary} />
+		<FlowDiagram {activeStage} summary={latestSummary} hideCouncil={data.hideCouncil} />
 
 		<!-- Modell-Status-Panel: permanent sichtbar; live waehrend
 		     Validator/Lens-Lauf, dimmed danach mit Timestamp. -->
@@ -358,8 +359,8 @@
 			lastRunAt={panelLastRunAt}
 		/>
 
-		<!-- Lens-Fortschritts-Pille — nur sichtbar wenn lens-run aktiv -->
-		{#if data.lensStatus?.running}
+		<!-- Lens-Fortschritts-Pille — nur sichtbar wenn lens-run aktiv (Council) -->
+		{#if data.lensStatus?.running && !data.hideCouncil}
 			<LensProgress status={data.lensStatus} />
 		{/if}
 
@@ -372,18 +373,25 @@
 			/>
 		{/if}
 
-		<!-- Übergang → Kampagne: permanent sichtbarer Kampagnen-Track -->
-		<div class="eyebrow">
-			<span>ÜBERGANG → KAMPAGNE</span>
-			<span class="stamp">mensch-getrieben · Wochen-Skala</span>
-		</div>
-		<CampaignTrack workflows={data.workflows} />
+		<!-- Übergang → Kampagne: permanent sichtbarer Kampagnen-Track (Council) -->
+		{#if !data.hideCouncil}
+			<div class="eyebrow">
+				<span>ÜBERGANG → KAMPAGNE</span>
+				<span class="stamp">mensch-getrieben · Wochen-Skala</span>
+			</div>
+			<CampaignTrack workflows={data.workflows} />
+		{/if}
 
-		<!-- Verlauf: Tagesgruppierung + Lauf-Spur-Aufklappung -->
+		<!-- Verlauf: Tagesgruppierung + Lauf-Spur-Aufklappung.
+		     hideCouncil → nur mail-side Runs (Council-Lens/-Ingest raus). -->
 		<div class="eyebrow">
 			<span>VERLAUF</span>
 		</div>
-		<PipelineRunList runs={data.pipelineRuns} />
+		<PipelineRunList
+			runs={data.hideCouncil
+				? data.pipelineRuns.filter((r) => r.source === 'mail')
+				: data.pipelineRuns}
+		/>
 	{:else}
 		<!-- Werkbank: alternative Master-Detail-Sicht -->
 		<div class="eyebrow">
