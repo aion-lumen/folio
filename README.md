@@ -1,5 +1,8 @@
 <div align="center">
-  <img src="assets/beacon.svg" alt="Aion Lumen Beacon" width="120" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/beacon-light.svg">
+    <img src="assets/beacon.svg" alt="Aion Lumen Beacon" width="120">
+  </picture>
   <h1>Folio</h1>
   <p><strong>A markdown vault as memory. A local AI agent as your strategy partner.</strong></p>
   <p>Part of <a href="https://aion-lumen.ch">Aion Lumen</a>.</p>
@@ -95,6 +98,11 @@ See [docs/quickstart.md](docs/quickstart.md) for the demo's environment variable
 ## Screenshots
 
 Captured against the bundled demo state (fictional Alex + Maya household in Algarve, no real data). Reproducible end-to-end — see [multi-agent quickstart](https://github.com/aion-lumen/multi-agent-lab/blob/main/docs/quickstart.md) for the `make demo` workflow.
+
+<p align="center">
+  <img src="docs/screenshots/release/09-campaign-overview.png" width="720" alt="Folio dashboard — campaign timeline, kanban board and Hermes chat panel side by side (demo vault)" />
+  <br><sub><em>Campaign dashboard — five-act timeline, chapter kanban, and the Hermes chat panel reading the vault live.</em></sub>
+</p>
 
 <p align="center">
   <img src="docs/screenshots/release/08-heute-20260611.png" width="720" alt="Heute dashboard — entry view with vault/mail/pipeline/hermes cards" />
