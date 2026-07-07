@@ -21,9 +21,8 @@ Folio commits to the vault only after Afschin confirms in the UI.
 
 ## Format authority
 
-Read and follow **[FOLIO-IMPORT.md](https://mirhamed.ch/FOLIO-IMPORT.md)** — the single source of truth for v1.
+Read and follow **[FOLIO-IMPORT.md](https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md)** — the single source of truth for v1.
 
-Mirror: `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
 Local copy (if repo present): `folio/FOLIO-IMPORT.md`
 
 Required frontmatter: `folio_import: v1`, `type`, `target`, `id`, `source`, `created`.

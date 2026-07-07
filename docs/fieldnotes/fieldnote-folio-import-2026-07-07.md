@@ -2,8 +2,7 @@
 
 **An:** Fable  
 **Von:** Engineer-Session  
-**Spec-URL:** `https://mirhamed.ch/FOLIO-IMPORT.md`  
-**Mirror:** `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
+**Spec-URL:** `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
 
 ## Delivered
 
@@ -33,7 +32,7 @@ Agents/sessions write **only** to `~/.folio/inbox/`. Vault and `folio.db` are to
 ## For future directive headers
 
 ```
-Spec: https://mirhamed.ch/FOLIO-IMPORT.md
+Spec: https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md
 Inbox: ~/.folio/inbox/
 ```
 

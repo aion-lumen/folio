@@ -1,7 +1,6 @@
 # Folio Interchange Format v1
 
-**Spec URL (stable):** `https://mirhamed.ch/FOLIO-IMPORT.md`
-**Mirror:** `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
+**Spec URL (stable):** `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
 
 ## Design decisions
 
