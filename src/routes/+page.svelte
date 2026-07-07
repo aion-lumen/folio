@@ -9,6 +9,7 @@
 	import CardMail from '$lib/heute/CardMail.svelte';
 	import CardPipeline from '$lib/heute/CardPipeline.svelte';
 	import CardHermes from '$lib/heute/CardHermes.svelte';
+	import CardInbox from '$lib/heute/CardInbox.svelte';
 
 	let { data } = $props();
 
@@ -35,6 +36,7 @@
 	<section class="card-grid">
 		<CardVault vaultPresent={data.vaultPresent} />
 		<CardMail stats={data.mail} />
+		<CardInbox pending={data.inboxPending} />
 		<CardPipeline lastRun={data.lastRun} />
 		<CardHermes />
 	</section>
@@ -69,6 +71,11 @@
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 16px;
+	}
+	@media (min-width: 900px) {
+		.card-grid {
+			grid-template-columns: repeat(3, minmax(0, 1fr));
+		}
 	}
 	@media (max-width: 640px) {
 		.card-grid {

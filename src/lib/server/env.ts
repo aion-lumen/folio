@@ -3,12 +3,22 @@ import { readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
+function readActiveVaultFromDisk(): string | null {
+	try {
+		const raw = readFileSync(join(homedir(), '.folio', 'active-vault.json'), 'utf-8');
+		const parsed = JSON.parse(raw) as { path?: string };
+		const p = parsed.path?.trim();
+		return p || null;
+	} catch {
+		return null;
+	}
+}
+
 export function getVaultPath(): string {
-	// Read process.env first (live), falling back to $env/dynamic/private (a
-	// startup snapshot from .env). The setup wizard sets process.env.VAULT_PATH
-	// at runtime, so the freshly created/linked vault is reachable without a
-	// server restart; the snapshot still covers a normal restart where .env holds it.
-	const p = process.env.VAULT_PATH ?? env.VAULT_PATH;
+	// 1) ~/.folio/active-vault.json — explicit user choice (switcher), survives Vite restart
+	// 2) Live process.env (setup wizard hot-set)
+	// 3) $env/dynamic/private snapshot from .env at server start
+	const p = readActiveVaultFromDisk() ?? process.env.VAULT_PATH ?? env.VAULT_PATH;
 	if (!p) throw new Error('VAULT_PATH not set');
 	return p;
 }
@@ -119,6 +129,16 @@ export function getUserContextPath(): string {
 
 export function getPythonBinPath(): string {
 	return env.PYTHON_BIN_PATH ?? join(getAionLumenPath(), '.venv/bin/python3');
+}
+
+/** Staging inbox for Folio Interchange Format v1 (outside vault). */
+export function getInboxPath(): string {
+	return env.FOLIO_INBOX_PATH ?? join(homedir(), '.folio/inbox');
+}
+
+/** Idempotency ledger for imported document ids. */
+export function getImportLedgerPath(): string {
+	return join(homedir(), '.folio/import-ledger.json');
 }
 
 // 2026-05-25 Block 3 — Wohnort-PLZ für Distance-Anzeige im DetailPanel.
