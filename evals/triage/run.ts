@@ -1,0 +1,150 @@
+#!/usr/bin/env npx tsx
+/**
+ * Folio inbox triage eval — compares models x prompt variants against labeled fixtures.
+ * Requires LM Studio at LM_STUDIO_BASE_URL (default http://127.0.0.1:1234).
+ *
+ * Usage: npm run eval:triage
+ *        VAULT_PATH=./templates/demo-vault npm run eval:triage
+ */
+import { readFile } from 'fs/promises';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+import { parse as parseYaml } from 'yaml';
+import { assessDocument } from '../../src/lib/server/agent/triage.js';
+import { buildCampaignContext } from '../../src/lib/server/agent/context.js';
+import type { PromptVariant } from '../../src/lib/server/agent/prompt.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const ROOT = join(__dirname, '../..');
+
+interface FixtureSpec {
+	file: string;
+	expected: 'task' | 'unclear' | 'not-a-task';
+	chapter_slug?: string;
+}
+
+interface Manifest {
+	fixtures: FixtureSpec[];
+	models: string[];
+	prompt_variants: PromptVariant[];
+}
+
+interface ComboResult {
+	model: string;
+	variant: PromptVariant;
+	accuracy: number;
+	falsePositiveRate: number;
+	falseNegativeRate: number;
+	unclearRate: number;
+	score: number;
+	details: string[];
+}
+
+async function main() {
+	process.env.VAULT_PATH =
+		process.env.VAULT_PATH ?? join(ROOT, 'templates/demo-vault');
+
+	const manifestRaw = await readFile(join(__dirname, 'manifest.yaml'), 'utf-8');
+	const manifest = parseYaml(manifestRaw) as Manifest;
+
+	// Warm campaign context (validates vault readable)
+	await buildCampaignContext();
+
+	const results: ComboResult[] = [];
+
+	for (const model of manifest.models) {
+		for (const variant of manifest.prompt_variants) {
+			let correct = 0;
+			let falsePos = 0;
+			let falseNeg = 0;
+			let unclearPred = 0;
+			const details: string[] = [];
+
+			for (const spec of manifest.fixtures) {
+				const path = join(__dirname, 'fixtures', spec.file);
+				const raw = await readFile(path, 'utf-8');
+				const assessment = await assessDocument(spec.file, raw, {
+					model,
+					promptVariant: variant,
+					useCache: false
+				});
+
+				const pred = assessment.verdict;
+				if (pred === 'unclear') unclearPred++;
+
+				const isCorrect = pred === spec.expected;
+				if (isCorrect) correct++;
+				else {
+					details.push(`${spec.file}: expected ${spec.expected}, got ${pred}`);
+					// False positive: predicted task when not task (expensive — auto-creates objective)
+					if (pred === 'task' && spec.expected !== 'task') falsePos++;
+					if (spec.expected === 'task' && pred !== 'task') falseNeg++;
+				}
+			}
+
+			const n = manifest.fixtures.length;
+			const accuracy = correct / n;
+			const falsePositiveRate = falsePos / n;
+			const falseNegativeRate = falseNeg / n;
+			const unclearRate = unclearPred / n;
+			// Penalize false positives heavily (auto-commit risk)
+			const score = accuracy - falsePositiveRate * 2 - falseNegativeRate * 0.5;
+
+			results.push({
+				model,
+				variant,
+				accuracy,
+				falsePositiveRate,
+				falseNegativeRate,
+				unclearRate,
+				score,
+				details
+			});
+		}
+	}
+
+	results.sort((a, b) => b.score - a.score);
+
+	console.log('\n=== Folio Triage Eval ===\n');
+	console.log(
+		'Model'.padEnd(28) +
+			'Prompt'.padEnd(12) +
+			'Acc%'.padEnd(8) +
+			'FP%'.padEnd(8) +
+			'FN%'.padEnd(8) +
+			'Unc%'.padEnd(8) +
+			'Score'
+	);
+	console.log('-'.repeat(80));
+
+	for (const r of results) {
+		console.log(
+			r.model.padEnd(28) +
+				r.variant.padEnd(12) +
+				(r.accuracy * 100).toFixed(0).padStart(5) +
+				'  ' +
+				(r.falsePositiveRate * 100).toFixed(0).padStart(5) +
+				'  ' +
+				(r.falseNegativeRate * 100).toFixed(0).padStart(5) +
+				'  ' +
+				(r.unclearRate * 100).toFixed(0).padStart(5) +
+				'  ' +
+				r.score.toFixed(3)
+		);
+	}
+
+	const best = results[0];
+	console.log('\n--- Recommendation ---');
+	console.log(`FOLIO_AGENT_MODEL=${best.model}`);
+	console.log(`Prompt variant: ${best.variant}`);
+	if (best.details.length > 0) {
+		console.log('\nMismatches (best combo):');
+		for (const d of best.details.slice(0, 8)) console.log(`  ${d}`);
+	}
+	console.log('');
+}
+
+main().catch((e) => {
+	console.error(e);
+	process.exit(1);
+});

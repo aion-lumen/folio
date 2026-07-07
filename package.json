@@ -15,7 +15,8 @@
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test": "vitest run",
-		"test:watch": "vitest"
+		"test:watch": "vitest",
+		"eval:triage": "tsx evals/triage/run.ts"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.60.0",
@@ -28,6 +29,7 @@
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",
 		"tailwindcss": "^4.2.2",
+		"tsx": "^4.20.3",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.7",
 		"vitest": "^3.2.4"

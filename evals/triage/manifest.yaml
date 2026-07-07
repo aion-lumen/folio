@@ -1,0 +1,41 @@
+# Expected labels for eval fixtures
+# verdict: task | unclear | not-a-task
+
+fixtures:
+  - file: clear-task-mandat.md
+    expected: task
+    chapter_slug: 02-integration
+  - file: clear-task-deadline.md
+    expected: task
+    chapter_slug: 01-neustart
+  - file: clear-task-finanz.md
+    expected: task
+    chapter_slug: 01-neustart
+  - file: ambiguous-chapter.md
+    expected: unclear
+  - file: vague-threshold.md
+    expected: unclear
+  - file: field-note-observation.md
+    expected: not-a-task
+  - file: status-update-only.md
+    expected: not-a-task
+  - file: retrospective-note.md
+    expected: not-a-task
+  - file: directive-no-new-goal.md
+    expected: not-a-task
+  - file: mixed-intent.md
+    expected: unclear
+  - file: clear-task-sprache.md
+    expected: task
+    chapter_slug: 01-neustart
+  - file: meeting-notes.md
+    expected: not-a-task
+
+models:
+  - gemma-4-26b-a4b-it-mlx
+  - qwen3.6-35b-a3b-ud-mlx
+  - qwen3-30b-a3b-thinking-2507
+
+prompt_variants:
+  - v1
+  - v1-strict
