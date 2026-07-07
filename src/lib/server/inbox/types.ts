@@ -1,3 +1,5 @@
+import type { TriageAssessment } from '../agent/types.js';
+
 export type FolioImportType = 'directive' | 'field-note' | 'objective-update' | 'note';
 
 export type InboxItemStatus = 'valid' | 'invalid' | 'duplicate';
@@ -34,6 +36,12 @@ export interface InboxScanItem {
 	title: string | null;
 	status: InboxItemStatus;
 	error: string | null;
+	triage?: TriageAssessment | null;
+}
+
+export interface InboxTriageSummary {
+	auto_committed: number;
+	awaiting_review: number;
 }
 
 export interface InboxScanResult {
@@ -43,6 +51,7 @@ export interface InboxScanResult {
 	duplicate: number;
 	items: InboxScanItem[];
 	byType: Record<string, number>;
+	triage?: InboxTriageSummary;
 }
 
 export interface CommitResultItem {

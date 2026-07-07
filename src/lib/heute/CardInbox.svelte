@@ -5,7 +5,13 @@
 	import { goto } from '$app/navigation';
 	import { FolderInput, ArrowRight } from 'lucide-svelte';
 
-	let { pending }: { pending: number } = $props();
+	let {
+		pending,
+		triage = { awaiting_review: 0, auto_committed: 0 }
+	}: {
+		pending: number;
+		triage?: { awaiting_review: number; auto_committed: number };
+	} = $props();
 </script>
 
 <button class="card" type="button" onclick={() => goto('/inbox')}>
@@ -14,15 +20,26 @@
 		<span class="title">Import-Inbox</span>
 		<ArrowRight size={14} class="arrow" />
 	</header>
-	{#if pending === 0}
+	{#if pending === 0 && triage.auto_committed === 0}
 		<p class="primary muted">Inbox leer</p>
 		<p class="hint">Agenten liefern .md-Dateien nach ~/.folio/inbox/</p>
 	{:else}
 		<p class="primary">
-			<span class="counter">{pending}</span>
-			<span class="counter-suffix">wartend</span>
+			{#if triage.auto_committed > 0}
+				<span class="counter ok">{triage.auto_committed}</span>
+				<span class="counter-suffix">auto-angelegt</span>
+			{/if}
+			{#if pending > 0}
+				<span class="counter">{pending}</span>
+				<span class="counter-suffix">wartend</span>
+			{/if}
 		</p>
-		<p class="hint">Preview &amp; Commit auf /inbox</p>
+		<p class="hint">
+			{#if triage.awaiting_review > 0}
+				{triage.awaiting_review} warten auf Review ·
+			{/if}
+			Preview &amp; Commit auf /inbox
+		</p>
 	{/if}
 </button>
 
@@ -67,6 +84,7 @@
 		display: flex;
 		align-items: baseline;
 		gap: 8px;
+		flex-wrap: wrap;
 		color: var(--color-foreground);
 	}
 	.primary.muted {
@@ -77,6 +95,9 @@
 		font-size: 22px;
 		font-weight: 600;
 		color: var(--color-lumen-warm, hsl(28 92% 58%));
+	}
+	.counter.ok {
+		color: hsl(142 60% 40%);
 	}
 	.counter-suffix {
 		font-size: 13px;

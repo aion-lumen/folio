@@ -8,7 +8,7 @@ import { join } from 'path';
 import { getVaultPath } from '$lib/server/env.js';
 import { getFeedbackRows } from '$lib/server/feedback/reader.js';
 import { getReviewedIds, listRecentWorkerRuns } from '$lib/server/folio-db/reader.js';
-import { countPendingInbox } from '$lib/server/inbox/scanner.js';
+import { countPendingInbox, getInboxHubStats, scanInboxForDisplay } from '$lib/server/inbox/scanner.js';
 import type { FeedbackRow } from '$lib/server/feedback/types.js';
 import type { PageServerLoad } from './$types.js';
 
@@ -95,15 +95,26 @@ export const load: PageServerLoad = async () => {
 	}
 
 	let inboxPending = 0;
+	let inboxTriage = { awaiting_review: 0, auto_committed: 0 };
 	try {
-		inboxPending = await countPendingInbox();
+		const stats = await getInboxHubStats();
+		inboxPending = stats.pending;
+		inboxTriage = {
+			awaiting_review: stats.awaiting_review,
+			auto_committed: stats.auto_committed
+		};
 	} catch {
-		// inbox path not writable — 0
+		try {
+			inboxPending = await countPendingInbox();
+		} catch {
+			// inbox path not writable — 0
+		}
 	}
 
 	return {
 		vaultPresent,
 		inboxPending,
+		inboxTriage,
 		mail: {
 			total: mailTotal,
 			unreviewed: mailUnreviewed,

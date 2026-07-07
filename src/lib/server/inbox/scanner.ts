@@ -1,4 +1,6 @@
 import { mkdir, readFile, readdir, rename, writeFile } from 'fs/promises';
+import { getFolioAgentAuto } from '../env.js';
+import { attachCachedAssessments, runInboxTriage } from '../agent/triage.js';
 import { join } from 'path';
 import { getInboxPath } from '../env.js';
 import { getImportedIds } from './ledger.js';
@@ -157,5 +159,53 @@ export async function scanInbox(
 		duplicate,
 		items,
 		byType
+	};
+}
+
+/** Attach cached LLM assessments without calling the model. */
+export { attachCachedAssessments } from '../agent/triage.js';
+
+/** Scan inbox and attach cached triage only — never calls the LLM (fast page loads). */
+export async function scanInboxForDisplay(
+	dirs: InboxDirs = resolveInboxDirs(),
+	ledgerPath?: string
+): Promise<InboxScanResult> {
+	const scan = await scanInbox(dirs, ledgerPath);
+	return attachCachedAssessments(scan, dirs);
+}
+
+/** Scan inbox; when FOLIO_AGENT_AUTO=1, run triage and auto-commit eligible items. */
+export async function scanInboxWithAgent(
+	dirs: InboxDirs = resolveInboxDirs(),
+	ledgerPath?: string
+): Promise<InboxScanResult> {
+	const scan = await scanInbox(dirs, ledgerPath);
+	if (!getFolioAgentAuto()) {
+		return attachCachedAssessments(scan, dirs);
+	}
+	const { scan: enriched } = await runInboxTriage(scan, dirs, {
+		ledgerPath,
+		autoCommit: true
+	});
+	return enriched;
+}
+
+/** Stats for Heute hub CardInbox. */
+export async function getInboxHubStats(
+	dirs: InboxDirs = resolveInboxDirs(),
+	ledgerPath?: string
+): Promise<{
+	pending: number;
+	valid: number;
+	awaiting_review: number;
+	auto_committed: number;
+}> {
+	const scan = await attachCachedAssessments(await scanInbox(dirs, ledgerPath), dirs);
+
+	return {
+		pending: scan.pending,
+		valid: scan.valid,
+		awaiting_review: scan.triage?.awaiting_review ?? scan.valid,
+		auto_committed: scan.triage?.auto_committed ?? 0
 	};
 }

@@ -36,7 +36,7 @@
 	<section class="card-grid">
 		<CardVault vaultPresent={data.vaultPresent} />
 		<CardMail stats={data.mail} />
-		<CardInbox pending={data.inboxPending} />
+		<CardInbox pending={data.inboxPending} triage={data.inboxTriage} />
 		<CardPipeline lastRun={data.lastRun} />
 		<CardHermes />
 	</section>
