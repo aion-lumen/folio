@@ -10,6 +10,13 @@
 		total: number;
 		unreviewed: number;
 		unreviewedByAccount: Record<string, number>;
+		triageTodayByDomain?: Record<string, number>;
+		triageTodayActionable?: Array<{
+			domain: string;
+			sender: string;
+			subject: string;
+			actionability: string;
+		}>;
 	}
 
 	let { stats }: { stats: MailStats } = $props();
@@ -17,6 +24,12 @@
 	const accountEntries = $derived(
 		Object.entries(stats.unreviewedByAccount).sort(([, a], [, b]) => b - a)
 	);
+
+	const domainEntries = $derived(
+		Object.entries(stats.triageTodayByDomain ?? {}).sort(([, a], [, b]) => b - a)
+	);
+
+	const actionableToday = $derived(stats.triageTodayActionable ?? []);
 </script>
 
 <button class="card" type="button" onclick={() => goto('/mail-queue')}>
@@ -34,6 +47,32 @@
 			<span class="counter-suffix">ungelesen</span>
 			<span class="counter-total">von {stats.total}</span>
 		</p>
+		{#if domainEntries.length > 0}
+			<div class="triage-section">
+				<p class="section-label">Heute triagiert</p>
+				<ul class="domain-list">
+					{#each domainEntries as [domain, count]}
+						<li>
+							<span class="domain-name">{domain}</span>
+							<span class="domain-count">{count}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
+		{#if actionableToday.length > 0}
+			<div class="triage-section">
+				<p class="section-label">Actionable heute</p>
+				<ul class="actionable-list">
+					{#each actionableToday as item}
+						<li>
+							<span class="action-domain">{item.domain}</span>
+							<span class="action-subject" title={item.subject}>{item.subject}</span>
+						</li>
+					{/each}
+				</ul>
+			</div>
+		{/if}
 		{#if accountEntries.length > 0}
 			<ul class="account-list">
 				{#each accountEntries as [acct, count]}
@@ -128,6 +167,56 @@
 		color: var(--color-muted-foreground);
 	}
 	.acct-count { color: var(--color-foreground); }
+
+	.triage-section {
+		margin-top: 8px;
+		padding-top: 8px;
+		border-top: 1px solid var(--color-border);
+	}
+	.section-label {
+		font-size: 11px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.04em;
+		color: var(--color-muted-foreground);
+		margin: 0 0 6px;
+	}
+	.domain-list,
+	.actionable-list {
+		list-style: none;
+		margin: 0;
+		padding: 0;
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+	.domain-list li,
+	.actionable-list li {
+		display: flex;
+		justify-content: space-between;
+		gap: 8px;
+		font-size: 12px;
+		font-family: var(--font-mono);
+		color: var(--color-muted-foreground);
+	}
+	.domain-count { color: var(--color-foreground); }
+	.actionable-list li {
+		flex-direction: column;
+		align-items: flex-start;
+	}
+	.action-domain {
+		font-size: 10px;
+		text-transform: uppercase;
+		color: var(--color-lumen-warm, hsl(28 92% 58%));
+	}
+	.action-subject {
+		font-size: 12px;
+		color: var(--color-foreground);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		max-width: 100%;
+	}
 
 	.hint {
 		font-size: 12px;

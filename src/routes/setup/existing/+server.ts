@@ -1,7 +1,8 @@
 import { json, error, redirect } from '@sveltejs/kit';
-import { access, readFile, writeFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import type { RequestHandler } from './$types.js';
+import { switchActiveVault } from '$lib/server/vault/switch.js';
 
 const ENV_PATH = join(process.cwd(), '.env');
 
@@ -9,12 +10,13 @@ export const POST: RequestHandler = async ({ request }) => {
 	const { vaultPath: rawPath } = await request.json();
 	if (!rawPath) throw error(400, 'vaultPath required');
 
-	const vaultPath = rawPath.replace(/^~/, process.env.HOME!);
-
+	let vaultPath: string;
 	try {
-		await access(join(vaultPath, '_campaign', 'campaign.md'));
-	} catch {
-		throw error(400, JSON.stringify({ message: `Keine campaign.md unter ${vaultPath}/_campaign/ gefunden` }));
+		const result = await switchActiveVault(rawPath);
+		vaultPath = result.path;
+	} catch (e) {
+		const message = e instanceof Error ? e.message : 'Ungültiger Vault-Pfad';
+		throw error(400, JSON.stringify({ message }));
 	}
 
 	let envContent = '';

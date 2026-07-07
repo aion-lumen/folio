@@ -7,6 +7,7 @@
 	import { Maximize2, Minimize2, MessageCircle } from 'lucide-svelte';
 	import PulsarMark from '$lib/components/ui/PulsarMark.svelte';
 	import MailBadge from '$lib/components/layout/MailBadge.svelte';
+	import VaultSwitcher from '$lib/components/layout/VaultSwitcher.svelte';
 
 	const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
 
@@ -14,6 +15,7 @@
 	// campaignStore behält State im SPA-Module-Singleton; ohne Route-Gate würde Header
 	// Kampagne überall anzeigen.
 	const isVaultRoute = $derived(page.url.pathname.startsWith('/vault'));
+	const vaultPath = $derived((page.data.vaultPath as string | undefined) ?? '');
 
 	const act = $derived(campaignStore.activeAct);
 	const chapter = $derived(campaignStore.activeChapter);
@@ -37,18 +39,23 @@
 	let avatarOpen = $state(false);
 
 	function openVault() {
-		toastStore.show('Vault-Explorer kommt in v0.2');
+		openVaultSwitcher();
+	}
+
+	function closeAvatar() {
+		avatarOpen = false;
+	}
+
+	let aboutOpen = $state(false);
+	let vaultSwitcherOpen = $state(false);
+
+	function openVaultSwitcher() {
+		vaultSwitcherOpen = true;
 		avatarOpen = false;
 	}
 
 	function openSettings() {
 		toastStore.show('Einstellungen kommen in v0.2');
-		avatarOpen = false;
-	}
-
-	let aboutOpen = $state(false);
-
-	function closeAvatar() {
 		avatarOpen = false;
 	}
 </script>
@@ -57,6 +64,7 @@
 	onkeydown={(e) => {
 		if (e.key === 'Escape' && layoutStore.focusMode) layoutStore.exitFocus();
 		if (avatarOpen && e.key === 'Escape') avatarOpen = false;
+		if (vaultSwitcherOpen && e.key === 'Escape') vaultSwitcherOpen = false;
 	}}
 />
 
@@ -119,23 +127,27 @@
 			{/if}
 		</button>
 
-		<!-- Sync status -->
-		{#if campaign}
-			<div
-				class="sync-status"
-				title={syncState === 'error' ? 'Vault-Sync fehlgeschlagen' : 'Vault-Status'}
+		<!-- Vault chip (always visible when VAULT_PATH set) -->
+		{#if layoutStore.vaultName && layoutStore.vaultName !== 'vault'}
+			<button
+				type="button"
+				class="sync-status vault-chip"
+				title={vaultPath || `${layoutStore.vaultName} — Vault wechseln`}
+				onclick={openVaultSwitcher}
 			>
-				<span
-					class="sync-dot"
-					class:sync-synced={syncState === 'synced'}
-					class:sync-syncing={syncState === 'syncing'}
-					class:sync-error={syncState === 'error'}
-				></span>
+				{#if campaign}
+					<span
+						class="sync-dot"
+						class:sync-synced={syncState === 'synced'}
+						class:sync-syncing={syncState === 'syncing'}
+						class:sync-error={syncState === 'error'}
+					></span>
+				{/if}
 				<span class="sync-label">{layoutStore.vaultName}.local</span>
-				{#if syncedLabel && syncState !== 'error'}
+				{#if campaign && syncedLabel && syncState !== 'error'}
 					<span class="sync-time">synced {syncedLabel}</span>
 				{/if}
-			</div>
+			</button>
 		{/if}
 
 		<!-- Mail status badge -->
@@ -175,7 +187,7 @@
 			{#if avatarOpen}
 				<div class="avatar-menu" role="menu">
 					<button role="menuitem" class="menu-item" onclick={openVault}>
-						Vault öffnen
+						Vault wechseln…
 					</button>
 					<button role="menuitem" class="menu-item" onclick={openSettings}>
 						Einstellungen
@@ -192,6 +204,8 @@
 		</div>
 	</div>
 </header>
+
+<VaultSwitcher open={vaultSwitcherOpen} onclose={() => (vaultSwitcherOpen = false)} />
 
 <!-- About dialog -->
 {#if aboutOpen}
@@ -346,6 +360,17 @@
 		font-size: 11px;
 		color: var(--color-muted-foreground);
 		cursor: default;
+	}
+	.vault-chip {
+		background: none;
+		border: none;
+		font-family: inherit;
+		cursor: pointer;
+		transition: background 150ms, color 150ms;
+	}
+	.vault-chip:hover {
+		background: var(--color-muted);
+		color: var(--color-foreground);
 	}
 	.sync-dot {
 		width: 7px;

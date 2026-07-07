@@ -8,8 +8,10 @@ import type { LayoutServerLoad } from './$types.js';
 
 export const load: LayoutServerLoad = async () => {
 	let vaultName = 'vault';
+	let vaultPath = '';
 	try {
-		vaultName = basename(getVaultPath());
+		vaultPath = getVaultPath();
+		vaultName = basename(vaultPath);
 	} catch {
 		// VAULT_PATH nicht gesetzt — Default-Name reicht, Folio läuft auch ohne Vault.
 	}
@@ -21,5 +23,5 @@ export const load: LayoutServerLoad = async () => {
 	// user_context.yaml synchronisieren.
 	const regelwerk = loadRegelwerkValidated();
 
-	return { vaultName, regelwerk };
+	return { vaultName, vaultPath, regelwerk };
 };

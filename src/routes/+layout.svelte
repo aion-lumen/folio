@@ -6,6 +6,10 @@
 
 	let { data, children } = $props();
 
+	$effect(() => {
+		layoutStore.vaultName = data.vaultName ?? 'vault';
+	});
+
 	// F.9 Block-3: Root-Layout ist Modul-agnostisch. campaignStore-Hydration +
 	// Vault-Watcher-SSE leben jetzt in (vault)/+layout.svelte. Hier nur AppShell-
 	// Wrap + minimaler layoutStore-Boot mit vaultName.

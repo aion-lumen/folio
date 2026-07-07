@@ -1,7 +1,8 @@
 import { redirect, fail } from '@sveltejs/kit';
 import { readFile, writeFile, mkdir, readdir } from 'fs/promises';
 import { join } from 'path';
-import type { Actions } from './$types.js';
+	import type { Actions } from './$types.js';
+	import { switchActiveVault } from '$lib/server/vault/switch.js';
 
 // Neutral path (no home dir / clear name): keeps the absolute path out of
 // Hermes tool-call screenshots. /Users/Shared is a standard, writable macOS
@@ -49,11 +50,7 @@ export const actions: Actions = {
 		try {
 			await copyDemoVault();
 			await updateEnvVaultPath(DEMO_VAULT_TARGET);
-			// Quickstart fix: make the new vault visible to the *running* process.
-			// `vite preview` does not reload .env, and getVaultPath() reads
-			// $env/dynamic/private (== process.env). Set it directly so /vault is
-			// reachable immediately — no server restart needed.
-			process.env.VAULT_PATH = DEMO_VAULT_TARGET;
+			await switchActiveVault(DEMO_VAULT_TARGET);
 		} catch (e) {
 			return fail(500, { message: e instanceof Error ? e.message : 'Demo vault setup failed' });
 		}
