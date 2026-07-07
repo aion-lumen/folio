@@ -21,9 +21,18 @@ Folio commits to the vault only after Afschin confirms in the UI.
 
 ## Format authority
 
-Read and follow **[FOLIO-IMPORT.md](https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md)** — the single source of truth for v1.
+Read and follow **[FOLIO-IMPORT.md](https://aion-lumen.ch/folio/import-spec.md)** — the single source of truth for v1.
+
+Mirror (repo): `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
 
 Local copy (if repo present): `folio/FOLIO-IMPORT.md`
+
+## Delivery
+
+1. Drop `{id}.md` into `~/.folio/inbox/` (filename = frontmatter `id`).
+2. `source`: lowercase slug (e.g. `fable-session`).
+3. For **new campaign goals**: state a clear title + measurable threshold in the body — Folio triage may auto-create an objective when unambiguous.
+4. Field notes / status updates: use `type: field-note` or `objective-update`; triage will not auto-create objectives for those.
 
 Required frontmatter: `folio_import: v1`, `type`, `target`, `id`, `source`, `created`.
 

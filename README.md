@@ -57,6 +57,23 @@ HERMES_API_KEY=your-key-here
 
 For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and [docs/MAIL.md](docs/MAIL.md).
 
+## Import inbox & LLM triage
+
+External agents deliver Markdown to `~/.folio/inbox/` per [FOLIO-IMPORT.md](FOLIO-IMPORT.md) (public spec: [aion-lumen.ch/folio/import-spec.md](https://aion-lumen.ch/folio/import-spec.md)). Folio validates, optionally runs local LLM triage (LM Studio), and can auto-create campaign objectives when confidence is high.
+
+```env
+LM_STUDIO_BASE_URL=http://127.0.0.1:1234
+FOLIO_AGENT_MODEL=qwen3-30b-a3b-thinking-2507   # tune via npm run eval:triage
+FOLIO_AGENT_CONFIDENCE=0.8
+FOLIO_AGENT_AUTO=0   # opt-in; button trigger is default
+```
+
+```bash
+npm run eval:triage   # compare models × prompts on fixtures (requires LM Studio)
+```
+
+Preview and commit in the UI: **Heute → Import-Inbox** or `/inbox`.
+
 ## Demo (mock data)
 
 Bundled demo of the full pipeline against isolated `*-demo.db` files on port `5174` — your real `~/.folio` is untouched. Prerequisites: seed the demo state from multi-agent-lab first (see [Demo (full stack)](#demo-full-stack) below).

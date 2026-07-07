@@ -1,6 +1,7 @@
 # Folio Interchange Format v1
 
-**Spec URL (stable):** `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
+**Spec URL (stable):** `https://aion-lumen.ch/folio/import-spec.md`  
+**Mirror (repo):** `https://raw.githubusercontent.com/aion-lumen/folio/main/FOLIO-IMPORT.md`
 
 ## Design decisions
 
@@ -141,9 +142,37 @@ _(Body ignored for objective-update; patch drives the commit.)_
 ## Agent delivery checklist
 
 1. Write one `.md` file per document to `~/.folio/inbox/`.
-2. Use a new, unique `id` per delivery.
-3. Never write directly into the vault path or `folio.db`.
-4. Read this spec from the stable URL above when unsure.
+2. **Filename:** use `{id}.md` where `id` matches the frontmatter `id` field (e.g. `pilot-checklist-2026-07.md`).
+3. Use a new, unique `id` per delivery.
+4. **`source`:** lowercase slug of the delivering agent/session (e.g. `fable-session`, `engineer-session`).
+5. Never write directly into the vault path or `folio.db`.
+6. Read this spec from the stable URL above when unsure.
+7. For **new campaign goals**, write a clear title and measurable threshold in the body — Folio's triage agent may auto-create an `### obj-…` objective when unambiguous.
+
+## Automatic triage (Folio agent)
+
+After schema validation, Folio can run a **local LLM triage** (LM Studio) on valid inbox documents:
+
+| Verdict | Meaning |
+|---------|---------|
+| `task` (eindeutig) | New campaign objective — auto-created in the matching chapter when confidence ≥ `FOLIO_AGENT_CONFIDENCE` (default 0.8) |
+| `unclear` | Might be a task — stays in `/inbox` for human review with LLM reasoning |
+| `not-a-task` | Field note, status update, or observation — manual import only |
+
+**Environment:**
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FOLIO_AGENT_AUTO` | off | `1` = run triage on every inbox scan (Heute hub, `/inbox`) |
+| `FOLIO_AGENT_MODEL` | `gemma-4-26b-a4b-it-mlx` | LM Studio model (tune via `npm run eval:triage`) |
+| `FOLIO_AGENT_CONFIDENCE` | `0.8` | Minimum confidence for auto-creating objectives |
+| `LM_STUDIO_BASE_URL` | `http://127.0.0.1:1234` | LM Studio OpenAI-compatible API |
+
+**API:** `POST /api/inbox/triage` — assess all valid pending items; auto-commits eligible ones.
+
+Audit log: `~/.folio/triage-log.jsonl`. Assessment cache: `~/.folio/triage-cache.json`.
+
+Auto-created objectives always get `status: todo` and a history entry `created via inbox-triage`.
 
 ## Versioning
 
