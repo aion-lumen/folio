@@ -9,6 +9,7 @@ import { getCachedAssessment, hashContent, setCachedAssessment } from './cache.j
 import { buildCampaignContext } from './context.js';
 import { commitTriageObjective } from './commit-triage.js';
 import { isAutoEligible, normalizeLlmAssessment, runGuardrails } from './guardrails.js';
+import { isSourceAutoTrusted } from './trusted-sources.js';
 import { callLmStudioJson } from './llm.js';
 import { resolveTriageModel } from './preflight.js';
 import { buildTriagePrompt, type PromptVariant } from './prompt.js';
@@ -131,7 +132,13 @@ export async function runInboxTriage(
 		});
 		assessed++;
 
-		if (autoCommit && isAutoEligible(assessment)) {
+		// Trust gate: only trusted, non-derived sources may auto-commit. Untrusted source OR
+		// derived_from_external:true → always manual review, regardless of confidence.
+		if (
+			autoCommit &&
+			isAutoEligible(assessment) &&
+			isSourceAutoTrusted(item.source, item.derived_from_external)
+		) {
 			const commit = await commitTriageObjective(dirs, item.filename, assessment, options?.ledgerPath);
 			if (commit.ok) {
 				assessment = {
@@ -139,7 +146,10 @@ export async function runInboxTriage(
 					auto_committed: true,
 					committed_objective_id: commit.objective_id ?? null
 				};
-				await auditAssessment(item.filename, item.id ?? item.filename, model, assessment);
+				await auditAssessment(item.filename, item.id ?? item.filename, model, assessment, {
+				source: item.source,
+				derived_from_external: item.derived_from_external
+			});
 				auto_committed.push(commit);
 				continue;
 			}

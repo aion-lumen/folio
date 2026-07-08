@@ -1,6 +1,7 @@
 import { appendFile, mkdir } from 'fs/promises';
 import { dirname } from 'path';
 import { getTriageLogPath } from '../env.js';
+import { isTrustedSource } from './trusted-sources.js';
 import type { TriageAssessment } from './types.js';
 
 export interface TriageAuditEntry {
@@ -15,6 +16,8 @@ export interface TriageAuditEntry {
 	committed_objective_id?: string | null;
 	reasoning: string;
 	guardrail_violation?: string | null;
+	source?: string | null;
+	source_trust?: 'trusted' | 'untrusted' | 'derived-external';
 }
 
 export async function appendTriageAudit(entry: Omit<TriageAuditEntry, 'ts'>): Promise<void> {
@@ -28,7 +31,8 @@ export async function auditAssessment(
 	filename: string,
 	documentId: string,
 	model: string,
-	assessment: TriageAssessment
+	assessment: TriageAssessment,
+	trust?: { source?: string; derived_from_external?: boolean }
 ): Promise<void> {
 	await appendTriageAudit({
 		document_id: documentId,
@@ -40,6 +44,14 @@ export async function auditAssessment(
 		auto_committed: assessment.auto_committed ?? false,
 		committed_objective_id: assessment.committed_objective_id ?? null,
 		reasoning: assessment.reasoning,
-		guardrail_violation: assessment.guardrail_violation ?? null
+		guardrail_violation: assessment.guardrail_violation ?? null,
+		source: trust?.source ?? null,
+		source_trust: trust
+			? trust.derived_from_external
+				? 'derived-external'
+				: isTrustedSource(trust.source)
+					? 'trusted'
+					: 'untrusted'
+			: undefined
 	});
 }

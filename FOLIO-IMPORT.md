@@ -33,6 +33,7 @@ One document per `.md` file. YAML frontmatter + Markdown body.
 |-------|------|-------------|
 | `title` | string | Display title (defaults to first heading in body) |
 | `tags` | string[] | Free-form labels |
+| `derived_from_external` | boolean | Content derived from external material (e.g. an incoming mail). Forces manual review — never auto-committed, regardless of confidence. Defaults to `false`. |
 
 ### Type-specific fields
 
@@ -155,7 +156,7 @@ After schema validation, Folio can run a **local LLM triage** (LM Studio) on val
 
 | Verdict | Meaning |
 |---------|---------|
-| `task` (eindeutig) | New campaign objective — auto-created in the matching chapter when confidence ≥ `FOLIO_AGENT_CONFIDENCE` (default 0.8) |
+| `task` (eindeutig) | New campaign objective — auto-created in the matching chapter when confidence ≥ `FOLIO_AGENT_CONFIDENCE` (default 0.8) **and** the source is trusted (see below) |
 | `unclear` | Might be a task — stays in `/inbox` for human review with LLM reasoning |
 | `not-a-task` | Field note, status update, or observation — manual import only |
 
@@ -166,11 +167,18 @@ After schema validation, Folio can run a **local LLM triage** (LM Studio) on val
 | `FOLIO_AGENT_AUTO` | off | `1` = run triage on every inbox scan (Heute hub, `/inbox`) |
 | `FOLIO_AGENT_MODEL` | `gemma-4-26b-a4b-it-mlx` | LM Studio model (tune via `npm run eval:triage`) |
 | `FOLIO_AGENT_CONFIDENCE` | `0.8` | Minimum confidence for auto-creating objectives |
+| `FOLIO_TRUSTED_SOURCES_PATH` | `config/trusted_sources.yaml` | List of sources eligible for auto-commit |
 | `LM_STUDIO_BASE_URL` | `http://127.0.0.1:1234` | LM Studio OpenAI-compatible API |
+
+**Source-Trust-Policy.** Auto-commit is additionally gated on the import's `source`: only sources
+listed in `config/trusted_sources.yaml` may be auto-committed. An import whose `source` is not on the
+list, or that carries `derived_from_external: true`, **always** goes to manual review — regardless of
+verdict or confidence. Trust is derived from `source`; it is never a frontmatter field itself. If the
+config is missing, no source is trusted (fail-closed → everything is reviewed).
 
 **API:** `POST /api/inbox/triage` — assess all valid pending items; auto-commits eligible ones.
 
-Audit log: `~/.folio/triage-log.jsonl`. Assessment cache: `~/.folio/triage-cache.json`.
+Audit log: `~/.folio/triage-log.jsonl` (records `source` + `source_trust`). Assessment cache: `~/.folio/triage-cache.json`.
 
 Auto-created objectives always get `status: todo` and a history entry `created via inbox-triage`.
 

@@ -2,6 +2,7 @@ import { getFolioAgentAuto } from '$lib/server/env.js';
 import { checkTriagePreflight } from '$lib/server/agent/preflight.js';
 import { getRecentInboxActivity } from '$lib/server/agent/recent.js';
 import { scanInboxForDisplay } from '$lib/server/inbox/scanner.js';
+import { loadTrustedSources } from '$lib/server/agent/trusted-sources.js';
 import type { PageServerLoad } from './$types.js';
 
 export const load: PageServerLoad = async () => {
@@ -13,6 +14,7 @@ export const load: PageServerLoad = async () => {
 	return {
 		scan,
 		agentAuto: getFolioAgentAuto(),
+		trustedSources: loadTrustedSources(),
 		triagePreflight,
 		lastActivity
 	};

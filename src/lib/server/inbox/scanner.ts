@@ -115,6 +115,8 @@ export async function scanInbox(
 				type: fm.type,
 				target: fm.target,
 				title: displayTitle({ ...doc, frontmatter: fm }),
+				source: fm.source,
+				derived_from_external: fm.derived_from_external,
 				status: 'duplicate',
 				error: `duplicate id already imported: ${fm.id}`
 			});
@@ -143,6 +145,8 @@ export async function scanInbox(
 			type: fm.type,
 			target: fm.target,
 			title: displayTitle({ ...doc, frontmatter: fm }),
+			source: fm.source,
+			derived_from_external: fm.derived_from_external,
 			status: 'valid',
 			error: null
 		});

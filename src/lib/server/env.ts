@@ -102,6 +102,13 @@ export function getMoveActionsPath(): string {
 		?? join(homedir(), 'Projects/folio/config/move_actions.yaml');
 }
 
+/** Sources whose imports may auto-commit (source ∈ list). Override: FOLIO_TRUSTED_SOURCES_PATH */
+export function getTrustedSourcesPath(): string {
+	return process.env.FOLIO_TRUSTED_SOURCES_PATH
+		?? kitEnv().FOLIO_TRUSTED_SOURCES_PATH
+		?? join(homedir(), 'Projects/folio/config/trusted_sources.yaml');
+}
+
 /** Root of aion-lumen/multi-agent (Python pipeline). Override: AION_LUMEN_PATH */
 export function getAionLumenPath(): string {
 	return kitEnv().AION_LUMEN_PATH ?? join(homedir(), 'Projects/aion-lumen/multi-agent');

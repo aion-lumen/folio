@@ -59,6 +59,10 @@ export function validateFrontmatterShape(
 			return { ok: false, error: `invalid patch.status: ${p.status}` };
 		}
 	}
+	// Optional (v1-additive): when present, must be boolean.
+	if (fm.derived_from_external !== undefined && typeof fm.derived_from_external !== 'boolean') {
+		return { ok: false, error: 'derived_from_external must be a boolean' };
+	}
 	return { ok: true, data: fm as unknown as FolioImportFrontmatter };
 }
 
