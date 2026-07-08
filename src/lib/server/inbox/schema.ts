@@ -10,7 +10,8 @@ const IMPORT_TYPES = new Set<FolioImportType>([
 	'directive',
 	'field-note',
 	'objective-update',
-	'note'
+	'note',
+	'lead'
 ]);
 
 const VALID_STATUSES = new Set([
@@ -23,6 +24,18 @@ const VALID_STATUSES = new Set([
 ]);
 
 const OBJECTIVE_ID_RE = /^obj-\d+[a-z]?-\d+$/;
+
+/**
+ * Coerce a frontmatter deadline to an ISO `yyyy-mm-dd` string. YAML auto-parses
+ * a bare `deadline: 2026-08-15` into a Date, so downstream string logic must
+ * normalize it. Returns undefined for empty/unparseable values.
+ */
+export function normalizeDeadline(v: unknown): string | undefined {
+	if (v == null || v === '') return undefined;
+	if (v instanceof Date) return Number.isNaN(v.getTime()) ? undefined : v.toISOString().slice(0, 10);
+	const s = String(v).trim();
+	return s || undefined;
+}
 
 export function parseInboxFile(filename: string, raw: string): ParsedInboxDocument {
 	const { data, content } = matter(raw);
@@ -57,6 +70,14 @@ export function validateFrontmatterShape(
 		const p = patch as Record<string, unknown>;
 		if (p.status !== undefined && !VALID_STATUSES.has(String(p.status))) {
 			return { ok: false, error: `invalid patch.status: ${p.status}` };
+		}
+	}
+	if (type === 'lead') {
+		for (const field of ['rolle', 'quelle'] as const) {
+			const val = fm[field];
+			if (val === undefined || val === null || String(val).trim() === '') {
+				return { ok: false, error: `lead requires field: ${field}` };
+			}
 		}
 	}
 	// Optional (v1-additive): when present, must be boolean.
@@ -118,6 +139,11 @@ export async function validateDocument(
 	if (!shape.ok) return shape;
 	if (shape.data.type === 'objective-update' && !OBJECTIVE_ID_RE.test(shape.data.target)) {
 		return { ok: false, error: `objective-update target must be objective id, got: ${shape.data.target}` };
+	}
+	// Lead sentinel: target 'current' resolves to the active chapter at commit time,
+	// so it does not exist as a static vault anchor — skip the existence check.
+	if (shape.data.type === 'lead' && shape.data.target === 'current') {
+		return { ok: true };
 	}
 	const exists = await validateTargetExists(shape.data.target);
 	if (!exists) return { ok: false, error: `unknown target: ${shape.data.target}` };

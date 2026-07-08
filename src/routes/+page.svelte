@@ -10,6 +10,7 @@
 	import CardPipeline from '$lib/heute/CardPipeline.svelte';
 	import CardHermes from '$lib/heute/CardHermes.svelte';
 	import CardInbox from '$lib/heute/CardInbox.svelte';
+	import CardFristnaheLead from '$lib/heute/CardFristnaheLead.svelte';
 
 	let { data } = $props();
 
@@ -34,6 +35,7 @@
 	</header>
 
 	<section class="card-grid">
+		<CardFristnaheLead leads={data.leads} />
 		<CardVault vaultPresent={data.vaultPresent} />
 		<CardMail stats={data.mail} />
 		<CardInbox pending={data.inboxPending} triage={data.inboxTriage} />

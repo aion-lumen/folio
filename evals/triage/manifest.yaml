@@ -2,6 +2,10 @@
 # verdict: task | unclear | not-a-task
 
 fixtures:
+  - file: lead-freelance-python.md
+    expected: task
+  - file: lead-freelance-devops.md
+    expected: task
   - file: clear-task-mandat.md
     expected: task
     chapter_slug: 02-integration

@@ -9,7 +9,16 @@ import { getVaultPath } from '$lib/server/env.js';
 import { getFeedbackRows } from '$lib/server/feedback/reader.js';
 import { getReviewedIds, listRecentWorkerRuns } from '$lib/server/folio-db/reader.js';
 import { countPendingInbox, getInboxHubStats, scanInboxForDisplay } from '$lib/server/inbox/scanner.js';
+import { archiveExpiredLeads } from '$lib/server/inbox/lead-ttl.js';
 import type { FeedbackRow } from '$lib/server/feedback/types.js';
+
+export interface FristnaherLead {
+	id: string | null;
+	rolle: string;
+	quelle: string;
+	deadline: string;
+	filename: string;
+}
 import type { PageServerLoad } from './$types.js';
 
 function startOfTodayLocal(): Date {
@@ -111,10 +120,34 @@ export const load: PageServerLoad = async () => {
 		}
 	}
 
+	// Fristnahe Leads (deadline ≤ 48h). TTL first archives expired leads (best-effort).
+	let leads: FristnaherLead[] = [];
+	try {
+		await archiveExpiredLeads();
+		const scan = await scanInboxForDisplay();
+		const nowMs = Date.now();
+		const H48 = 48 * 60 * 60 * 1000;
+		leads = scan.items
+			.filter((i) => i.type === 'lead' && i.status === 'valid' && !!i.deadline)
+			.map((i) => ({ item: i, ms: Date.parse(i.deadline as string) }))
+			.filter((x) => !Number.isNaN(x.ms) && x.ms - nowMs <= H48)
+			.sort((a, b) => a.ms - b.ms)
+			.map((x) => ({
+				id: x.item.id,
+				rolle: x.item.rolle ?? '',
+				quelle: x.item.quelle ?? '',
+				deadline: x.item.deadline as string,
+				filename: x.item.filename
+			}));
+	} catch {
+		// inbox path not available — no leads.
+	}
+
 	return {
 		vaultPresent,
 		inboxPending,
 		inboxTriage,
+		leads,
 		mail: {
 			total: mailTotal,
 			unreviewed: mailUnreviewed,

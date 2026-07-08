@@ -16,6 +16,21 @@
 
 	const validItems = $derived(data.scan.items.filter((i: InboxScanItem) => i.status === 'valid'));
 
+	// B5: group items by dedup_key so cross-portal duplicate leads cluster in review.
+	const groupedItems = $derived.by(() => {
+		const map = new Map<string, InboxScanItem[]>();
+		const order: string[] = [];
+		for (const item of data.scan.items) {
+			const key = item.dedup_key ?? item.id ?? item.filename;
+			if (!map.has(key)) {
+				map.set(key, []);
+				order.push(key);
+			}
+			map.get(key)!.push(item);
+		}
+		return order.map((key) => ({ key, items: map.get(key)! }));
+	});
+
 	$effect(() => {
 		preflight = data.triagePreflight;
 		lastActivity = data.lastActivity;
@@ -156,49 +171,71 @@
 		{/if}
 	</div>
 
+	{#snippet itemRow(item: InboxScanItem)}
+		<li class="item {item.status}">
+			<div class="row">
+				<span class="badge">{item.status}</span>
+				{#if item.triage}
+					<span class="verdict {verdictClass(item.triage)}">{verdictLabel(item.triage)}</span>
+				{/if}
+				<strong>{item.title ?? item.filename}</strong>
+			</div>
+			<div class="meta">
+				{#if item.type}<span>{item.type}</span>{/if}
+				{#if item.target}<span>→ {item.target}</span>{/if}
+				{#if item.id}<span>id:{item.id}</span>{/if}
+				{#if item.source}
+					{#if item.derived_from_external}
+						<span class="trust derived" title="Aus externem Material abgeleitet — immer Review">external</span>
+					{:else if data.trustedSources.includes(item.source)}
+						<span class="trust ok" title="Vertraute Quelle — Auto-Commit erlaubt">trusted</span>
+					{:else}
+						<span class="trust untrusted" title="Unbekannte Quelle — immer Review">untrusted</span>
+					{/if}
+					<span>source:{item.source}</span>
+				{/if}
+				{#if item.duplicate_of}
+					<span class="trust dup" title="Duplikat eines früheren Leads (gleicher dedup_key)">duplikat</span>
+				{/if}
+				{#if item.triage?.committed_objective_id}
+					<span>obj:{item.triage.committed_objective_id}</span>
+				{/if}
+			</div>
+			{#if item.type === 'lead'}
+				<div class="meta lead-meta">
+					{#if item.rolle}<span>rolle:{item.rolle}</span>{/if}
+					{#if item.quelle}<span>quelle:{item.quelle}</span>{/if}
+					{#if item.deadline}<span>deadline:{item.deadline}</span>{/if}
+				</div>
+			{/if}
+			{#if item.triage?.objective && !item.triage.auto_committed}
+				<div class="proposal">
+					<strong>Vorschlag:</strong> {item.triage.objective.title}
+					<span class="dim">→ {item.triage.chapter_slug}</span>
+					<div class="dim">{item.triage.objective.threshold}</div>
+				</div>
+			{/if}
+			{#if item.triage?.reasoning}
+				<p class="reasoning">{item.triage.reasoning}</p>
+			{/if}
+			{#if item.triage?.guardrail_violation}
+				<p class="err-line">{item.triage.guardrail_violation}</p>
+			{/if}
+			{#if item.error}<p class="err-line">{item.error}</p>{/if}
+		</li>
+	{/snippet}
+
 	<ul class="list">
-		{#each data.scan.items as item}
-			<li class="item {item.status}">
-				<div class="row">
-					<span class="badge">{item.status}</span>
-					{#if item.triage}
-						<span class="verdict {verdictClass(item.triage)}">{verdictLabel(item.triage)}</span>
-					{/if}
-					<strong>{item.title ?? item.filename}</strong>
-				</div>
-				<div class="meta">
-					{#if item.type}<span>{item.type}</span>{/if}
-					{#if item.target}<span>→ {item.target}</span>{/if}
-					{#if item.id}<span>id:{item.id}</span>{/if}
-					{#if item.source}
-						{#if item.derived_from_external}
-							<span class="trust derived" title="Aus externem Material abgeleitet — immer Review">external</span>
-						{:else if data.trustedSources.includes(item.source)}
-							<span class="trust ok" title="Vertraute Quelle — Auto-Commit erlaubt">trusted</span>
-						{:else}
-							<span class="trust untrusted" title="Unbekannte Quelle — immer Review">untrusted</span>
-						{/if}
-						<span>source:{item.source}</span>
-					{/if}
-					{#if item.triage?.committed_objective_id}
-						<span>obj:{item.triage.committed_objective_id}</span>
-					{/if}
-				</div>
-				{#if item.triage?.objective && !item.triage.auto_committed}
-					<div class="proposal">
-						<strong>Vorschlag:</strong> {item.triage.objective.title}
-						<span class="dim">→ {item.triage.chapter_slug}</span>
-						<div class="dim">{item.triage.objective.threshold}</div>
-					</div>
-				{/if}
-				{#if item.triage?.reasoning}
-					<p class="reasoning">{item.triage.reasoning}</p>
-				{/if}
-				{#if item.triage?.guardrail_violation}
-					<p class="err-line">{item.triage.guardrail_violation}</p>
-				{/if}
-				{#if item.error}<p class="err-line">{item.error}</p>{/if}
-			</li>
+		{#each groupedItems as group}
+			{#if group.items.length > 1}
+				<li class="group-head">
+					<span class="badge dup">{group.items.length}× gleicher Lead</span>
+					<span class="dim">dedup_key:{group.key}</span>
+				</li>
+			{/if}
+			{#each group.items as item}
+				{@render itemRow(item)}
+			{/each}
 		{/each}
 	</ul>
 
@@ -265,6 +302,10 @@
 	.trust.ok { background: hsl(142 40% 90%); color: hsl(142 40% 25%); }
 	.trust.untrusted { background: hsl(38 60% 90%); color: hsl(38 60% 28%); }
 	.trust.derived { background: hsl(0 55% 92%); color: hsl(0 55% 35%); }
+	.trust.dup { background: hsl(268 40% 92%); color: hsl(268 45% 40%); }
+	.lead-meta { margin-top: 4px; }
+	.group-head { list-style: none; display: flex; align-items: center; gap: 10px; margin: 8px 0 2px; padding: 4px 0; }
+	.group-head .badge.dup { background: hsl(268 40% 90%); color: hsl(268 45% 38%); }
 	.proposal { margin-top: 8px; font-size: 13px; line-height: 1.45; }
 	.dim { color: var(--color-muted-foreground); font-size: 12px; }
 	.reasoning { margin: 8px 0 0; font-size: 12px; color: var(--color-muted-foreground); font-style: italic; }

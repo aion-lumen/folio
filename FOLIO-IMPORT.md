@@ -21,7 +21,7 @@ One document per `.md` file. YAML frontmatter + Markdown body.
 | Field | Type | Description |
 |-------|------|-------------|
 | `folio_import` | literal `v1` | Format version |
-| `type` | enum | `directive` \| `field-note` \| `objective-update` \| `note` |
+| `type` | enum | `directive` \| `field-note` \| `objective-update` \| `note` \| `lead` |
 | `target` | string | Anchor in the vault (see Target IDs below) |
 | `id` | string | Unique import id (slug, e.g. `pilot-checklist-2026-07`) |
 | `source` | string | Delivering session or agent name |
@@ -48,6 +48,24 @@ patch:
 
 **`directive` | `field-note` | `note`** — body is the full Markdown content committed to the vault.
 
+**`lead`** — a freelance/job lead derived from mail (always `derived_from_external: true`,
+so never auto-committed). On review-commit it becomes an objective in the **current chapter**.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `rolle` | string | **Required.** Role/title of the lead. |
+| `quelle` | string | **Required.** Source/portal (e.g. `freelancermap`). |
+| `deadline` | string | Optional ISO date; drives the "Fristnahe Leads" hub card + TTL auto-archive. |
+| `satz` | string | Optional rate (e.g. `800 EUR/Tag`). |
+| `ort` | string | Optional location (or `Remote`). |
+| `link` | string | Optional portal detail URL. |
+| `dedup_key` | string | Optional cross-portal dedup key; identical leads group in review. |
+| `duplicate_of` | string | Optional id of the first lead with this `dedup_key`. |
+
+The `target` of a lead is the sentinel `current` — folio resolves it to the active chapter at
+commit time (see Target IDs). Leads only ever reach commit via manual review (the trust gate
+blocks auto-commit); expired leads (deadline passed, uncommitted) are auto-archived.
+
 ### Target IDs
 
 Valid `target` values (must exist in the active vault):
@@ -58,6 +76,7 @@ Valid `target` values (must exist in the active vault):
 | `chapter-{n}` or `{n}` | `chapter-2`, `02` | Chapter number (supports branch chapters e.g. `03a`) |
 | `act-{n}` | `act-1` | Act file in `_campaign/acts/` |
 | `{chapter-slug}` | `02-durchbruch` | Chapter filename without `.md` |
+| `current` (leads only) | `current` | Active chapter, resolved at commit time |
 
 Regex for objectives: `^obj-\d+[a-z]?-\d+$` (matches Folio vault reader).
 

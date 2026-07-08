@@ -6,6 +6,7 @@ import { getInboxPath } from '../env.js';
 import { getImportedIds } from './ledger.js';
 import {
 	displayTitle,
+	normalizeDeadline,
 	parseInboxFile,
 	validateDocument,
 	validateFrontmatterShape
@@ -117,6 +118,11 @@ export async function scanInbox(
 				title: displayTitle({ ...doc, frontmatter: fm }),
 				source: fm.source,
 				derived_from_external: fm.derived_from_external,
+				rolle: fm.rolle,
+				quelle: fm.quelle,
+				deadline: normalizeDeadline(fm.deadline),
+				dedup_key: fm.dedup_key,
+				duplicate_of: fm.duplicate_of,
 				status: 'duplicate',
 				error: `duplicate id already imported: ${fm.id}`
 			});
@@ -147,6 +153,11 @@ export async function scanInbox(
 			title: displayTitle({ ...doc, frontmatter: fm }),
 			source: fm.source,
 			derived_from_external: fm.derived_from_external,
+			rolle: fm.rolle,
+			quelle: fm.quelle,
+			deadline: normalizeDeadline(fm.deadline),
+			dedup_key: fm.dedup_key,
+			duplicate_of: fm.duplicate_of,
 			status: 'valid',
 			error: null
 		});

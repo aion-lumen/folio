@@ -59,7 +59,9 @@ For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and [d
 
 ## Import inbox & LLM triage
 
-External agents deliver Markdown to `~/.folio/inbox/` per [FOLIO-IMPORT.md](FOLIO-IMPORT.md) (public spec: [aion-lumen.ch/folio/import-spec.md](https://aion-lumen.ch/folio/import-spec.md)). Folio validates, optionally runs local LLM triage (LM Studio), and can auto-create campaign objectives when confidence is high.
+External agents deliver Markdown to `~/.folio/inbox/` per [FOLIO-IMPORT.md](FOLIO-IMPORT.md) (public spec: [aion-lumen.ch/folio/import-spec.md](https://aion-lumen.ch/folio/import-spec.md)). Folio validates, optionally runs local LLM triage (LM Studio), and can auto-create campaign objectives when confidence is high — but only from **trusted sources** (`config/trusted_sources.yaml`); anything `derived_from_external` always goes to manual review.
+
+The mail pipeline can also deliver **job-leads** (`type: lead`): freelance/project opportunities that surface on the Heute hub ("Fristnahe Leads", deadline ≤ 48h) and, on review-commit, become objectives in the current chapter.
 
 ```env
 LM_STUDIO_BASE_URL=http://127.0.0.1:1234

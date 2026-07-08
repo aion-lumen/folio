@@ -2,10 +2,11 @@ import { mkdir, readFile, rename, writeFile } from 'fs/promises';
 import { join } from 'path';
 import matter from 'gray-matter';
 import { getVaultPath } from '../env.js';
-import { updateObjective } from '../vault/writer.js';
+import { updateObjective, createObjective } from '../vault/writer.js';
+import { loadCampaign, loadActiveChapter } from '../vault/reader.js';
 import type { ObjectiveStatus } from '$lib/types/campaign.js';
 import { isImportedId, recordImport } from './ledger.js';
-import { parseInboxFile, validateDocument, validateFrontmatterShape } from './schema.js';
+import { normalizeDeadline, parseInboxFile, validateDocument, validateFrontmatterShape } from './schema.js';
 import { resolveInboxDirs, type InboxDirs } from './scanner.js';
 import type { CommitResult, CommitResultItem, FolioImportFrontmatter } from './types.js';
 
@@ -37,6 +38,33 @@ async function commitMarkdownFile(
 ): Promise<void> {
 	const dest = join(getVaultPath(), 'internal', subdir, `${fm.id}.md`);
 	await atomicWriteVault(dest, buildVaultMarkdown(fm, body));
+}
+
+/**
+ * Commit a lead as a new objective in the current chapter (deterministic, no LLM).
+ * `target: 'current'` (the emitter sentinel) resolves to the active chapter at
+ * commit time; an explicit target is used as the chapter slug. Leads always reach
+ * this path via manual review — the trust gate blocks any auto-commit.
+ */
+async function commitLead(fm: FolioImportFrontmatter): Promise<string> {
+	let slug: string | null;
+	if (fm.target && fm.target !== 'current') {
+		slug = fm.target;
+	} else {
+		const campaign = await loadCampaign();
+		const active = await loadActiveChapter(campaign.current_chapter);
+		slug = active?.slug ?? null;
+	}
+	if (!slug) throw new Error('no active chapter to attach lead');
+	const deadline = normalizeDeadline(fm.deadline);
+	return createObjective(slug, {
+		title: `Lead: ${fm.rolle ?? '?'} @ ${fm.quelle ?? '?'}`,
+		threshold: `Bewerbung abgeschickt${deadline ? ` bis ${deadline}` : ''}`,
+		weight: 1,
+		related_goals: [],
+		deadline,
+		historyNote: `created from lead ${fm.id}`
+	});
 }
 
 async function commitOne(
@@ -79,6 +107,9 @@ async function commitOne(
 			case 'directive':
 			case 'note':
 				await commitMarkdownFile('imports', fm, doc.body);
+				break;
+			case 'lead':
+				await commitLead(fm);
 				break;
 		}
 	} catch (e) {

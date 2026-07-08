@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- Source-trust policy for inbox auto-commit: objectives are only auto-created from
+  trusted sources (`config/trusted_sources.yaml`); `derived_from_external` imports
+  always go to manual review.
+- Import type `lead` (freelance/job leads from the mail pipeline): required `rolle`/
+  `quelle` + optional `deadline`/`satz`/`ort`/`link`/`dedup_key`. Committed as an
+  objective in the current chapter (`target: current` sentinel). New Heute-hub card
+  "Fristnahe Leads", TTL auto-archive of expired leads, and dedup grouping in review.
+
 ## [0.1.0] - 2026-04-26
 
 First public release. life-dashboard is a local-first, privacy-respecting
