@@ -12,24 +12,27 @@ cat > "$FILE_PATH" <<EOF
 ---
 folio_import: v1
 type: note
-target: chapter-1
+target: 02-integration
 id: ${DOC_ID}
 source: screenshot-demo
 created: 2026-07-08T12:00:00+02:00
-title: Demo Import Objective Seed
+title: "Momentum-Import: MVP-Warteliste"
 tags: [demo, import, screenshot]
 ---
 
-# Campaign objective proposal
+# Momentum-Ziel für Alex
 
-Please add a new objective to chapter 1:
+Bitte als Objective im Kapitel Momentum anlegen:
 
-- Title: Inbox-Automation dry-run with objective landing
-- Threshold: First import path lands one unambiguous objective in campaign chapter 1 and is visible in Heute-Hub.
-- Weight: 3
-- Related goals: obj-01-01
+- Title: Landing-Page + Warteliste fuer DevTool-MVP
+- Threshold: Landing-Page live, Warteliste >= 50 Eintragungen, Analytics aktiv - bis 2026-10-31.
+- Weight: 1.5
+- Related goals: obj-02-02
 
-This is demo data only.
+Kontext:
+- Ziel passt zur bestehenden Demo-Kampagne von Alex in Lissabon.
+- Fokus: sichtbarer Schritt von Idee zu validiertem MVP-Funnel.
+- Demo data only.
 EOF
 
 echo "Seeded demo inbox file: $FILE_PATH"

@@ -31,6 +31,22 @@ async function settle(page: import('@playwright/test').Page, ms = 1200): Promise
 	await page.waitForTimeout(ms);
 }
 
+const DEMO_CHAT_MESSAGES = [
+	{
+		id: 'demo-1',
+		role: 'user',
+		content: 'Momentum: Bitte den neuen Inbox-Import im Blick behalten.',
+		timestamp: new Date().toISOString()
+	},
+	{
+		id: 'demo-2',
+		role: 'assistant',
+		content:
+			'Verstanden. Objective obj-02-06 ist angelegt und in Kapitel 2 sichtbar. Nächster sinnvoller Schritt: Landing-Page-Tracking prüfen.',
+		timestamp: new Date().toISOString()
+	}
+];
+
 test.describe.serial('Import evidence screenshots (demo only)', () => {
 	test.beforeAll(() => {
 		execSync(`bash "${SEED_SCRIPT}"`, { stdio: 'inherit' });
@@ -46,6 +62,33 @@ test.describe.serial('Import evidence screenshots (demo only)', () => {
 		await page.waitForSelector('.msg.ok', { timeout: 20_000 });
 		await settle(page, 1000);
 		await page.screenshot({ path: shotPath(5, 'import-inbox'), fullPage: false });
+	});
+
+	test('07 — campaign board with generated objective + chat', async ({ page }) => {
+		await page.addInitScript((messages) => {
+			window.localStorage.setItem('folio-chat', JSON.stringify(messages));
+		}, DEMO_CHAT_MESSAGES);
+
+		await page.goto(`${BASE_URL}/vault?act=1&chapter=2`, { waitUntil: 'domcontentloaded' });
+		await page.waitForSelector('.kanban', { timeout: 15_000 });
+		await page.waitForSelector('.obj-id', { timeout: 15_000 });
+		const chapterTwo = page.getByRole('button', { name: /Kapitel 2 · Momentum/ });
+		if (await chapterTwo.count()) {
+			await chapterTwo.first().click();
+			await settle(page, 500);
+		}
+
+		const chatButton = page.getByRole('button', { name: 'Hermes Chat' });
+		const isActive = await chatButton.first().evaluate((el) =>
+			el.classList.contains('active')
+		);
+		if (!isActive) await chatButton.first().click();
+		await page.waitForSelector('.head-title', { timeout: 10_000 });
+		await settle(page, 1200);
+
+		await page.waitForSelector('.kanban .card', { timeout: 15_000 });
+		await settle(page, 600);
+		await page.screenshot({ path: shotPath(7, 'campaign-view'), fullPage: false });
 	});
 
 	test('06 — heute-hub with import card', async ({ page }) => {
