@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { clearTriageCache } from './cache.js';
 import { assessDocument, runInboxTriage } from './triage.js';
 import { validateGuardrails } from './guardrails.js';
+import { _resetTrustedSourcesCache } from './trusted-sources.js';
 import { createObjective } from '../vault/writer.js';
 import { resolveInboxDirs, scanInbox } from '../inbox/scanner.js';
 import type { TriageAssessment } from './types.js';
@@ -63,6 +64,13 @@ describe.sequential('folio agent triage', () => {
 		process.env.FOLIO_INBOX_PATH = dirs.inbox;
 		process.env.FOLIO_AGENT_CONFIDENCE = '0.8';
 		process.env.FOLIO_AGENT_AUTO = '0';
+
+		// Trust-policy fixture: `test-agent` is trusted so the baseline auto-commit tests still pass.
+		const trustedPath = join(baseDir, 'trusted_sources.yaml');
+		await writeFile(trustedPath, 'trusted_sources:\n  - test-agent\n', 'utf-8');
+		process.env.FOLIO_TRUSTED_SOURCES_PATH = trustedPath;
+		_resetTrustedSourcesCache();
+
 		await writeFile(join(baseDir, '.folio/active-vault.json'), JSON.stringify({ path: vaultDir }));
 		await clearTriageCache();
 	});
@@ -73,17 +81,28 @@ describe.sequential('folio agent triage', () => {
 		delete process.env.HOME;
 		delete process.env.FOLIO_AGENT_CONFIDENCE;
 		delete process.env.FOLIO_AGENT_AUTO;
+		delete process.env.FOLIO_TRUSTED_SOURCES_PATH;
+		_resetTrustedSourcesCache();
 	});
 
-	async function writeInboxDoc(name: string, body: string) {
+	async function writeInboxDoc(
+		name: string,
+		body: string,
+		opts?: { source?: string; derived_from_external?: boolean }
+	) {
+		const source = opts?.source ?? 'test-agent';
+		const derivedLine =
+			opts?.derived_from_external !== undefined
+				? `derived_from_external: ${opts.derived_from_external}\n`
+				: '';
 		const content = `---
 folio_import: v1
 type: note
 target: chapter-1
 id: ${name.replace('.md', '')}
-source: test-agent
+source: ${source}
 created: 2026-07-07
-title: Test document
+${derivedLine}title: Test document
 ---
 
 ${body}`;
@@ -144,6 +163,49 @@ ${body}`;
 		const scan2 = await scanInbox(dirs, ledgerPath);
 		expect(scan2.valid).toBe(0);
 		expect(scan2.duplicate).toBe(0);
+	});
+
+	it('untrusted source: high-confidence task goes to review, not auto-commit', async () => {
+		await writeInboxDoc(
+			'triage-untrusted.md',
+			'# Neues Ziel\n\nBitte Objective anlegen: Test deliverable bis Ende Jahr.',
+			{ source: 'some-random-source' }
+		);
+
+		const scan = await scanInbox(dirs, ledgerPath);
+		expect(scan.valid).toBe(1);
+
+		const { result } = await runInboxTriage(scan, dirs, {
+			ledgerPath,
+			autoCommit: true,
+			mockResponse: TASK_RESPONSE
+		});
+		expect(result.auto_committed).toHaveLength(0);
+		expect(result.awaiting_review).toContain('triage-untrusted.md');
+
+		// Item stays in inbox — nothing committed to the vault.
+		const scan2 = await scanInbox(dirs, ledgerPath);
+		expect(scan2.valid).toBe(1);
+	});
+
+	it('derived_from_external: even a trusted source goes to review, not auto-commit', async () => {
+		await writeInboxDoc(
+			'triage-derived.md',
+			'# Neues Ziel\n\nBitte Objective anlegen: Test deliverable bis Ende Jahr.',
+			{ source: 'test-agent', derived_from_external: true }
+		);
+
+		const scan = await scanInbox(dirs, ledgerPath);
+		expect(scan.valid).toBe(1);
+		expect(scan.items[0].derived_from_external).toBe(true);
+
+		const { result } = await runInboxTriage(scan, dirs, {
+			ledgerPath,
+			autoCommit: true,
+			mockResponse: TASK_RESPONSE
+		});
+		expect(result.auto_committed).toHaveLength(0);
+		expect(result.awaiting_review).toContain('triage-derived.md');
 	});
 
 	it('leaves unclear items for review', async () => {

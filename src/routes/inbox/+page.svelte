@@ -170,6 +170,16 @@
 					{#if item.type}<span>{item.type}</span>{/if}
 					{#if item.target}<span>→ {item.target}</span>{/if}
 					{#if item.id}<span>id:{item.id}</span>{/if}
+					{#if item.source}
+						{#if item.derived_from_external}
+							<span class="trust derived" title="Aus externem Material abgeleitet — immer Review">external</span>
+						{:else if data.trustedSources.includes(item.source)}
+							<span class="trust ok" title="Vertraute Quelle — Auto-Commit erlaubt">trusted</span>
+						{:else}
+							<span class="trust untrusted" title="Unbekannte Quelle — immer Review">untrusted</span>
+						{/if}
+						<span>source:{item.source}</span>
+					{/if}
 					{#if item.triage?.committed_objective_id}
 						<span>obj:{item.triage.committed_objective_id}</span>
 					{/if}
@@ -251,6 +261,10 @@
 	.verdict.auto { background: hsl(142 50% 85%); color: hsl(142 50% 22%); }
 	.verdict.none { display: none; }
 	.meta { font-size: 12px; font-family: var(--font-mono); color: var(--color-muted-foreground); display: flex; gap: 12px; flex-wrap: wrap; }
+	.trust { padding: 0 6px; border-radius: 4px; font-weight: 600; }
+	.trust.ok { background: hsl(142 40% 90%); color: hsl(142 40% 25%); }
+	.trust.untrusted { background: hsl(38 60% 90%); color: hsl(38 60% 28%); }
+	.trust.derived { background: hsl(0 55% 92%); color: hsl(0 55% 35%); }
 	.proposal { margin-top: 8px; font-size: 13px; line-height: 1.45; }
 	.dim { color: var(--color-muted-foreground); font-size: 12px; }
 	.reasoning { margin: 8px 0 0; font-size: 12px; color: var(--color-muted-foreground); font-style: italic; }

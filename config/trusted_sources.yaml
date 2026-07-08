@@ -1,0 +1,7 @@
+# Folio Source-Trust-Policy
+# Quellen (Frontmatter `source`), deren Imports Auto-Commit erhalten dürfen (source ∈ dieser Liste).
+# `derived_from_external: true` hebt Vertrauen IMMER auf (Inhalt aus externem Material → immer Review).
+# Fehlt/kaputt diese Datei, ist keine Quelle vertraut → alle Imports fallen ins manuelle Review.
+trusted_sources:
+  - fable-session-claude-ai
+  - cowork-release-pilot

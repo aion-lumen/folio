@@ -19,6 +19,8 @@ export interface FolioImportFrontmatter {
 	created: string;
 	title?: string;
 	tags?: string[];
+	/** Marks content derived from external material (e.g. an incoming mail). Forces manual review. */
+	derived_from_external?: boolean;
 	patch?: FolioImportPatch;
 }
 
@@ -34,6 +36,8 @@ export interface InboxScanItem {
 	type: FolioImportType | null;
 	target: string | null;
 	title: string | null;
+	source?: string;
+	derived_from_external?: boolean;
 	status: InboxItemStatus;
 	error: string | null;
 	triage?: TriageAssessment | null;
