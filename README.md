@@ -128,11 +128,6 @@ Captured against the bundled demo state (fictional Alex + Maya household in Alga
   <br><sub><em>Heute dashboard — four cards as entry points (vault, mail-queue, pipeline, hermes chat).</em></sub>
 </p>
 
-<p align="center">
-  <img src="docs/screenshots/release/01-mail-queue-20260611.png" width="720" alt="Mail queue — 40 demo mails with confidence stripes" />
-  <br><sub><em>Mail queue — domain × actionability tags, sender ranking, search + filters.</em></sub>
-</p>
-
 ### Mail pipeline (reference architecture)
 
 Folio orchestrates the Python pipeline in [multi-agent-lab](https://github.com/aion-lumen/multi-agent-lab):
