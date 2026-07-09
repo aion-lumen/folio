@@ -1,0 +1,30 @@
+{
+  "generated_at": "2026-07-09T11:40:49.785Z",
+  "eval": "import-triage",
+  "fixtures": 14,
+  "models": [
+    "qwen3-30b-a3b-thinking-2507"
+  ],
+  "prompt_variants": [
+    "v1"
+  ],
+  "best": {
+    "model": "qwen3-30b-a3b-thinking-2507",
+    "variant": "v1",
+    "accuracy": 0.9286,
+    "score": 0.9286,
+    "false_positive_rate": 0,
+    "false_negative_rate": 0
+  },
+  "combos": [
+    {
+      "model": "qwen3-30b-a3b-thinking-2507",
+      "variant": "v1",
+      "accuracy": 0.9286,
+      "score": 0.9286,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0,
+      "unclear_rate": 0.1429
+    }
+  ]
+}

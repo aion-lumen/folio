@@ -6,7 +6,7 @@
  * Usage: npm run eval:triage
  *        VAULT_PATH=./templates/demo-vault npm run eval:triage
  */
-import { readFile } from 'fs/promises';
+import { readFile, writeFile } from 'fs/promises';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
@@ -104,6 +104,39 @@ async function main() {
 	}
 
 	results.sort((a, b) => b.score - a.score);
+
+	// Aufgabe 3c: write the curated public evidence artifact. THIS is the site/CV number
+	// (import-triage accuracy over the labelled fixtures) — distinct from the multi-agent
+	// full-eval (40 mails, internal operating metric). Fixed path, checked in for the site link.
+	const best0 = results[0];
+	const stamp = new Date().toISOString().slice(0, 10);
+	const resultsPayload = {
+		generated_at: new Date().toISOString(),
+		eval: 'import-triage',
+		fixtures: manifest.fixtures.length,
+		models: manifest.models,
+		prompt_variants: manifest.prompt_variants,
+		best: {
+			model: best0.model,
+			variant: best0.variant,
+			accuracy: Number(best0.accuracy.toFixed(4)),
+			score: Number(best0.score.toFixed(4)),
+			false_positive_rate: Number(best0.falsePositiveRate.toFixed(4)),
+			false_negative_rate: Number(best0.falseNegativeRate.toFixed(4))
+		},
+		combos: results.map((r) => ({
+			model: r.model,
+			variant: r.variant,
+			accuracy: Number(r.accuracy.toFixed(4)),
+			score: Number(r.score.toFixed(4)),
+			false_positive_rate: Number(r.falsePositiveRate.toFixed(4)),
+			false_negative_rate: Number(r.falseNegativeRate.toFixed(4)),
+			unclear_rate: Number(r.unclearRate.toFixed(4))
+		}))
+	};
+	const resultsPath = join(__dirname, `results-${stamp}.json`);
+	await writeFile(resultsPath, JSON.stringify(resultsPayload, null, 2) + '\n', 'utf-8');
+	console.log(`\nResults written: ${resultsPath}`);
 
 	console.log('\n=== Folio Triage Eval ===\n');
 	console.log(
