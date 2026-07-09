@@ -50,8 +50,11 @@ interface ComboResult {
 }
 
 async function main() {
-	process.env.VAULT_PATH =
-		process.env.VAULT_PATH ?? join(ROOT, 'templates/demo-vault');
+	// Hermetic: declare the eval vault via the highest-precedence override so active-vault.json
+	// cannot hijack what we measure against. The operator's VAULT_PATH still wins if set;
+	// otherwise we pin templates/demo-vault. No user state is written (active-vault.json untouched).
+	process.env.FOLIO_VAULT_OVERRIDE =
+		process.env.VAULT_PATH ?? process.env.FOLIO_VAULT_OVERRIDE ?? join(ROOT, 'templates/demo-vault');
 
 	const manifestRaw = await readFile(join(__dirname, 'manifest.yaml'), 'utf-8');
 	const manifest = parseYaml(manifestRaw) as Manifest;
