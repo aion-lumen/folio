@@ -8,6 +8,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
 	import { mailDetailStore } from '$lib/stores/mailDetail.svelte.js';
@@ -50,6 +51,12 @@
 	// NOT on an account name. The former `account === 'yahoo'` proxy broke silently once
 	// demo mails were masked to konto-a/konto-b (Aufgabe 1.4). See util/reclassify.ts.
 	const canReclassifyRow = $derived(canReclassify(row));
+	// Council capability for the active vault — gates the "→ Übernommen" action (data effect,
+	// council ingest). Demo does not register Council (Aufgabe 4b), so the action is removed,
+	// not just hidden. Server also enforces this in /api/mail/override.
+	const councilRegistered = $derived(
+		(page.data as { councilRegistered?: boolean }).councilRegistered ?? true
+	);
 
 	// 2026-06-05 (Korrektur 1, B3): qm/preis fuer Pillen via on-demand
 	// cross-DB lookup. Nur fetchen wenn echte Mail-Row (feedback_id da) +
@@ -307,6 +314,7 @@
 				onApply={applyCorrection}
 				{saving}
 				{saveError}
+				{councilRegistered}
 			/>
 		{:else}
 			<div class="non-yahoo-hint">Re-Klassifikation nur für echte Mail-Rows verfügbar.</div>

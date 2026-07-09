@@ -35,3 +35,39 @@ Der Guard prüft das Etikett, nicht die tatsächliche Bedingung.
 - **kitEnv-only Store-Getter** (feedback/folio/council/inbox): die in Aufgabe 1/4 bereits robust
   gemachten Instanzen; die restlichen kitEnv-Getter sind Config-Pfade (nicht demo-gescopte Stores),
   daher geringeres Risiko derselben Klasse.
+
+## Vierte Instanz — umgekehrtes Vorzeichen: FEHLENDER Guard (2026-07-09, 08b Schritt 2)
+Nicht „falscher Guard" (Name statt Fähigkeit), sondern **fehlender Guard**: eine **Aktion mit
+Datenwirkung** prüft nicht, ob ihr **Ziel existiert**.
+- **`→ Übernommen`** (VerdictStage) = „Mail in Council ingestieren" → POST `/api/mail/override`
+  (`overridden_actionability: 'uebernommen'`). Der Button rendert im Demo bei immo-Mails, obwohl
+  Council dort **nicht registriert** ist (Aufgabe 4b) → **tote Aktion**: die UI verspricht eine
+  Fähigkeit, die die Registrierung entzogen hat.
+- **Fix (08b):** Aktion an dieselbe Bedingung wie Council koppeln. (i) **Server** (`/api/mail/override`)
+  weist `'uebernommen'` mit 409 ab, wenn `!isCouncilRegistered()` — echte Capability-Entziehung, nicht
+  nur Anzeige. (ii) **UI** (VerdictStage) rendert den Button nur bei `councilRegistered` (Flag aus der
+  mail-queue-Load). Versteckter Button **plus** offene API wäre genau die Falle „angenommen statt
+  geprüft".
+
+**Gemeinsamer Nenner aller vier Instanzen:** *Fähigkeiten werden angenommen statt geprüft* — mal über
+ein falsches Etikett (Name/Env), mal über eine fehlende Prüfung (Aktion ohne Ziel-Check).
+
+### Council-Einstiegspunkt-Inventar (Scan 2026-07-09) — nicht nur die eine Stelle
+- `/council`, `/council/mobile*` (Seiten): **404 im Demo** (Layout-Guard, 4b). ✓
+- `/api/mail/override` (`uebernommen`): **jetzt geguarded** (Server 409 + Button-Hide). ✓
+- `/api/council/object-by-feedback/[id]` (read): liefert im Demo `found:false` (Council-DB `null`) —
+  harmlos, kein Leak. ✓
+- **Offen/Follow-up:** die schreibenden `/api/council/*`-Routen (`ingest`, `[id]/{trigger,status,view,
+  note}`, `me/rankings`) sind **nur** über die (im Demo 404) Council-Seiten erreichbar — im Demo-UI
+  also nicht live —, aber auf **API-Ebene ungeguarded**. Empfehlung: gemeinsamer
+  `isCouncilRegistered()`-Guard (bzw. ein `+server.ts`-Hook/Helper) über diese Routen — **08c**, wenn
+  die Council-Registrierungs-API ohnehin gebaut wird. Hier nur als Inventar dokumentiert, nicht gefixt
+  (Scope 08b = die eine live-erreichbare Aktion).
+
+## Verifikations-Loch (4c, notiert)
+Die Council-Pillen (ENTFERNUNG/QM²/PREIS, 4c) sind **visuell nicht belegbar**, weil im Demo
+`active_rules.distance_threshold_km === null` ist (Korridor-Config im Demo nicht gesetzt) → die Pillen
+rendern für **keine** Mail. Der 4c-Guard (`&& domain === 'immo'`) ist **code-verifiziert**; der
+Demo-Zustand kann ihn nicht zeigen. Optionen: (a) Demo-Korridor-Config setzen (dann 4c auch visuell
+belegt) — kleiner Demo-Daten-Zusatz; (b) als **offenen Punkt für 08c** vermerken. Für 08b reicht
+Code-Verifikation.
