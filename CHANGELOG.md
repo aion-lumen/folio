@@ -5,6 +5,27 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-09
+
+### Added
+- Vault-scoped mail & DB stores: mail/feedback/council data is bound to the active
+  vault. Demo vaults isolate to demo fixtures (konto-a/konto-b), never real IMAP
+  (capability guard, not a warning).
+- `make eval-full`: automated 3-model end-to-end eval over the 40-mail demo corpus
+  against golden labels (`demo_labels.yaml`), writing `evals/full/<date>-report.md`
+  + JSON with exit codes (Cowork-consumable). Internal ops metric, separate from the
+  public triage number.
+- `{{EVAL_ACCURACY}}` injector (`evals/triage/inject-eval-numbers.ts`): the number
+  cascade is now scripted, not hand-edited; operator points `--file` at site/CV files.
+
+### Changed
+- Council is unregistered in demo vaults: `/council` → 404; detail pills shown only
+  for `immo`; "→ Übernommen" is gated on Council registration (server 409 otherwise).
+- Re-classification is gated on capability, not on account name.
+
+### Fixed
+- Demo vault no longer surfaces private accounts/labels (vault-scoping bug).
+
 ## [0.2.0] - 2026-07-09
 
 ### Added

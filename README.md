@@ -20,7 +20,7 @@ Cloud AI forgets you at the end of every session. You start over. Every time. Fo
 
 ## Status
 
-**Status:** v0.1.0 public preview  
+**Status:** v0.3.0 public preview  
 **License:** AGPL-3.0  
 **Platforms:** Linux / macOS / WSL2
 
