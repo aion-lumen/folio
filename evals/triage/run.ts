@@ -29,6 +29,13 @@ interface Manifest {
 	prompt_variants: PromptVariant[];
 }
 
+interface FixturePrediction {
+	file: string;
+	expected: 'task' | 'unclear' | 'not-a-task';
+	predicted: string;
+	match: boolean;
+}
+
 interface ComboResult {
 	model: string;
 	variant: PromptVariant;
@@ -38,6 +45,8 @@ interface ComboResult {
 	unclearRate: number;
 	score: number;
 	details: string[];
+	// Per-fixture predictions: which fixture wobbles is now provable, not derived.
+	predictions: FixturePrediction[];
 }
 
 async function main() {
@@ -59,6 +68,7 @@ async function main() {
 			let falseNeg = 0;
 			let unclearPred = 0;
 			const details: string[] = [];
+			const predictions: FixturePrediction[] = [];
 
 			for (const spec of manifest.fixtures) {
 				const path = join(__dirname, 'fixtures', spec.file);
@@ -73,6 +83,12 @@ async function main() {
 				if (pred === 'unclear') unclearPred++;
 
 				const isCorrect = pred === spec.expected;
+				predictions.push({
+					file: spec.file,
+					expected: spec.expected,
+					predicted: pred,
+					match: isCorrect
+				});
 				if (isCorrect) correct++;
 				else {
 					details.push(`${spec.file}: expected ${spec.expected}, got ${pred}`);
@@ -98,7 +114,8 @@ async function main() {
 				falseNegativeRate,
 				unclearRate,
 				score,
-				details
+				details,
+				predictions
 			});
 		}
 	}
@@ -131,7 +148,9 @@ async function main() {
 			score: Number(r.score.toFixed(4)),
 			false_positive_rate: Number(r.falsePositiveRate.toFixed(4)),
 			false_negative_rate: Number(r.falseNegativeRate.toFixed(4)),
-			unclear_rate: Number(r.unclearRate.toFixed(4))
+			unclear_rate: Number(r.unclearRate.toFixed(4)),
+			// Per-fixture predictions per combo — makes "which fixture flipped" provable.
+			fixtures: r.predictions
 		}))
 	};
 	const resultsPath = join(__dirname, `results-${stamp}.json`);
@@ -166,14 +185,21 @@ async function main() {
 		);
 	}
 
+	// Mismatches per combo (not only the best) — every wobbling fixture is visible in stdout.
+	console.log('\n--- Mismatches per combo ---');
+	for (const r of results) {
+		if (r.details.length === 0) {
+			console.log(`${r.model} / ${r.variant}: none`);
+		} else {
+			console.log(`${r.model} / ${r.variant}:`);
+			for (const d of r.details) console.log(`  ${d}`);
+		}
+	}
+
 	const best = results[0];
 	console.log('\n--- Recommendation ---');
 	console.log(`FOLIO_AGENT_MODEL=${best.model}`);
 	console.log(`Prompt variant: ${best.variant}`);
-	if (best.details.length > 0) {
-		console.log('\nMismatches (best combo):');
-		for (const d of best.details.slice(0, 8)) console.log(`  ${d}`);
-	}
 	console.log('');
 }
 
