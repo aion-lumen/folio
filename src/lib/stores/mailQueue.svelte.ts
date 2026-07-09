@@ -378,6 +378,9 @@ export function filtersFromUrl(searchParams: URLSearchParams): Filters {
 // Defensive fallback auf 'yahoo' für legacy null/empty values vor Migration.
 function mapAccountIdFromDb(dbValue: string | null | undefined): AccountId {
 	if (dbValue === 'mirhamed') return 'mirhamed_ch';
+	// Demo-store structural masking: konto-a / konto-b are never real identifiers.
+	if (dbValue === 'konto-a' || dbValue === 'konto_a') return 'konto_a';
+	if (dbValue === 'konto-b' || dbValue === 'konto_b') return 'konto_b';
 	if (dbValue === 'gmail' || dbValue === 'yahoo' || dbValue === 'mirhamed_ch') return dbValue;
 	return 'yahoo';
 }

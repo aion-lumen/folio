@@ -7,12 +7,14 @@ import { dirname } from 'path';
 import { getFolioDbPath } from '../env.js';
 
 let _conn: Database.Database | null = null;
+let _connPath: string | null = null;
 
 /** Test-only: close cached connection so FOLIO_DB_PATH can change. */
 export function resetFolioDbForTests(): void {
 	if (_conn) {
 		_conn.close();
 		_conn = null;
+		_connPath = null;
 	}
 }
 
@@ -294,10 +296,13 @@ CREATE TABLE IF NOT EXISTS worker_run_summary (
 `;
 
 export function getFolioDb(): Database.Database {
-	if (_conn) return _conn;
 	const path = getFolioDbPath();
+	// Reopen when the resolved path changes (vault switch real↔demo) — vault-scoped store.
+	if (_conn && _connPath === path) return _conn;
+	if (_conn) _conn.close();
 	mkdirSync(dirname(path), { recursive: true });
 	_conn = new Database(path);
+	_connPath = path;
 	_conn.pragma('journal_mode = WAL');
 	_conn.exec(SCHEMA);
 	// 2026-06-05: object_status_override.reason — Spalten-Migration fuer

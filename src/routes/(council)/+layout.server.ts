@@ -3,9 +3,14 @@
 // nicht existieren, da auto-upsert role='council_member' setzt) fliegen raus.
 
 import { error } from '@sveltejs/kit';
+import { isCouncilRegistered } from '$lib/server/env.js';
 import type { LayoutServerLoad } from './$types.js';
 
 export const load: LayoutServerLoad = async ({ locals }) => {
+	// Aufgabe 4(b): a demo vault does not register Council — it structurally does not exist.
+	if (!isCouncilRegistered()) {
+		throw error(404, 'Council ist im Demo-Modus nicht verfügbar (Vault registriert kein Council).');
+	}
 	const role = locals.user.role;
 	if (role !== 'owner' && role !== 'council_member') {
 		throw error(403, 'Council ist nur für Owner und Council-Members zugänglich');

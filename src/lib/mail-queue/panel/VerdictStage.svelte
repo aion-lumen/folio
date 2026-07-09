@@ -24,7 +24,8 @@
 		stripeState,
 		onApply,
 		saving = false,
-		saveError = null
+		saveError = null,
+		councilRegistered = true
 	}: {
 		row: UnifiedMailRow;
 		stripeState: 'still' | 'ne' | 'ne-strong' | undefined;
@@ -36,6 +37,9 @@
 		) => Promise<void>;
 		saving?: boolean;
 		saveError?: string | null;
+		// Whether the active vault registers Council. Gates the "→ Übernommen" action
+		// (council ingest) — demo does not register Council, so the action is removed.
+		councilRegistered?: boolean;
 	} = $props();
 
 	const hasCorrection = $derived(row.correction?.corrected_domain != null);
@@ -200,7 +204,9 @@
 			disabled={saving || overridePending}
 			onclick={() => pickAction('actionable')}
 		>Aktionable</button>
-		{#if currentDomain === 'immo'}
+		{#if currentDomain === 'immo' && councilRegistered}
+			<!-- "→ Übernommen" = Council ingest (data effect). Only when the active vault
+			     registers Council — demo does not (Aufgabe 4b), so no dead action. -->
 			<button
 				type="button"
 				class="action-btn action-uebernommen"

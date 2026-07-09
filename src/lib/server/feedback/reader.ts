@@ -7,10 +7,16 @@ import { getFeedbackDbPath } from '../env.js';
 import type { FeedbackRow, FeedbackFilter, FeedbackCounts } from './types.js';
 
 let _conn: Database.Database | null = null;
+let _connPath: string | null = null;
 
 function getConn(): Database.Database {
-	if (_conn) return _conn;
-	_conn = new Database(getFeedbackDbPath(), { readonly: true, fileMustExist: true });
+	const path = getFeedbackDbPath();
+	// Reopen when the resolved path changes (e.g. vault switch real↔demo) — the mail
+	// store is vault-scoped, so a cached connection to the old DB must not linger.
+	if (_conn && _connPath === path) return _conn;
+	if (_conn) _conn.close();
+	_conn = new Database(path, { readonly: true, fileMustExist: true });
+	_connPath = path;
 	// Verify WAL is on (sanity for concurrent worker-writes)
 	const mode = _conn.pragma('journal_mode', { simple: true });
 	if (mode !== 'wal') {

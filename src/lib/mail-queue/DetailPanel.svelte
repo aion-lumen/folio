@@ -8,6 +8,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
 	import { mailDetailStore } from '$lib/stores/mailDetail.svelte.js';
@@ -28,6 +29,7 @@
 	import PanelBody from './panel/PanelBody.svelte';
 	import { summarizeClassification } from './summarize-classification.js';
 	import StatusPillen from '$lib/shared/StatusPillen.svelte';
+	import { canReclassify } from '$lib/util/reclassify.js';
 
 	type MarkerKey = 'zu-weit' | 'zu-klein';
 
@@ -45,10 +47,19 @@
 	const row = $derived(liveRow ?? cachedSnap);
 	const isFilteredOut = $derived(open && liveRow == null && cachedSnap != null);
 	const body = $derived(mailDetailStore.current);
-	const isYahoo = $derived(row?.account === 'yahoo' && !row?.isMock);
+	// Gate re-classification on the real capability (numeric feedback_id, not a mock) —
+	// NOT on an account name. The former `account === 'yahoo'` proxy broke silently once
+	// demo mails were masked to konto-a/konto-b (Aufgabe 1.4). See util/reclassify.ts.
+	const canReclassifyRow = $derived(canReclassify(row));
+	// Council capability for the active vault — gates the "→ Übernommen" action (data effect,
+	// council ingest). Demo does not register Council (Aufgabe 4b), so the action is removed,
+	// not just hidden. Server also enforces this in /api/mail/override.
+	const councilRegistered = $derived(
+		(page.data as { councilRegistered?: boolean }).councilRegistered ?? true
+	);
 
 	// 2026-06-05 (Korrektur 1, B3): qm/preis fuer Pillen via on-demand
-	// cross-DB lookup. Nur fetchen wenn Mail (yahoo, feedback_id da) +
+	// cross-DB lookup. Nur fetchen wenn echte Mail-Row (feedback_id da) +
 	// active_rules da (immo-Domain mit priority-match).
 	let qmPreis = $state<{ qm: number | null; price_value: number | null; price_currency: string | null } | null>(null);
 	let qmPreisLoading = $state(false);
@@ -56,10 +67,10 @@
 	// (out_of_corridor:<plz>, expired:redirect_error, corridor_check_skipped).
 	let inseratMarkers = $state<string[]>([]);
 	$effect(() => {
-		// row.uid ist feedback.id-as-string fuer yahoo-rows (siehe
+		// row.uid ist feedback.id-as-string fuer echte feedback-Rows (siehe
 		// UnifiedMailRow type-comment). Mock-Rows haben uid='m_NNNN'
-		// → isYahoo=false filtert die schon raus.
-		const feedbackId = row && isYahoo ? parseInt(row.uid, 10) : NaN;
+		// → canReclassifyRow=false filtert die schon raus.
+		const feedbackId = row && canReclassifyRow ? parseInt(row.uid, 10) : NaN;
 		if (!Number.isFinite(feedbackId) || !row?.active_rules) {
 			qmPreis = null;
 			inseratMarkers = [];
@@ -118,7 +129,7 @@
 			}
 			lastShownUid = curUid;
 		}
-		if (row && isYahoo && !row.reviewed && pendingMark?.uid !== row.uid) {
+		if (row && canReclassifyRow && !row.reviewed && pendingMark?.uid !== row.uid) {
 			const feedbackId = parseInt(row.uid, 10);
 			if (Number.isFinite(feedbackId)) {
 				pendingMark = { uid: row.uid, feedbackId };
@@ -140,10 +151,11 @@
 		note: string | null,
 		markers: MarkerKey[]
 	): Promise<void> {
-		if (!row || !isYahoo) return;
+		if (!row || !canReclassifyRow) return;
 		const feedbackId = parseInt(row.uid, 10);
 		if (!Number.isFinite(feedbackId)) {
-			saveError = 'Ungültige feedback-id (nur yahoo-Rows können re-klassifiziert werden)';
+			saveError =
+				'Ungültige feedback-id (nur echte Mail-Rows mit feedback-id können re-klassifiziert werden)';
 			return;
 		}
 		saving = true;
@@ -196,7 +208,7 @@
 			close();
 			return;
 		}
-		if (!isYahoo) return;
+		if (!canReclassifyRow) return;
 
 		// Resolve current state (mirrors VerdictStage-Derivation)
 		// 2026-06-08 Bauteil 2.7: effective_actionability first — Reader latest-
@@ -295,23 +307,27 @@
 
 		<PanelHeader {row} onClose={close} />
 
-		{#if isYahoo}
+		{#if canReclassifyRow}
 			<VerdictStage
 				{row}
 				stripeState={stripeStateValue}
 				onApply={applyCorrection}
 				{saving}
 				{saveError}
+				{councilRegistered}
 			/>
 		{:else}
-			<div class="non-yahoo-hint">Re-Klassifikation nur für Yahoo-Mails aktiviert.</div>
+			<div class="non-yahoo-hint">Re-Klassifikation nur für echte Mail-Rows verfügbar.</div>
 		{/if}
 
-		{#if row.active_rules && row.active_rules.distance_threshold_km != null}
+		{#if row.active_rules && row.active_rules.distance_threshold_km != null && row.domain === 'immo'}
 			<!-- B3 2026-06-05: Drei Pillen — qm/preis on-demand-geladen.
 			     Wenn Mail noch nicht in council.objects ingested → qmPreis=null,
 			     Pillen rendern grau "—". Schwellen heute hardcoded; Konsolidierung
-			     mit regelwerk im Folge-Direktive-Scope. -->
+			     mit regelwerk im Folge-Direktive-Scope.
+			     Interim 08c: Council-Felder (ENTFERNUNG/QM²/PREIS) nur bei domain==='immo'
+			     rendern — Übergangs-Filterung gegen leere Pillen bei Job/Shopping/Finance.
+			     Wird in 08c durch die Council-Registrierungs-API ersetzt, NICHT erweitert. -->
 			<section class="pillen-section">
 				<StatusPillen
 					entfernung={{
