@@ -70,11 +70,23 @@ export function getRecentIngestAcks(): IngestAckRow[] {
 }
 
 let _conn: Database.Database | null = null;
+let _connPath: string | null = null;
 function getCouncilDb(): Database.Database | null {
-	if (_conn) return _conn;
 	const dbPath = getCouncilDbPath();
-	if (!existsSync(dbPath)) return null;
+	// null ⇒ Council not registered for the active vault (demo). Drop any cached
+	// real-vault connection and report absence — all readers handle null gracefully.
+	if (!dbPath || !existsSync(dbPath)) {
+		if (_conn) {
+			_conn.close();
+			_conn = null;
+			_connPath = null;
+		}
+		return null;
+	}
+	if (_conn && _connPath === dbPath) return _conn;
+	if (_conn) _conn.close();
 	_conn = new Database(dbPath, { readonly: true, fileMustExist: true });
+	_connPath = dbPath;
 	return _conn;
 }
 

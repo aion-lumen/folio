@@ -10,12 +10,23 @@ import { getFolioDb } from '../folio-db/init.js';
 import { getCouncilDbPath } from '../env.js';
 
 let _councilConn: Database.Database | null = null;
+let _councilConnPath: string | null = null;
 
 function getCouncilDb(): Database.Database | null {
-	if (_councilConn) return _councilConn;
 	const dbPath = getCouncilDbPath();
-	if (!existsSync(dbPath)) return null;
+	// null ⇒ Council not registered (demo vault). Drop cached connection, report absence.
+	if (!dbPath || !existsSync(dbPath)) {
+		if (_councilConn) {
+			_councilConn.close();
+			_councilConn = null;
+			_councilConnPath = null;
+		}
+		return null;
+	}
+	if (_councilConn && _councilConnPath === dbPath) return _councilConn;
+	if (_councilConn) _councilConn.close();
 	_councilConn = new Database(dbPath, { readonly: true, fileMustExist: true });
+	_councilConnPath = dbPath;
 	return _councilConn;
 }
 import type { CouncilObjectRow } from './types.js';

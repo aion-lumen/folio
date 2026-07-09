@@ -6,6 +6,7 @@ import {
 	getFeedbackDbPath,
 	getFolioDbPath,
 	getCouncilDbPath,
+	isCouncilRegistered,
 	isDemoVaultActive,
 	isDemoVaultPath
 } from './env.js';
@@ -39,12 +40,14 @@ describe('vault-scoped DB paths', () => {
 		expect(isDemoVaultPath(null)).toBe(false);
 	});
 
-	it('demo vault (by path) scopes all three stores to *-demo.db', () => {
+	it('demo vault (by path) scopes mail+folio stores to *-demo.db; Council is unregistered', () => {
 		writeActiveVault({ path: '/Users/Shared/folio-demo' });
 		expect(isDemoVaultActive()).toBe(true);
 		expect(getFeedbackDbPath()).toContain('feedback-demo.db');
 		expect(getFolioDbPath()).toContain('folio-demo.db');
-		expect(getCouncilDbPath()).toContain('council-demo.db');
+		// Aufgabe 4(b): demo vault does NOT register Council → null (not council-demo.db).
+		expect(isCouncilRegistered()).toBe(false);
+		expect(getCouncilDbPath()).toBeNull();
 	});
 
 	it('demo:true flag scopes even without a heuristic path match', () => {
@@ -53,12 +56,14 @@ describe('vault-scoped DB paths', () => {
 		expect(getFeedbackDbPath()).toContain('feedback-demo.db');
 	});
 
-	it('real vault resolves to the real stores (no -demo)', () => {
+	it('real vault resolves to the real stores (no -demo) + Council registered', () => {
 		writeActiveVault({ path: join(home, 'Projects/life') });
 		expect(isDemoVaultActive()).toBe(false);
 		expect(getFeedbackDbPath()).toContain('feedback.db');
 		expect(getFeedbackDbPath()).not.toContain('feedback-demo.db');
 		expect(getFolioDbPath()).not.toContain('folio-demo.db');
+		expect(isCouncilRegistered()).toBe(true);
+		expect(getCouncilDbPath()).toContain('council.db');
 	});
 
 	it('no active vault → real stores (default)', () => {

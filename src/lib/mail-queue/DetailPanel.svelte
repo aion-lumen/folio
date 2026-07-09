@@ -307,11 +307,14 @@
 			<div class="non-yahoo-hint">Re-Klassifikation nur für Yahoo-Mails aktiviert.</div>
 		{/if}
 
-		{#if row.active_rules && row.active_rules.distance_threshold_km != null}
+		{#if row.active_rules && row.active_rules.distance_threshold_km != null && row.domain === 'immo'}
 			<!-- B3 2026-06-05: Drei Pillen — qm/preis on-demand-geladen.
 			     Wenn Mail noch nicht in council.objects ingested → qmPreis=null,
 			     Pillen rendern grau "—". Schwellen heute hardcoded; Konsolidierung
-			     mit regelwerk im Folge-Direktive-Scope. -->
+			     mit regelwerk im Folge-Direktive-Scope.
+			     Interim 08c: Council-Felder (ENTFERNUNG/QM²/PREIS) nur bei domain==='immo'
+			     rendern — Übergangs-Filterung gegen leere Pillen bei Job/Shopping/Finance.
+			     Wird in 08c durch die Council-Registrierungs-API ersetzt, NICHT erweitert. -->
 			<section class="pillen-section">
 				<StatusPillen
 					entfernung={{

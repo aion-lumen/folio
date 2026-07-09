@@ -138,8 +138,15 @@ export function getAionLumenPath(): string {
 	return kitEnv().AION_LUMEN_PATH ?? join(homedir(), 'Projects/aion-lumen/multi-agent');
 }
 
-export function getCouncilDbPath(): string {
-	if (isDemoVaultActive()) return join(homedir(), '.council/council-demo.db');
+/** True when Council is registered for the active vault. Demo vaults do NOT register Council. */
+export function isCouncilRegistered(): boolean {
+	return !isDemoVaultActive();
+}
+
+export function getCouncilDbPath(): string | null {
+	// Aufgabe 4(b): a demo vault does NOT register Council — capability removal at the
+	// data-access layer (not display filtering). null ⇒ readers return empty, no council.
+	if (!isCouncilRegistered()) return null;
 	return kitEnv().COUNCIL_DB_PATH ?? join(homedir(), '.council/council.db');
 }
 
