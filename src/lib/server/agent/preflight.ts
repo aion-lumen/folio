@@ -1,11 +1,37 @@
-import { getFolioAgentModel, getLmStudioBaseUrl } from '../env.js';
+import {
+	getFeedbackDbPath,
+	getFolioAgentModel,
+	getLmStudioBaseUrl,
+	readActiveVaultMeta
+} from '../env.js';
 
-export interface TriagePreflight {
+export interface VaultMailPreflight {
+	vault_mode: 'real' | 'demo';
+	vault_path: string | null;
+	mail_store: string;
+	/** Non-null when real IMAP is blocked (demo mode) — capability removal, not a warning. */
+	imap_blocked_reason: string | null;
+}
+
+export interface TriagePreflight extends VaultMailPreflight {
 	ok: boolean;
 	configured_model: string;
 	resolved_model: string | null;
 	available_models: string[];
 	message: string;
+}
+
+/** Active vault ↔ mail-store mapping + demo IMAP capability state. */
+export function getVaultMailPreflight(): VaultMailPreflight {
+	const { path, demo } = readActiveVaultMeta();
+	return {
+		vault_mode: demo ? 'demo' : 'real',
+		vault_path: path,
+		mail_store: getFeedbackDbPath(),
+		imap_blocked_reason: demo
+			? 'Demo-Vault aktiv — echter IMAP-Account gesperrt (nur --imap-fixture).'
+			: null
+	};
 }
 
 export async function listLmStudioModels(): Promise<string[]> {
@@ -31,10 +57,12 @@ export async function resolveTriageModel(): Promise<{ model: string | null; avai
 
 export async function checkTriagePreflight(): Promise<TriagePreflight> {
 	const configured = getFolioAgentModel();
+	const vaultMail = getVaultMailPreflight();
 	const { model, available } = await resolveTriageModel();
 
 	if (available.length === 0) {
 		return {
+			...vaultMail,
 			ok: false,
 			configured_model: configured,
 			resolved_model: null,
@@ -45,6 +73,7 @@ export async function checkTriagePreflight(): Promise<TriagePreflight> {
 
 	if (!model) {
 		return {
+			...vaultMail,
 			ok: false,
 			configured_model: configured,
 			resolved_model: null,
@@ -55,6 +84,7 @@ export async function checkTriagePreflight(): Promise<TriagePreflight> {
 
 	const fallback = model !== configured;
 	return {
+		...vaultMail,
 		ok: true,
 		configured_model: configured,
 		resolved_model: model,

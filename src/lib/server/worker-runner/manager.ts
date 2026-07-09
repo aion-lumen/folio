@@ -10,7 +10,7 @@ import {
 	insertWorkerRun,
 	updateWorkerRunStatus
 } from '$lib/server/folio-db/writer.js';
-import { getAionLumenPath, getPythonBinPath, loadHermesEnvVars } from '$lib/server/env.js';
+import { getAionLumenPath, getPythonBinPath, isDemoVaultActive, loadHermesEnvVars } from '$lib/server/env.js';
 import type { ActiveRunInfo, RunEndEvent, RunLogLine, RunStreamMsg, StartRunInput } from './types.js';
 
 // F.7-Bugfix + F.9: loadHermesEnvVars lebt jetzt in env.ts (geteilt mit Hermes-Chat-API).
@@ -109,6 +109,14 @@ function attachStreamListener(
 }
 
 export function startRun(input: StartRunInput): { uuid: string; board_slug: string } {
+	// Demo capability wall: a demo vault must NEVER read a real IMAP account.
+	// This is a hard block (not a warning) — the real IMAP fetch lives in production_worker.
+	if (isDemoVaultActive()) {
+		throw new Error(
+			'Demo-Vault aktiv: echter IMAP-Worker-Run ist deaktiviert (Capability-Entzug). ' +
+				'Demo-Mails kommen ausschliesslich aus --imap-fixture, nie aus IMAP.'
+		);
+	}
 	if (_active) {
 		throw new Error(`Another run is active (uuid=${_active.uuid})`);
 	}

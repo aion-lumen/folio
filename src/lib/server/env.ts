@@ -15,14 +15,35 @@ function kitEnv(): Record<string, string | undefined> {
 }
 
 function readActiveVaultFromDisk(): string | null {
+	return readActiveVaultMeta().path;
+}
+
+/** True for the bundled/shared demo vaults (path-based fallback when no explicit flag). */
+export function isDemoVaultPath(p: string | null | undefined): boolean {
+	if (!p) return false;
+	return p.includes('demo-vault') || p.includes('folio-demo');
+}
+
+/**
+ * Active vault + whether it is a demo vault. The mail/DB stores are scoped off this
+ * (env-independent, unlike kitEnv() which does not surface demo-server.sh exports).
+ * `demo` is the explicit flag written by the switcher, falling back to a path heuristic
+ * so pre-existing active-vault.json files (no flag) still scope correctly.
+ */
+export function readActiveVaultMeta(): { path: string | null; demo: boolean } {
 	try {
 		const raw = readFileSync(join(homedir(), '.folio', 'active-vault.json'), 'utf-8');
-		const parsed = JSON.parse(raw) as { path?: string };
-		const p = parsed.path?.trim();
-		return p || null;
+		const parsed = JSON.parse(raw) as { path?: string; demo?: boolean };
+		const p = parsed.path?.trim() || null;
+		return { path: p, demo: parsed.demo === true || isDemoVaultPath(p) };
 	} catch {
-		return null;
+		return { path: null, demo: false };
 	}
+}
+
+/** True when the active vault is a demo vault → stores must resolve to *-demo.db. */
+export function isDemoVaultActive(): boolean {
+	return readActiveVaultMeta().demo;
 }
 
 export function getVaultPath(): string {
@@ -86,6 +107,8 @@ export function getHermesApiKey(): string {
 }
 
 export function getFeedbackDbPath(): string {
+	// Vault-scoped: a demo vault binds to the demo mail store (never the real feedback.db).
+	if (isDemoVaultActive()) return join(getAionLumenPath(), 'state/feedback-demo.db');
 	return kitEnv().FEEDBACK_DB_PATH
 		?? join(homedir(), 'Projects/aion-lumen/multi-agent/state/feedback.db');
 }
@@ -93,6 +116,7 @@ export function getFeedbackDbPath(): string {
 export function getFolioDbPath(): string {
 	// Default lives outside the project tree so vite/chokidar does not watch it.
 	// Watching state/folio.db-wal caused full page reloads on every validator write.
+	if (isDemoVaultActive()) return join(homedir(), '.folio/folio-demo.db');
 	return kitEnv().FOLIO_DB_PATH
 		?? join(homedir(), '.folio/folio.db');
 }
@@ -115,6 +139,7 @@ export function getAionLumenPath(): string {
 }
 
 export function getCouncilDbPath(): string {
+	if (isDemoVaultActive()) return join(homedir(), '.council/council-demo.db');
 	return kitEnv().COUNCIL_DB_PATH ?? join(homedir(), '.council/council.db');
 }
 

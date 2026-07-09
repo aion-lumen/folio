@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { homedir } from 'os';
 import { basename, join } from 'path';
+import { isDemoVaultPath } from '../env.js';
 import { upsertVaultInRegistry, validateVaultPath } from './registry.js';
 
 const FOLIO_DIR = join(homedir(), '.folio');
@@ -11,7 +12,12 @@ export async function writeActiveVaultFile(vaultPath: string): Promise<void> {
 	await mkdir(FOLIO_DIR, { recursive: true });
 	await writeFile(
 		ACTIVE_VAULT_FILE,
-		JSON.stringify({ path: vaultPath, switchedAt: new Date().toISOString() }, null, 2),
+		JSON.stringify(
+			// `demo` scopes the mail/DB stores to *-demo.db (read by env.ts, env-independent).
+			{ path: vaultPath, demo: isDemoVaultPath(vaultPath), switchedAt: new Date().toISOString() },
+			null,
+			2
+		),
 		'utf-8'
 	);
 }

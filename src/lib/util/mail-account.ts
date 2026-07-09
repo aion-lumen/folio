@@ -2,8 +2,10 @@
 // Multi-Account-Vorbau (F.4-Plan v13 D2): UI baut für gmail/yahoo/mirhamed.ch.
 // F.6 wird inferAccount() durch echte account_id-Column ersetzen.
 
-export type AccountId = 'gmail' | 'yahoo' | 'mirhamed_ch';
-export const ACCOUNT_IDS: AccountId[] = ['gmail', 'yahoo', 'mirhamed_ch'];
+// konto_a / konto_b are demo-only, structurally-masked account labels (never real
+// identifiers) — the demo mail store seeds account_id='konto-a'/'konto-b'.
+export type AccountId = 'gmail' | 'yahoo' | 'mirhamed_ch' | 'konto_a' | 'konto_b';
+export const ACCOUNT_IDS: AccountId[] = ['gmail', 'yahoo', 'mirhamed_ch', 'konto_a', 'konto_b'];
 
 export interface AccountMeta {
 	id: AccountId;
@@ -32,6 +34,18 @@ export const ACCOUNTS: Record<AccountId, AccountMeta> = {
 		label: 'mirhamed.ch',
 		addr: 'you@example.org',
 		desc: 'Custom domain'
+	},
+	konto_a: {
+		id: 'konto_a',
+		label: 'konto-a',
+		addr: 'demo@example.com',
+		desc: 'Demo account A'
+	},
+	konto_b: {
+		id: 'konto_b',
+		label: 'konto-b',
+		addr: 'demo@example.net',
+		desc: 'Demo account B'
 	}
 };
 
@@ -51,6 +65,17 @@ export const ACCOUNT_CLASS: Record<AccountId, { dot: string; soft: string; deep:
 		dot: 'bg-account-mirhamed',
 		soft: 'bg-account-mirhamed-soft',
 		deep: 'text-account-mirhamed-deep'
+	},
+	// Demo accounts reuse existing account color tokens (no new @theme tokens needed).
+	konto_a: {
+		dot: 'bg-account-yahoo',
+		soft: 'bg-account-yahoo-soft',
+		deep: 'text-account-yahoo-deep'
+	},
+	konto_b: {
+		dot: 'bg-account-gmail',
+		soft: 'bg-account-gmail-soft',
+		deep: 'text-account-gmail-deep'
 	}
 };
 
