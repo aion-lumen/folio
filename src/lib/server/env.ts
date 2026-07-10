@@ -47,10 +47,19 @@ export function isDemoVaultActive(): boolean {
 }
 
 export function getVaultPath(): string {
+	// 0) FOLIO_VAULT_OVERRIDE — hermetic override, highest precedence. Only the eval harness
+	//    sets it. It forces the vault regardless of active-vault.json, WITHOUT writing any user
+	//    state — so an eval run measures against the vault it declares, not "whichever vault
+	//    happened to be active". Fixes the non-hermetic eval (active-vault.json used to win over
+	//    the harness's process.env.VAULT_PATH, silently deciding what got measured).
 	// 1) ~/.folio/active-vault.json — explicit user choice (switcher), survives Vite restart
 	// 2) Live process.env (setup wizard hot-set)
 	// 3) $env/dynamic/private snapshot from .env at server start
-	const p = readActiveVaultFromDisk() ?? process.env.VAULT_PATH ?? kitEnv().VAULT_PATH;
+	const p =
+		process.env.FOLIO_VAULT_OVERRIDE ??
+		readActiveVaultFromDisk() ??
+		process.env.VAULT_PATH ??
+		kitEnv().VAULT_PATH;
 	if (!p) throw new Error('VAULT_PATH not set');
 	return p;
 }

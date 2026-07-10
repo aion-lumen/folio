@@ -71,3 +71,25 @@ rendern für **keine** Mail. Der 4c-Guard (`&& domain === 'immo'`) ist **code-ve
 Demo-Zustand kann ihn nicht zeigen. Optionen: (a) Demo-Korridor-Config setzen (dann 4c auch visuell
 belegt) — kleiner Demo-Daten-Zusatz; (b) als **offenen Punkt für 08c** vermerken. Für 08b reicht
 Code-Verifikation.
+
+## Fünfte Instanz — der Harness nimmt an, er bestimme den Vault (2026-07-10, Eval-Hermetik)
+(Die Direktive nennt sie „vierte Instanz" — sie zählt die drei Namens-Proxies + diese; der Übernommen-
+Fall oben ist die dazwischen gefundene vierte. Reihenfolge hier: 5.)
+
+Wieder **angenommene statt geprüfte Fähigkeit**, diesmal im Eval-Harness: `evals/triage/run.ts` setzte
+`process.env.VAULT_PATH=templates/demo-vault` und **nahm an**, damit den Eval-Vault zu bestimmen. Tat es
+nicht: `getVaultPath()` (`env.ts`) löst `readActiveVaultFromDisk() ?? process.env.VAULT_PATH ?? …` — also
+**`active-vault.json` zuerst**. Solange die aktive Vault gesetzt ist (immer), wurde `VAULT_PATH` ignoriert
+→ jeder Lauf maß gegen „welche Vault gerade aktiv war". Symptome: kippende Varianten-Rangfolge zwischen
+Läufen (v1-strict ist über die STRICT_EXTRA-„chapter fit"-Regel kontext-, also vault-empfindlich).
+
+**Fix (diese Runde):** `FOLIO_VAULT_OVERRIDE` mit **höchster** Präzedenz in `getVaultPath()`; nur der
+Harness setzt sie. Der Harness kann seinen Vault jetzt **deklarieren** statt ihn anzunehmen — ohne
+Nutzer-State zu schreiben (kein `active-vault.json`-Write, kein Restore, keine Signal-Fragilität).
+Bewusst (A) statt (B) „temporär `active-vault.json` überschreiben + restaurieren": (B) mutiert genau den
+State, aus dem der Bug stammt. Gedeckt durch Unit-Test (Override schlägt `active-vault.json`).
+
+**Gemeinsamer Nenner jetzt über fünf Instanzen:** Eine Fähigkeit (Store bestimmen, re-klassifizieren,
+Council ansteuern, den Eval-Vault festlegen) wird **angenommen** — über ein Etikett (Name/Env), eine
+fehlende Prüfung (Aktion ohne Ziel), oder eine **nicht deklarierte, nur gehoffte** Präzedenz. Heuristik:
+Wer eine Fähigkeit braucht, muss sie **erzwingen/prüfen**, nicht voraussetzen.

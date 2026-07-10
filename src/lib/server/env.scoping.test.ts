@@ -6,6 +6,7 @@ import {
 	getFeedbackDbPath,
 	getFolioDbPath,
 	getCouncilDbPath,
+	getVaultPath,
 	isCouncilRegistered,
 	isDemoVaultActive,
 	isDemoVaultPath
@@ -30,6 +31,8 @@ describe('vault-scoped DB paths', () => {
 	afterEach(() => {
 		if (prevHome === undefined) delete process.env.HOME;
 		else process.env.HOME = prevHome;
+		delete process.env.FOLIO_VAULT_OVERRIDE;
+		delete process.env.VAULT_PATH;
 		rmSync(home, { recursive: true, force: true });
 	});
 
@@ -69,5 +72,19 @@ describe('vault-scoped DB paths', () => {
 	it('no active vault → real stores (default)', () => {
 		expect(isDemoVaultActive()).toBe(false);
 		expect(getFolioDbPath()).not.toContain('-demo');
+	});
+
+	// Hermetic eval: FOLIO_VAULT_OVERRIDE wins over active-vault.json, so a run measures
+	// against the vault the harness declares — never "whichever vault happened to be active".
+	it('FOLIO_VAULT_OVERRIDE takes precedence over active-vault.json (eval hermeticity)', () => {
+		writeActiveVault({ path: '/some/other/active/vault', demo: true });
+		process.env.FOLIO_VAULT_OVERRIDE = '/repo/folio/templates/demo-vault';
+		expect(getVaultPath()).toBe('/repo/folio/templates/demo-vault');
+	});
+
+	it('without the override, active-vault.json still wins over process.env.VAULT_PATH', () => {
+		writeActiveVault({ path: '/the/active/vault' });
+		process.env.VAULT_PATH = '/an/env/vault';
+		expect(getVaultPath()).toBe('/the/active/vault');
 	});
 });

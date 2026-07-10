@@ -33,7 +33,7 @@ fixtures:
     expected: task
     chapter_slug: 01-neustart
   - file: meeting-notes.md
-    expected: not-a-task
+    expected: unclear
 
 models:
   - gemma-4-26b-a4b-it-mlx

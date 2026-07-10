@@ -1,15 +1,18 @@
 {
-  "generated_at": "2026-07-09T11:40:49.785Z",
+  "generated_at": "2026-07-09T23:19:57.829Z",
   "eval": "import-triage",
   "fixtures": 14,
   "models": [
+    "gemma-4-26b-a4b-it-mlx",
+    "qwen3.6-35b-a3b-ud-mlx",
     "qwen3-30b-a3b-thinking-2507"
   ],
   "prompt_variants": [
-    "v1"
+    "v1",
+    "v1-strict"
   ],
   "best": {
-    "model": "qwen3-30b-a3b-thinking-2507",
+    "model": "gemma-4-26b-a4b-it-mlx",
     "variant": "v1",
     "accuracy": 0.9286,
     "score": 0.9286,
@@ -18,13 +21,574 @@
   },
   "combos": [
     {
+      "model": "gemma-4-26b-a4b-it-mlx",
+      "variant": "v1",
+      "accuracy": 0.9286,
+      "score": 0.9286,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0,
+      "unclear_rate": 0.2143,
+      "fixtures": [
+        {
+          "file": "lead-freelance-python.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "lead-freelance-devops.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-mandat.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-deadline.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-finanz.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "ambiguous-chapter.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "vague-threshold.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "field-note-observation.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "status-update-only.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "retrospective-note.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "directive-no-new-goal.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "mixed-intent.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "clear-task-sprache.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "meeting-notes.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        }
+      ]
+    },
+    {
+      "model": "qwen3.6-35b-a3b-ud-mlx",
+      "variant": "v1",
+      "accuracy": 0.9286,
+      "score": 0.9286,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0,
+      "unclear_rate": 0.2143,
+      "fixtures": [
+        {
+          "file": "lead-freelance-python.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "lead-freelance-devops.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-mandat.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-deadline.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-finanz.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "ambiguous-chapter.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "vague-threshold.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "field-note-observation.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "status-update-only.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "retrospective-note.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "directive-no-new-goal.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "mixed-intent.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "clear-task-sprache.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "meeting-notes.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        }
+      ]
+    },
+    {
       "model": "qwen3-30b-a3b-thinking-2507",
       "variant": "v1",
       "accuracy": 0.9286,
       "score": 0.9286,
       "false_positive_rate": 0,
       "false_negative_rate": 0,
-      "unclear_rate": 0.1429
+      "unclear_rate": 0.2143,
+      "fixtures": [
+        {
+          "file": "lead-freelance-python.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "lead-freelance-devops.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-mandat.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-deadline.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-finanz.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "ambiguous-chapter.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "vague-threshold.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "field-note-observation.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "status-update-only.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "retrospective-note.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "directive-no-new-goal.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "mixed-intent.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "clear-task-sprache.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "meeting-notes.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        }
+      ]
+    },
+    {
+      "model": "gemma-4-26b-a4b-it-mlx",
+      "variant": "v1-strict",
+      "accuracy": 0.7857,
+      "score": 0.75,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0.0714,
+      "unclear_rate": 0.2143,
+      "fixtures": [
+        {
+          "file": "lead-freelance-python.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "lead-freelance-devops.md",
+          "expected": "task",
+          "predicted": "unclear",
+          "match": false
+        },
+        {
+          "file": "clear-task-mandat.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-deadline.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-finanz.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "ambiguous-chapter.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "vague-threshold.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "field-note-observation.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "status-update-only.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "retrospective-note.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "directive-no-new-goal.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "mixed-intent.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        },
+        {
+          "file": "clear-task-sprache.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "meeting-notes.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        }
+      ]
+    },
+    {
+      "model": "qwen3.6-35b-a3b-ud-mlx",
+      "variant": "v1-strict",
+      "accuracy": 0.7857,
+      "score": 0.75,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0.0714,
+      "unclear_rate": 0.2143,
+      "fixtures": [
+        {
+          "file": "lead-freelance-python.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "lead-freelance-devops.md",
+          "expected": "task",
+          "predicted": "unclear",
+          "match": false
+        },
+        {
+          "file": "clear-task-mandat.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-deadline.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-finanz.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "ambiguous-chapter.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "vague-threshold.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "field-note-observation.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "status-update-only.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "retrospective-note.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "directive-no-new-goal.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "mixed-intent.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        },
+        {
+          "file": "clear-task-sprache.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "meeting-notes.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        }
+      ]
+    },
+    {
+      "model": "qwen3-30b-a3b-thinking-2507",
+      "variant": "v1-strict",
+      "accuracy": 0.7857,
+      "score": 0.75,
+      "false_positive_rate": 0,
+      "false_negative_rate": 0.0714,
+      "unclear_rate": 0.2143,
+      "fixtures": [
+        {
+          "file": "lead-freelance-python.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "lead-freelance-devops.md",
+          "expected": "task",
+          "predicted": "unclear",
+          "match": false
+        },
+        {
+          "file": "clear-task-mandat.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-deadline.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "clear-task-finanz.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "ambiguous-chapter.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "vague-threshold.md",
+          "expected": "unclear",
+          "predicted": "unclear",
+          "match": true
+        },
+        {
+          "file": "field-note-observation.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "status-update-only.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "retrospective-note.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "directive-no-new-goal.md",
+          "expected": "not-a-task",
+          "predicted": "not-a-task",
+          "match": true
+        },
+        {
+          "file": "mixed-intent.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        },
+        {
+          "file": "clear-task-sprache.md",
+          "expected": "task",
+          "predicted": "task",
+          "match": true
+        },
+        {
+          "file": "meeting-notes.md",
+          "expected": "unclear",
+          "predicted": "not-a-task",
+          "match": false
+        }
+      ]
     }
   ]
 }
