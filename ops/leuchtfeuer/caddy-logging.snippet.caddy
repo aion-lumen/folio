@@ -1,0 +1,40 @@
+# Leuchtfeuer — Caddy access logging with IP anonymisation + 7-day retention.
+# Add a `log` block to EACH of the four site blocks (aion-lumen.ch, frag-shifu.ch,
+# noblecause.ai, mirhamed.ch). IPs are masked IN CADDY (last octet / IPv6 /48) so the raw
+# address is never written to disk — the 0-external-calls / no-visitor-storage promise stays
+# literally true. Logs roll and are kept 7 days, then discarded.
+#
+# Caddyfile form (repeat per site, changing the output filename to /var/log/caddy/<site>.log):
+
+aion-lumen.ch {
+	log {
+		output file /var/log/caddy/aion-lumen.ch.log {
+			roll_size 50MiB
+			roll_keep 8
+			roll_keep_for 168h        # 7-day retention
+		}
+		format filter {
+			wrap json
+			fields {
+				# keep first 24 bits of IPv4 (zero the last octet), /48 for IPv6 → anonymised at write time
+				request>client_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+				request>remote_ip ip_mask {
+					ipv4 24
+					ipv6 48
+				}
+			}
+		}
+	}
+
+	# ... existing site config (root, file_server, handlers) stays unchanged ...
+}
+
+# Notes
+# - `request>client_ip` is the newer Caddy field; `remote_ip` covers older versions. Masking both
+#   is harmless (whichever exists gets masked).
+# - The collector (collect_caddy.py) treats the IP as already masked and additionally hashes
+#   (masked-ip + UA) for the uniques estimate — it never stores an address.
+# - Retention is enforced by Caddy's roll settings; no separate logrotate needed.

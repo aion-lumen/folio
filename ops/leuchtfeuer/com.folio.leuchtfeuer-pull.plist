@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Leuchtfeuer metrics pull (LOCAL Mac, launchd). Pulls the VPS aggregates into ~/.folio/metrics/
+  once a day. Pull-only over SSH: the VPS never pushes into this machine.
+
+  Setup:
+    1. Fill in the SSH host below (the ~/.ssh/config `aionlumen-deploy` host is a placeholder —
+       point METRICS_HOST at the VPS with a key that can read /var/lib/leuchtfeuer/metrics/).
+    2. cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/
+       (edit paths: replace __HOME__ with your home dir; launchd does not expand ~)
+    3. launchctl load ~/Library/LaunchAgents/com.folio.leuchtfeuer-pull.plist
+
+  No --delete: local history is append-only (the card only reads the last 30 days anyway; the
+  VPS may prune older files without affecting the local record).
+-->
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>com.folio.leuchtfeuer-pull</string>
+	<key>ProgramArguments</key>
+	<array>
+		<string>/usr/bin/rsync</string>
+		<string>-az</string>
+		<!-- FILL IN: user@vps-host (or an ~/.ssh/config alias) that can read the metrics dir -->
+		<string>METRICS_HOST:/var/lib/leuchtfeuer/metrics/</string>
+		<string>__HOME__/.folio/metrics/</string>
+	</array>
+	<key>StartCalendarInterval</key>
+	<dict>
+		<key>Hour</key><integer>7</integer>
+		<key>Minute</key><integer>30</integer>
+	</dict>
+	<key>RunAtLoad</key>
+	<true/>
+	<key>StandardOutPath</key>
+	<string>__HOME__/.folio/cache/leuchtfeuer-pull.log</string>
+	<key>StandardErrorPath</key>
+	<string>__HOME__/.folio/cache/leuchtfeuer-pull.log</string>
+</dict>
+</plist>

@@ -30,3 +30,7 @@ src/lib/server/folio-db/.test-tmp/
 
 # Vitest local output
 test-results/
+
+# Python bytecode (ops/ collectors)
+__pycache__/
+*.pyc

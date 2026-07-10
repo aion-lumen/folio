@@ -1,0 +1,8 @@
+# /etc/cron.d/leuchtfeuer — daily Leuchtfeuer collectors (root).
+# Install: sudo cp cron.d-leuchtfeuer /etc/cron.d/leuchtfeuer && sudo chmod 644 /etc/cron.d/leuchtfeuer
+# Requires: run-collectors.sh + collect_*.py deployed to /opt/leuchtfeuer, /etc/leuchtfeuer/env in place.
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# 00:20 UTC daily — after midnight so "yesterday" is a complete day of logs.
+20 0 * * * root /opt/leuchtfeuer/run-collectors.sh >> /var/log/leuchtfeuer.log 2>&1

@@ -11,6 +11,7 @@
 	import CardHermes from '$lib/heute/CardHermes.svelte';
 	import CardInbox from '$lib/heute/CardInbox.svelte';
 	import CardFristnaheLead from '$lib/heute/CardFristnaheLead.svelte';
+	import CardLeuchtfeuer from '$lib/heute/CardLeuchtfeuer.svelte';
 
 	let { data } = $props();
 
@@ -41,6 +42,7 @@
 		<CardInbox pending={data.inboxPending} triage={data.inboxTriage} />
 		<CardPipeline lastRun={data.lastRun} />
 		<CardHermes />
+		<CardLeuchtfeuer data={data.leuchtfeuer} />
 	</section>
 </div>
 
