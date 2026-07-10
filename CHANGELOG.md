@@ -5,7 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.4.0] - 2026-07-10
+
+### Added
+- Leuchtfeuer: Heute-hub card + /leuchtfeuer detail view showing site & repo metrics
+  (visits, door ratio story:system, GitHub stars, repo views) from server logs only —
+  no client-side tracking, no cookies, no external analytics. Reads read-only from
+  ~/.folio/metrics/; degrades to "last known state with date" when metrics are missing.
+- ops/leuchtfeuer: VPS collectors (Caddy log parse w/ in-parse IP anonymisation + bot
+  filter; GitHub stars/traffic snapshot), cron wrapper, Caddy logging snippet, launchd
+  pull agent, unit tests (stdlib only).
 
 ### Changed
 - Locked the operational triage prompt variant as an explicit `DEFAULT_PROMPT_VARIANT = 'v1'`

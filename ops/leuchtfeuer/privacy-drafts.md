@@ -23,5 +23,5 @@ no external services, no visitor profiles.
 frag-shifu has its own DE-only Datenschutz page and a distinct voice — separate wording:
 
 > Für die Reichweitenmessung genügen uns anonymisierte Server-Logs: die IP-Adresse wird gekürzt und
-> die Protokolle werden nach sieben Tagen gelöscht. Keine Cookies, keine Tracker, keine externen
-> Dienste, keine Profilbildung.
+> die Protokolle werden nach sieben Tagen gelöscht. Keine Tracking-Cookies, keine Tracker, keine
+> externen Dienste, keine Profilbildung.

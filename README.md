@@ -20,7 +20,7 @@ Cloud AI forgets you at the end of every session. You start over. Every time. Fo
 
 ## Status
 
-**Status:** v0.3.0 public preview  
+**Status:** v0.4.0 public preview  
 **License:** AGPL-3.0  
 **Platforms:** Linux / macOS / WSL2
 
@@ -30,6 +30,15 @@ Cloud AI forgets you at the end of every session. You start over. Every time. Fo
 - SQLite (local, file-based) via better-sqlite3 — no DB server
 - Local LLMs via Hermes Agent (Nous Research)
 - Cytoscape.js for graph visualisations
+
+## Leuchtfeuer
+
+The Heute hub carries a **Leuchtfeuer** card: site & repo reach metrics derived from
+**server logs only** — no client-side tracking, no cookies, no external analytics, so the
+sites' zero-external-calls promise stays literally true. IP addresses are anonymised at parse
+time and raw logs are dropped after 7 days. folio reads the aggregates read-only from
+`~/.folio/metrics/` and degrades gracefully to the last known state when they are missing.
+Collector, cron, and deployment details live in [`ops/leuchtfeuer/README.md`](ops/leuchtfeuer/README.md).
 
 ## Quick Start
 
