@@ -4,11 +4,16 @@
   once a day. Pull-only over SSH: the VPS never pushes into this machine.
 
   Setup:
-    1. Fill in the SSH host below (the ~/.ssh/config `aionlumen-deploy` host is a placeholder —
-       point METRICS_HOST at the VPS with a key that can read /var/lib/leuchtfeuer/metrics/).
-    2. cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/
-       (edit paths: replace __HOME__ with your home dir; launchd does not expand ~)
+    0. VPS side: a read-only pull user `leuchtfeuer-pull` with an authorized_keys forced command
+       (rrsync -ro /var/lib/leuchtfeuer/metrics) — see ops/leuchtfeuer/README.md. The key on the VPS
+       is restricted to read-only rsync of exactly that dir; the client therefore addresses the
+       RESTRICTED ROOT as `:/` (NOT the absolute path — rrsync interprets the client path relative
+       to its locked dir).
+    1. Replace __VPS_HOST__ (e.g. 185.143.100.222) and __HOME__ (your home dir; launchd does not
+       expand ~). The key is a dedicated Mac pull key (~/.ssh/leuchtfeuer_pull).
+    2. mkdir -p ~/.folio/cache && cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/
     3. launchctl load ~/Library/LaunchAgents/com.folio.leuchtfeuer-pull.plist
+       (RunAtLoad triggers an immediate pull; check ~/.folio/cache/leuchtfeuer-pull.log)
 
   No --delete: local history is append-only (the card only reads the last 30 days anyway; the
   VPS may prune older files without affecting the local record).
@@ -21,8 +26,11 @@
 	<array>
 		<string>/usr/bin/rsync</string>
 		<string>-az</string>
-		<!-- FILL IN: user@vps-host (or an ~/.ssh/config alias) that can read the metrics dir -->
-		<string>METRICS_HOST:/var/lib/leuchtfeuer/metrics/</string>
+		<string>-e</string>
+		<!-- dedicated read-only pull key; IdentitiesOnly avoids offering other keys -->
+		<string>ssh -i __HOME__/.ssh/leuchtfeuer_pull -o IdentitiesOnly=yes</string>
+		<!-- rrsync forced command locks the root → address it as ":/", not the absolute path -->
+		<string>leuchtfeuer-pull@__VPS_HOST__:/</string>
 		<string>__HOME__/.folio/metrics/</string>
 	</array>
 	<key>StartCalendarInterval</key>

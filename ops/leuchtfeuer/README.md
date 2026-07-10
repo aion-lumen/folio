@@ -52,10 +52,16 @@ Local tests: `cd ops/leuchtfeuer && python3 -m unittest -v` (7 tests, stdlib onl
    `/var/lib/leuchtfeuer/metrics/*/$(date -u -d yesterday +%F).json` and the github file exist.
 
 ## Deployment (Mac side — local pull)
-1. Fill the SSH host in `com.folio.leuchtfeuer-pull.plist` (`METRICS_HOST` → a key/user that can read
-   `/var/lib/leuchtfeuer/metrics/`) and replace `__HOME__` with your home path.
-2. `cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.folio.leuchtfeuer-pull.plist`
-3. First pull populates `~/.folio/metrics/`; the Heute "Leuchtfeuer" card fills in. Until then it shows
+Prereq: the VPS read-only pull user `leuchtfeuer-pull` exists with an authorized_keys **forced command**
+`command="/usr/bin/rrsync -ro /var/lib/leuchtfeuer/metrics",restrict` (see "VPS side" above). Because of
+rrsync the client addresses the **restricted root as `:/`**, not the absolute path.
+1. Dedicated pull key: `ssh-keygen -t ed25519 -f ~/.ssh/leuchtfeuer_pull -N ""`. Add its **public** key
+   (with the forced command above) to `/var/lib/leuchtfeuer-pull/.ssh/authorized_keys` on the VPS.
+2. In `com.folio.leuchtfeuer-pull.plist` replace `__VPS_HOST__` and `__HOME__`. Then:
+   `mkdir -p ~/.folio/cache && cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.folio.leuchtfeuer-pull.plist`
+3. Verify the immediate pull: `cat ~/.folio/cache/leuchtfeuer-pull.log` (no errors), `ls -R ~/.folio/metrics/`.
+   Manual test form: `rsync -az -e "ssh -i ~/.ssh/leuchtfeuer_pull -o IdentitiesOnly=yes" leuchtfeuer-pull@<vps>:/ ~/.folio/metrics/`.
+4. First pull populates `~/.folio/metrics/`; the Heute "Leuchtfeuer" card fills in. Until then it shows
    "Noch keine Metriken" (degradation, by design).
 
 ## Blocked on Afschin (CC does not do these)
