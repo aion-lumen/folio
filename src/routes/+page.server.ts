@@ -10,6 +10,7 @@ import { getFeedbackRows } from '$lib/server/feedback/reader.js';
 import { getReviewedIds, listRecentWorkerRuns } from '$lib/server/folio-db/reader.js';
 import { countPendingInbox, getInboxHubStats, scanInboxForDisplay } from '$lib/server/inbox/scanner.js';
 import { archiveExpiredLeads } from '$lib/server/inbox/lead-ttl.js';
+import { readLeuchtfeuer } from '$lib/server/leuchtfeuer/reader.js';
 import type { FeedbackRow } from '$lib/server/feedback/types.js';
 
 export interface FristnaherLead {
@@ -155,6 +156,8 @@ export const load: PageServerLoad = async () => {
 			triageTodayByDomain,
 			triageTodayActionable
 		},
-		lastRun
+		lastRun,
+		// Leuchtfeuer metrics (read-only from ~/.folio/metrics/). Degrades gracefully when absent.
+		leuchtfeuer: readLeuchtfeuer()
 	};
 };
