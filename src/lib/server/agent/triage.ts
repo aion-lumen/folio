@@ -12,7 +12,7 @@ import { isAutoEligible, normalizeLlmAssessment, runGuardrails } from './guardra
 import { isSourceAutoTrusted } from './trusted-sources.js';
 import { callLmStudioJson } from './llm.js';
 import { resolveTriageModel } from './preflight.js';
-import { buildTriagePrompt, type PromptVariant } from './prompt.js';
+import { buildTriagePrompt, DEFAULT_PROMPT_VARIANT, type PromptVariant } from './prompt.js';
 import type { TriageAssessment, TriageRunResult } from './types.js';
 
 async function resolveModelForRun(requested?: string): Promise<string | null> {
@@ -53,7 +53,7 @@ export async function assessDocument(
 		}
 	} else {
 		const ctx = await buildCampaignContext();
-		const prompt = buildTriagePrompt(doc, ctx, options?.promptVariant ?? 'v1');
+		const prompt = buildTriagePrompt(doc, ctx, options?.promptVariant ?? DEFAULT_PROMPT_VARIANT);
 		parsed = await callLmStudioJson<Record<string, unknown>>(prompt, model);
 	}
 

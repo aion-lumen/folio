@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- Locked the operational triage prompt variant as an explicit `DEFAULT_PROMPT_VARIANT = 'v1'`
+  (previously an implicit `?? 'v1'` default literal). No behaviour change — production always ran
+  on `v1`; the earlier public "v1-strict" claim was a website statement, not the code. `v1-strict`
+  stays available as an opt-in (`promptVariant` on the triage API). A regression test locks the
+  default against silent drift. For reference, the hermetic 3-model eval (results-2026-07-09.json)
+  measures `v1` = 13/14 with 0 false auto-commits; `v1-strict` = 11/14 (demotes real tasks via its
+  "chapter fit is weak" rule).
+
 ## [0.3.0] - 2026-07-09
 
 ### Added

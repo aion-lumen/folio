@@ -4,6 +4,14 @@ import { formatCampaignContextForPrompt } from './context.js';
 
 export type PromptVariant = 'v1' | 'v1-strict';
 
+// Explicit operational default. Was always 'v1' — but only as an implicit `?? 'v1'` literal, which is
+// exactly why an outward claim of "v1-strict" could stand for weeks without anything catching it (a
+// property assumed, never asserted — same class as the name-proxy field-note). Naming it + a regression
+// test locks the default against silent drift. v1-strict stays available as an opt-in (API promptVariant).
+// Hermetic 3-model eval (results-2026-07-09.json): v1 = 13/14, FP 0; v1-strict = 11/14 (demotes real tasks
+// via the "chapter fit is weak" rule, e.g. lead-freelance-devops → unclear).
+export const DEFAULT_PROMPT_VARIANT: PromptVariant = 'v1';
+
 const BASE_RULES = `You are the Folio inbox triage agent. Read an imported markdown document and decide whether it describes a **new campaign objective** (a concrete, actionable goal with a clear completion threshold).
 
 Return ONLY valid JSON (no markdown fences):
@@ -39,7 +47,7 @@ const STRICT_EXTRA = `
 export function buildTriagePrompt(
 	doc: ParsedInboxDocument,
 	ctx: CampaignContext,
-	variant: PromptVariant = 'v1'
+	variant: PromptVariant = DEFAULT_PROMPT_VARIANT
 ): string {
 	const fm = doc.frontmatter;
 	const extra = variant === 'v1-strict' ? STRICT_EXTRA : '';
