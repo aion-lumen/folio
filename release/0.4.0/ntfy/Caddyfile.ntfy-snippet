@@ -1,0 +1,10 @@
+# Append this block to /etc/caddy/Caddyfile, then:
+#   sudo caddy validate --config /etc/caddy/Caddyfile
+#   sudo systemctl reload caddy
+# TLS is automatic (Let's Encrypt via Caddy) on first request. DNS A-record for
+# ntfy.aion-lumen.ch → 185.143.100.222 must exist first.
+
+ntfy.aion-lumen.ch {
+	reverse_proxy 127.0.0.1:2586
+	encode gzip
+}

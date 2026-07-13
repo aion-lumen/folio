@@ -1,6 +1,6 @@
 import { error } from '@sveltejs/kit';
 import { spawn } from 'child_process';
-import { access, stat } from 'fs/promises';
+import { access, stat, readFile } from 'fs/promises';
 import { join } from 'path';
 import { homedir } from 'os';
 import { getLifeMailPath } from '$lib/server/env.js';
@@ -10,6 +10,32 @@ const HOME = homedir();
 const PIPELINE = join(getLifeMailPath(), 'scripts', 'pipeline.py');
 const LIFE_MAIL_DIR = getLifeMailPath();
 const BW_SESSION_FILE = join(HOME, '.config', 'life', 'bw-session');
+
+// ntfy folio-ops trigger — best-effort, same contract as life-mail/scripts/ntfy_publish.py.
+const NTFY_BASE_URL = 'https://ntfy.aion-lumen.ch';
+const NTFY_FOLIO_TOKEN_FILE = join(HOME, '.config', 'life', 'ntfy-folio-token');
+
+/** Publish a folio-ops error trigger. Best-effort: a down VPS or missing token must
+ *  never affect the pipeline run or the SSE response (all errors swallowed). */
+async function publishFolioOpsError(account: string, code: number | null, stderrTail: string): Promise<void> {
+	try {
+		const token = (await readFile(NTFY_FOLIO_TOKEN_FILE, 'utf-8')).trim();
+		const headers: Record<string, string> = {
+			// HTTP header must be ASCII — strip non-ASCII from the title
+			Title: `Mail-Run ${account} FEHLER (Code ${code})`.replace(/[^\x20-\x7E]/g, '?'),
+			Priority: 'urgent'
+		};
+		if (token) headers.Authorization = `Bearer ${token}`;
+		await fetch(`${NTFY_BASE_URL}/folio-ops`, {
+			method: 'POST',
+			headers,
+			body: stderrTail.trim() || `pipeline exit ${code} — siehe Logs`,
+			signal: AbortSignal.timeout(5000)
+		});
+	} catch {
+		/* best-effort — never propagate */
+	}
+}
 
 function buildEnv(): NodeJS.ProcessEnv {
 	const userPaths = [join(HOME, '.local', 'bin'), join(HOME, 'bin')];
@@ -68,6 +94,7 @@ export const POST: RequestHandler = async ({ url }) => {
 		start(controller) {
 			const enc = new TextEncoder();
 			const send = (data: string) => controller.enqueue(enc.encode(`data: ${data}\n\n`));
+			let stderrTail = ''; // keep the last stderr for the ntfy error trigger
 
 			const child = spawn('python3', [PIPELINE, '--account', account], {
 				env,
@@ -82,6 +109,7 @@ export const POST: RequestHandler = async ({ url }) => {
 			});
 
 			child.stderr.on('data', (chunk: Buffer) => {
+				stderrTail = (stderrTail + chunk.toString()).slice(-600);
 				for (const entry of annotateStderr(chunk.toString())) {
 					send(JSON.stringify(entry));
 				}
@@ -92,6 +120,8 @@ export const POST: RequestHandler = async ({ url }) => {
 					send(JSON.stringify({ c: 'ok', x: '✓ Pipeline abgeschlossen' }));
 				} else {
 					send(JSON.stringify({ c: 'err', x: `✗ Pipeline beendet mit Code ${code}` }));
+					// "siehe Logs" is no longer buried in the SSE panel — push a folio-ops trigger.
+					void publishFolioOpsError(account, code, stderrTail);
 				}
 				send('[DONE]');
 				controller.close();
@@ -99,6 +129,7 @@ export const POST: RequestHandler = async ({ url }) => {
 
 			child.on('error', (err) => {
 				send(JSON.stringify({ c: 'err', x: `Fehler beim Starten: ${err.message}` }));
+				void publishFolioOpsError(account, null, err.message);
 				send('[DONE]');
 				controller.close();
 			});

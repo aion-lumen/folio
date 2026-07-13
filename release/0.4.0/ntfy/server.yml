@@ -1,0 +1,25 @@
+# ntfy self-hosted server config → /etc/ntfy/server.yml
+# 0.4.0 Teil C. Behind Caddy (TLS terminated there), deny-all + token auth.
+
+base-url: "https://ntfy.aion-lumen.ch"
+listen-http: "127.0.0.1:2586"      # localhost only — Caddy reverse-proxies
+behind-proxy: true                 # trust X-Forwarded-* from Caddy
+
+# --- Auth: nobody reads/publishes without an explicit ACL entry -------------
+auth-file: "/var/lib/ntfy/user.db"
+auth-default-access: "deny-all"
+enable-login: true
+
+# --- Message cache: offline redelivery (a phone that was off still gets it) --
+cache-file: "/var/lib/ntfy/cache.db"
+cache-duration: "12h"
+
+# Attachments disabled (non-goal): leave attachment-cache-dir unset.
+
+# --- Optional iOS push (privacy mode) ---------------------------------------
+# Uncomment ONLY if iOS push is needed. The upstream then relays a wake-up with
+# only a message-ID poll trigger — the content is fetched from THIS VPS, never
+# leaves it. Android/desktop work without this (ntfy app subscribes directly).
+# upstream-base-url: "https://ntfy.sh"
+
+log-level: info
