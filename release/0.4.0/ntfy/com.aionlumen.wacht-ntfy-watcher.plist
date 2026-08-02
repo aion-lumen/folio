@@ -2,8 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
   Wacht ntfy marker-watcher. 0.4.0 Teil C.
-  Watches ~/.local/state/life/wacht-markers/ and publishes each marker the Hermes-
-  Wacht dropped to the self-hosted ntfy `hermes-wacht` topic. Every 5 min.
+  Watches /Users/afschinmirhamed/Projects/aion-lumen/wacht-markers/ (a MOUNTED dir
+  visible to the sandboxed Wacht task — the task's ~ is NOT the Mac home) and
+  publishes each marker to the self-hosted ntfy `hermes-wacht` topic. Every 5 min.
 
   Install:
     cp release/0.4.0/ntfy/com.aionlumen.wacht-ntfy-watcher.plist ~/Library/LaunchAgents/
@@ -21,6 +22,10 @@
     <array>
         <string>/usr/bin/python3</string>
         <string>/Users/afschinmirhamed/Projects/life-mail/scripts/wacht_marker_watcher.py</string>
+        <string>--markers-dir</string>
+        <string>/Users/afschinmirhamed/Projects/aion-lumen/wacht-markers</string>
+        <string>--archive-dir</string>
+        <string>/Users/afschinmirhamed/.local/state/life/wacht-markers-done</string>
     </array>
 
     <key>StartInterval</key>
