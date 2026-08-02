@@ -3,6 +3,11 @@
 Site + repo metrics for the Folio Heute-hub, from **server logs only** — no client-side tracking, no
 cookies, no external analytics. The 0-external-calls promise of the sites stays literally true.
 
+**Status: produktiv seit Juli 2026.** Der Pull läuft über den read-only-VPS-User `leuchtfeuer-pull`
+mit `authorized_keys`-forced-command (`rrsync -ro /var/lib/leuchtfeuer/metrics`, `restrict`) — kein
+interaktiver Zugang, kein Schreibrecht. Die „Deployment"-Abschnitte unten sind die **ausgeführte
+Einrichtungsanleitung / Referenz**, keine offene To-do-Liste.
+
 Data flow:
 ```
 Caddy JSON logs (IP masked in-Caddy)  ─┐
@@ -40,7 +45,7 @@ Local tests: `cd ops/leuchtfeuer && python3 -m unittest -v` (7 tests, stdlib onl
     rather expose an authenticated metrics endpoint instead of an SSH pull, that's a different design;
     confirm the private-dir + SSH-pull choice.
 
-## Deployment (Afschin — VPS side; CC has no VPS access, the SSH host alias is a placeholder)
+## Deployment (VPS side — ausgeführte Einrichtung, Referenz; CC hat keinen VPS-Zugang)
 1. **Caddy logging:** merge `caddy-logging.snippet.caddy` into each of the four site blocks, reload Caddy.
    Verify a fresh log line shows a masked IP (e.g. `1.2.3.0`).
 2. **Collectors:** `sudo mkdir -p /opt/leuchtfeuer && sudo cp collect_caddy.py collect_github.py run-collectors.sh /opt/leuchtfeuer/ && sudo chmod +x /opt/leuchtfeuer/*.sh`
@@ -64,10 +69,10 @@ rrsync the client addresses the **restricted root as `:/`**, not the absolute pa
 4. First pull populates `~/.folio/metrics/`; the Heute "Leuchtfeuer" card fills in. Until then it shows
    "Noch keine Metriken" (degradation, by design).
 
-## Blocked on Afschin (CC does not do these)
+## Betriebsstand (VPS-seitig ausgeführt; künftige Änderungen = Afschins sudo-Hand)
 - **PAT creation + placement** — done (env file in place). ✅
-- **VPS apply** (steps above) — needs sudo on `185.143.100.222`; CC has no VPS access.
-- **SSH host for the pull** — the `aionlumen-deploy` alias is a placeholder; fill a real host.
+- **VPS apply** (steps above) — ausgeführt, produktiv. ✅ Künftige Änderungen brauchen sudo auf `185.143.100.222` (CC hat keinen VPS-Zugang).
+- **SSH host for the pull** — konfiguriert: Pull von `185.143.100.222` über den `leuchtfeuer-pull`-User mit `rrsync`-forced-command. ✅ (kein offener Platzhalter mehr)
 
 ## Handoff to Cowork (Release-Lauf #3)
 The folio card lands via the release pilot (branch `feat/leuchtfeuer`). Cowork also applies the privacy
