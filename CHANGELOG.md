@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+- Council opt-in via `active-vault.json`, default off — P0.2-Entkopplung
+- ntfy self-hosted channel, folio-ops error trigger (`928d022`)
+- Leuchtfeuer pull plist corrected for rrsync forced command (`a94e861`)
+- Wacht marker watcher: separate archive dir
+
 ## [0.4.0] - 2026-07-10
 
 ### Added
