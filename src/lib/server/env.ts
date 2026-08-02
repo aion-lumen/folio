@@ -30,14 +30,17 @@ export function isDemoVaultPath(p: string | null | undefined): boolean {
  * `demo` is the explicit flag written by the switcher, falling back to a path heuristic
  * so pre-existing active-vault.json files (no flag) still scope correctly.
  */
-export function readActiveVaultMeta(): { path: string | null; demo: boolean } {
+export function readActiveVaultMeta(): { path: string | null; demo: boolean; council: boolean } {
 	try {
 		const raw = readFileSync(join(homedir(), '.folio', 'active-vault.json'), 'utf-8');
-		const parsed = JSON.parse(raw) as { path?: string; demo?: boolean };
+		const parsed = JSON.parse(raw) as { path?: string; demo?: boolean; council?: boolean };
 		const p = parsed.path?.trim() || null;
-		return { path: p, demo: parsed.demo === true || isDemoVaultPath(p) };
+		// `council` is opt-in (Default AUS): only an explicit `true` registers Council on a
+		// real vault. Mirrored 1:1 in the Python pipeline (multi-agent/scripts/council_state.py);
+		// a cross-language parity test locks the two against divergence.
+		return { path: p, demo: parsed.demo === true || isDemoVaultPath(p), council: parsed.council === true };
 	} catch {
-		return { path: null, demo: false };
+		return { path: null, demo: false, council: false };
 	}
 }
 
@@ -147,9 +150,15 @@ export function getAionLumenPath(): string {
 	return kitEnv().AION_LUMEN_PATH ?? join(homedir(), 'Projects/aion-lumen/multi-agent');
 }
 
-/** True when Council is registered for the active vault. Demo vaults do NOT register Council. */
+/**
+ * True when Council is registered for the active vault.
+ * Demo vaults NEVER register Council. On a real vault Council is opt-in via
+ * `"council": true` in active-vault.json (Default AUS — P0 immo/council-Move-
+ * Entkopplung 2026-07-12). Mirrored in multi-agent/scripts/council_state.py.
+ */
 export function isCouncilRegistered(): boolean {
-	return !isDemoVaultActive();
+	if (isDemoVaultActive()) return false;
+	return readActiveVaultMeta().council;
 }
 
 export function getCouncilDbPath(): string | null {

@@ -59,14 +59,44 @@ describe('vault-scoped DB paths', () => {
 		expect(getFeedbackDbPath()).toContain('feedback-demo.db');
 	});
 
-	it('real vault resolves to the real stores (no -demo) + Council registered', () => {
+	it('real vault resolves to the real stores (no -demo); Council OFF by default (P0 2026-07-12)', () => {
 		writeActiveVault({ path: join(home, 'Projects/life') });
 		expect(isDemoVaultActive()).toBe(false);
 		expect(getFeedbackDbPath()).toContain('feedback.db');
 		expect(getFeedbackDbPath()).not.toContain('feedback-demo.db');
 		expect(getFolioDbPath()).not.toContain('folio-demo.db');
+		// Default AUS: a real vault without an explicit council flag does NOT register Council.
+		expect(isCouncilRegistered()).toBe(false);
+		expect(getCouncilDbPath()).toBeNull();
+	});
+
+	it('real vault with council:true opts back into Council', () => {
+		writeActiveVault({ path: join(home, 'Projects/life'), council: true });
+		expect(isDemoVaultActive()).toBe(false);
 		expect(isCouncilRegistered()).toBe(true);
 		expect(getCouncilDbPath()).toContain('council.db');
+	});
+
+	// PARITY LOCK — must match multi-agent/tests/test_council_state.py CASES exactly.
+	// If you change one table, change the other; else the TS gate and the Python
+	// move-pipeline gate diverge silently.
+	it.each([
+		['demo_flag', { path: '/home/u/real', demo: true }, false],
+		['demo_flag_beats_council', { path: '/home/u/real', demo: true, council: true }, false],
+		['real_council_true', { path: '/home/u/real', council: true }, true],
+		['real_council_false', { path: '/home/u/real', council: false }, false],
+		['real_council_absent', { path: '/home/u/real' }, false],
+		['demo_path_heuristic', { path: '/x/demo-vault/y', council: true }, false],
+		['folio_demo_path_heuristic', { path: '/x/folio-demo', council: true }, false],
+		['empty_object', {}, false]
+	] as const)('council parity: %s', (_name, obj, expected) => {
+		writeActiveVault(obj);
+		expect(isCouncilRegistered()).toBe(expected);
+	});
+
+	it('council parity: missing file → not registered', () => {
+		// no active-vault.json written
+		expect(isCouncilRegistered()).toBe(false);
 	});
 
 	it('no active vault → real stores (default)', () => {
