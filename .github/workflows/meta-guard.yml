@@ -1,0 +1,47 @@
+name: meta-guard
+
+# Verhindert, dass Prozess-/Steuerungsmaterial (fieldnote-, direktive-, handoff-, …)
+# neu in dieses OEFFENTLICHE Repo committet wird. Solches Material gehoert ins private
+# meta-Repo. Regel: meta/README.md. Deterministisch (exakter Praefix-Match auf
+# neu hinzugefuegten Dateinamen), keine Heuristik.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  no-process-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject newly-added process/meta documents
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_PR: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ "$EVENT" = "pull_request" ]; then
+            base="$BASE_PR"
+          else
+            base="$BEFORE"
+          fi
+          # Fallback bei erstem Push / all-zero-SHA: gegen den Vorgaenger-Commit pruefen
+          if [ -z "${base:-}" ] || [ "$base" = "0000000000000000000000000000000000000000" ]; then
+            base="$(git rev-parse "$SHA^" 2>/dev/null || git hash-object -t tree /dev/null)"
+          fi
+          added="$(git diff --name-only --diff-filter=A "$base" "$SHA" || true)"
+          # Exakte Praefixe aus meta/README.md Abschnitt 3, auf den Basisnamen angewandt
+          bad="$(printf '%s\n' "$added" | grep -E '(^|/)(fieldnote|direktive|handoff|uebergabe|briefing|review|g1|g2|opus5|kimi|chatgpt|cc)-' || true)"
+          if [ -n "$bad" ]; then
+            echo "::error::Prozess-/Meta-Dokumente gehoeren ins private 'meta'-Repo, nicht in ein oeffentliches Repo. Siehe meta/README.md."
+            echo "Neu hinzugefuegte, verletzende Dateien:"
+            printf '%s\n' "$bad"
+            exit 1
+          fi
+          echo "OK - keine neu hinzugefuegten Prozess-/Meta-Dokumente."
