@@ -23,7 +23,9 @@ import type {
 	ObjectNoteRow,
 	WorkerRunLogRow,
 	WorkerRunSummaryRow,
-	UpsertWorkerRunSummaryInput
+	UpsertWorkerRunSummaryInput,
+	HermesTurnRow,
+	StartHermesTurnInput
 } from './types.js';
 
 export function insertCorrection(input: InsertCorrectionInput): CorrectionRow {
@@ -463,4 +465,66 @@ export function upsertWorkerRunSummary(
 	return db
 		.prepare('SELECT * FROM worker_run_summary WHERE run_uuid = ?')
 		.get(input.run_uuid) as WorkerRunSummaryRow;
+}
+
+/**
+ * Starts one Folio-owned Hermes turn and links the session to the selected
+ * objectives atomically. The stored execution profile is the credential-free
+ * public contract, never Hermes config or model-provider secrets.
+ */
+export function startHermesTurn(input: StartHermesTurnInput): HermesTurnRow {
+	const db = getFolioDb();
+	const now = new Date().toISOString();
+	const tx = db.transaction(() => {
+		const existing = db
+			.prepare(
+				`SELECT conversation_id, vault_fingerprint
+				 FROM hermes_sessions WHERE session_id = ?`
+			)
+			.get(input.session_id) as
+			| { conversation_id: string; vault_fingerprint: string }
+			| undefined;
+		if (
+			existing &&
+			(existing.conversation_id !== input.conversation_id ||
+				existing.vault_fingerprint !== input.vault_fingerprint)
+		) {
+			throw new Error('Hermes session correlation does not match its original vault');
+		}
+		db.prepare(
+			`INSERT INTO hermes_sessions
+			   (session_id, conversation_id, vault_fingerprint, started_at, last_activity_at)
+			 VALUES (?, ?, ?, ?, ?)
+			 ON CONFLICT(session_id) DO UPDATE SET last_activity_at = excluded.last_activity_at`
+		).run(input.session_id, input.conversation_id, input.vault_fingerprint, now, now);
+		const link = db.prepare(
+			`INSERT OR IGNORE INTO hermes_session_objectives
+			   (session_id, objective_id, linked_at) VALUES (?, ?, ?)`
+		);
+		for (const objectiveId of [...new Set(input.objective_ids)]) {
+			link.run(input.session_id, objectiveId, now);
+		}
+		db.prepare(
+			`INSERT INTO hermes_turns
+			   (turn_id, session_id, execution_profile_json, status, started_at)
+			 VALUES (?, ?, ?, 'running', ?)`
+		).run(input.turn_id, input.session_id, JSON.stringify(input.execution_profile), now);
+	});
+	tx();
+	return db.prepare('SELECT * FROM hermes_turns WHERE turn_id = ?').get(input.turn_id) as HermesTurnRow;
+}
+
+export function finishHermesTurn(
+	turnId: string,
+	status: 'completed' | 'failed' | 'aborted',
+	errorSummary: string | null = null
+): void {
+	const now = new Date().toISOString();
+	getFolioDb()
+		.prepare(
+			`UPDATE hermes_turns
+			 SET status = ?, error_summary = ?, completed_at = ?
+			 WHERE turn_id = ? AND status = 'running'`
+		)
+		.run(status, errorSummary?.slice(0, 1000) ?? null, now, turnId);
 }

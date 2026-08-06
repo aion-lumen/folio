@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -129,7 +129,8 @@ export function getFolioDbPath(): string {
 	// Default lives outside the project tree so vite/chokidar does not watch it.
 	// Watching state/folio.db-wal caused full page reloads on every validator write.
 	if (isDemoVaultActive()) return join(homedir(), '.folio/folio-demo.db');
-	return kitEnv().FOLIO_DB_PATH
+	return process.env.FOLIO_DB_PATH
+		?? kitEnv().FOLIO_DB_PATH
 		?? join(homedir(), '.folio/folio.db');
 }
 
@@ -185,6 +186,20 @@ export function getLifeMailPath(): string {
 
 export function getHermesHomePath(): string {
 	return kitEnv().HERMES_HOME_PATH ?? join(homedir(), '.hermes');
+}
+
+/**
+ * Manifest controlling which fixed context sources Folio reads for Hermes.
+ * A vault-local manifest may narrow or customize context; it cannot grant new
+ * filesystem capabilities because the schema exposes booleans, not source paths.
+ */
+export function getHermesContextPath(): string {
+	const override =
+		process.env.FOLIO_HERMES_CONTEXT_PATH ?? kitEnv().FOLIO_HERMES_CONTEXT_PATH;
+	if (override) return override;
+	const vaultManifest = join(getVaultPath(), 'hermes-context.yaml');
+	if (existsSync(vaultManifest)) return vaultManifest;
+	return join(process.cwd(), 'config', 'hermes-context.yaml');
 }
 
 export function getRegelwerkPath(): string {

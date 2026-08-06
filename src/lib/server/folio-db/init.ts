@@ -293,6 +293,41 @@ CREATE TABLE IF NOT EXISTS worker_run_summary (
     worker_imports_sample TEXT,
     written_at            TEXT    NOT NULL DEFAULT (datetime('now'))
 );
+
+-- v0.4.1: Folio owns Hermes session/turn traceability. Hermes remains the
+-- execution runtime; no Hermes database is used as Folio's audit source.
+CREATE TABLE IF NOT EXISTS hermes_sessions (
+    session_id         TEXT PRIMARY KEY,
+    conversation_id    TEXT NOT NULL UNIQUE,
+    vault_fingerprint  TEXT NOT NULL,
+    started_at         TEXT NOT NULL,
+    last_activity_at   TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_hermes_sessions_activity
+    ON hermes_sessions(last_activity_at DESC);
+
+CREATE TABLE IF NOT EXISTS hermes_session_objectives (
+    session_id    TEXT NOT NULL,
+    objective_id  TEXT NOT NULL,
+    linked_at     TEXT NOT NULL,
+    PRIMARY KEY (session_id, objective_id),
+    FOREIGN KEY (session_id) REFERENCES hermes_sessions(session_id)
+);
+CREATE INDEX IF NOT EXISTS idx_hso_objective
+    ON hermes_session_objectives(objective_id, linked_at DESC);
+
+CREATE TABLE IF NOT EXISTS hermes_turns (
+    turn_id                 TEXT PRIMARY KEY,
+    session_id              TEXT NOT NULL,
+    execution_profile_json  TEXT NOT NULL,
+    status                  TEXT NOT NULL CHECK(status IN ('running','completed','failed','aborted')),
+    error_summary           TEXT,
+    started_at              TEXT NOT NULL,
+    completed_at            TEXT,
+    FOREIGN KEY (session_id) REFERENCES hermes_sessions(session_id)
+);
+CREATE INDEX IF NOT EXISTS idx_hermes_turns_session
+    ON hermes_turns(session_id, started_at DESC);
 `;
 
 export function getFolioDb(): Database.Database {
@@ -304,7 +339,42 @@ export function getFolioDb(): Database.Database {
 	_conn = new Database(path);
 	_connPath = path;
 	_conn.pragma('journal_mode = WAL');
+	// better-sqlite3/SQLite does not make the schema's FK declarations a reliable
+	// runtime guard unless enforcement is enabled on every connection.
+	_conn.pragma('foreign_keys = ON');
 	_conn.exec(SCHEMA);
+
+	// Early 0.4.1 worktrees created hermes_turns before `aborted` became a
+	// first-class terminal state. SQLite cannot ALTER a CHECK constraint, so copy
+	// the table atomically while preserving every recorded turn.
+	const hermesTurnsSql = _conn
+		.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='hermes_turns'")
+		.get() as { sql: string } | undefined;
+	if (hermesTurnsSql && !hermesTurnsSql.sql.includes("'aborted'")) {
+		_conn.exec(`
+			BEGIN;
+			CREATE TABLE hermes_turns__new (
+				turn_id                 TEXT PRIMARY KEY,
+				session_id              TEXT NOT NULL,
+				execution_profile_json  TEXT NOT NULL,
+				status                  TEXT NOT NULL
+				                          CHECK(status IN ('running','completed','failed','aborted')),
+				error_summary           TEXT,
+				started_at              TEXT NOT NULL,
+				completed_at            TEXT,
+				FOREIGN KEY (session_id) REFERENCES hermes_sessions(session_id)
+			);
+			INSERT INTO hermes_turns__new
+			  (turn_id, session_id, execution_profile_json, status, error_summary, started_at, completed_at)
+			SELECT turn_id, session_id, execution_profile_json, status, error_summary, started_at, completed_at
+			FROM hermes_turns;
+			DROP TABLE hermes_turns;
+			ALTER TABLE hermes_turns__new RENAME TO hermes_turns;
+			CREATE INDEX idx_hermes_turns_session
+			  ON hermes_turns(session_id, started_at DESC);
+			COMMIT;
+		`);
+	}
 	// 2026-06-05: object_status_override.reason — Spalten-Migration fuer
 	// existierende DBs (CREATE TABLE IF NOT EXISTS triggert sonst nicht).
 	const hasReason = (

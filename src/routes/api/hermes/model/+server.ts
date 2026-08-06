@@ -1,10 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { getHermesHomePath } from '$lib/server/env.js';
+import { readHermesExecutionProfile } from '$lib/server/hermes/execution-profile.js';
+import type { ExecutionProfile } from '$lib/types/execution-profile.js';
 import type { RequestHandler } from './$types.js';
 
 const execAsync = promisify(exec);
@@ -30,33 +31,26 @@ const PROFILES = [
 	}
 ] as const;
 
-function detectActive(configYaml: string): string {
-	if (configYaml.includes('localhost:11434')) return 'ollama';
-	if (configYaml.includes('localhost:1234')) {
-		const defaultLine =
-			configYaml.match(/^\s*default:\s*"?([^"\n]+)"?/m)?.[1].toLowerCase() ?? '';
-		// Coder is the only "mlx" profile; everything else on :1234 (Qwen3.6 / *-Thinking-*) is the thinking profile
-		if (defaultLine.includes('coder')) return 'mlx';
-		if (
-			defaultLine.includes('qwen3.6') ||
-			defaultLine.includes('qwen-3.6') ||
-			defaultLine.includes('qwen3-6') ||
-			defaultLine.includes('thinking')
-		) {
-			return 'thinking';
-		}
-		return 'mlx';
+function detectSwitchProfile(profile: ExecutionProfile): string {
+	const modelId = profile.modelId.toLowerCase();
+	if (profile.provider === 'ollama') return 'ollama';
+	if (modelId.includes('coder')) return 'mlx';
+	if (modelId.includes('qwen3.6') || modelId.includes('qwen-3.6') || modelId.includes('thinking')) {
+		return 'thinking';
 	}
 	return 'unknown';
 }
 
 export const GET: RequestHandler = async () => {
 	try {
-		const configPath = join(getHermesHomePath(), 'config.yaml');
-		const config = await readFile(configPath, 'utf-8');
-		return json({ profiles: PROFILES, active: detectActive(config) });
+		const executionProfile = await readHermesExecutionProfile();
+		return json({
+			profiles: PROFILES,
+			active: detectSwitchProfile(executionProfile),
+			executionProfile
+		});
 	} catch (e) {
-		return json({ profiles: PROFILES, active: 'unknown', error: String(e) });
+		return json({ profiles: PROFILES, active: 'unknown', executionProfile: null, error: String(e) });
 	}
 };
 

@@ -197,6 +197,35 @@ export interface UpsertWorkerRunSummaryInput {
 	worker_imports_sample?: Array<Record<string, unknown>> | null;
 }
 
+export type HermesTurnStatus = 'running' | 'completed' | 'failed' | 'aborted';
+
+export interface HermesSessionRow {
+	session_id: string;
+	conversation_id: string;
+	vault_fingerprint: string;
+	started_at: string;
+	last_activity_at: string;
+}
+
+export interface HermesTurnRow {
+	turn_id: string;
+	session_id: string;
+	execution_profile_json: string;
+	status: HermesTurnStatus;
+	error_summary: string | null;
+	started_at: string;
+	completed_at: string | null;
+}
+
+export interface StartHermesTurnInput {
+	session_id: string;
+	turn_id: string;
+	conversation_id: string;
+	vault_fingerprint: string;
+	objective_ids: string[];
+	execution_profile: object;
+}
+
 // Council-side parallel-symmetrische Strukturen (cross-DB read).
 export type CouncilRunType = 'council-ingest' | 'council-lens';
 

@@ -1,20 +1,41 @@
+import type { ExecutionProfile } from '$lib/types/execution-profile.js';
+
 export interface ChatEvent {
-	type: 'text' | 'tool_call' | 'tool_result' | 'error' | 'system_notice';
+	type: 'text' | 'tool_call' | 'tool_result' | 'error' | 'system_notice' | 'execution_profile';
 	content?: string;
 	name?: string;
 	args?: Record<string, unknown>;
 	output?: string;
+	profile?: ExecutionProfile;
 }
 
 export interface ChatMessage {
 	id: string;
 	role: 'user' | 'assistant';
 	events: ChatEvent[];
+	sessionId?: string;
+	turnId?: string;
+	objectiveIds?: string[];
+	executionProfile?: ExecutionProfile;
 	streaming?: boolean;
 }
 
 const STORAGE_KEY = 'folio-chat';
+const SESSION_KEY = 'folio-chat-session';
 const MAX_MESSAGES = 100;
+
+function loadOrCreateSessionId(): string {
+	if (typeof window === 'undefined') return '';
+	try {
+		const stored = localStorage.getItem(SESSION_KEY);
+		if (stored) return stored;
+		const created = crypto.randomUUID();
+		localStorage.setItem(SESSION_KEY, created);
+		return created;
+	} catch {
+		return crypto.randomUUID();
+	}
+}
 
 function loadFromStorage(): ChatMessage[] {
 	if (typeof window === 'undefined') return [];
@@ -43,11 +64,13 @@ class ChatStore {
 	messages = $state<ChatMessage[]>([]);
 	open = $state(false);
 	loading = $state(false);
+	sessionId = $state('');
 	context = $state({ view: 'strategic', selectedItem: '', currentChapter: 1 });
 
 	constructor() {
 		if (typeof window !== 'undefined') {
 			this.messages = loadFromStorage();
+			this.sessionId = loadOrCreateSessionId();
 		}
 	}
 
@@ -80,14 +103,14 @@ class ChatStore {
 		}
 	}
 
-	/** Start a fresh conversation: reset the gateway pointer (server-side history)
-	 *  AND clear the local messages. Clearing only locally would leave the gateway
-	 *  replaying the old thread. */
+	/** Start a fresh Folio-owned session. Its new opaque ID derives a distinct
+	 * Hermes conversation, so no shared gateway pointer needs to be mutated. */
 	async newChat() {
 		try {
-			await fetch('/api/hermes/reset', { method: 'POST' });
+			this.sessionId = crypto.randomUUID();
+			localStorage.setItem(SESSION_KEY, this.sessionId);
 		} catch {
-			// non-fatal: still clear locally; a stale pointer self-heals on next orphan
+			this.sessionId = crypto.randomUUID();
 		}
 		this.clear();
 	}
@@ -108,16 +131,29 @@ class ChatStore {
 
 		// Snapshot history BEFORE adding the new user message
 		const history = this.buildHistory();
+		if (!this.sessionId) this.sessionId = loadOrCreateSessionId();
+		const turnId = crypto.randomUUID();
 
 		this.messages.push({
 			id: crypto.randomUUID(),
 			role: 'user',
-			events: [{ type: 'text', content: message }]
+			events: [{ type: 'text', content: message }],
+			sessionId: this.sessionId,
+			turnId,
+			objectiveIds: [...selectedObjectiveIds]
 		});
 		this.loading = true;
 
 		const assistantId = crypto.randomUUID();
-		this.messages.push({ id: assistantId, role: 'assistant', events: [], streaming: true });
+		this.messages.push({
+			id: assistantId,
+			role: 'assistant',
+			events: [],
+			sessionId: this.sessionId,
+			turnId,
+			objectiveIds: [...selectedObjectiveIds],
+			streaming: true
+		});
 
 		try {
 			const res = await fetch('/api/hermes/chat', {
@@ -127,7 +163,9 @@ class ChatStore {
 					message,
 					context: this.context,
 					history,
-					selectedObjectiveIds
+					selectedObjectiveIds,
+					sessionId: this.sessionId,
+					turnId
 				})
 			});
 
@@ -162,6 +200,13 @@ class ChatStore {
 						const event: ChatEvent = JSON.parse(data);
 						const idx = this.messages.findIndex((m) => m.id === assistantId);
 						if (idx !== -1) {
+							if (event.type === 'execution_profile' && event.profile) {
+								this.messages[idx] = {
+									...this.messages[idx],
+									executionProfile: event.profile
+								};
+								continue;
+							}
 							const events = [...this.messages[idx].events];
 							if (
 								event.type === 'text' &&

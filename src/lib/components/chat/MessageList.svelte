@@ -2,6 +2,7 @@
 	import { chatStore } from '$lib/stores/chat.svelte.js';
 	import { tick } from 'svelte';
 	import { marked } from 'marked';
+	import { executionProfileLabel } from '$lib/types/execution-profile.js';
 
 	marked.setOptions({ breaks: true });
 
@@ -33,6 +34,14 @@
 	{#each chatStore.messages as msg (msg.id)}
 		<div class="flex {msg.role === 'user' ? 'justify-end' : 'justify-start'}">
 			<div class="max-w-[85%] space-y-1">
+				{#if msg.role === 'assistant' && msg.executionProfile}
+					<div
+						class="px-1 text-[10px] text-muted-foreground"
+						title={`Profil ${msg.executionProfile.profileId} · ${msg.executionProfile.artifact?.id ?? 'Artefakt nicht lokal verifiziert'} · Fingerprint ${msg.executionProfile.fingerprint} · Prompt ${msg.executionProfile.promptVersion}@${msg.executionProfile.promptFingerprint} · Policy ${msg.executionProfile.policyVersion}`}
+					>
+						{executionProfileLabel(msg.executionProfile)}
+					</div>
+				{/if}
 				{#each msg.events as event}
 					{#if event.type === 'text'}
 						<div
@@ -66,6 +75,8 @@
 						<div class="px-2 py-1 text-xs italic text-muted-foreground/80">
 							ℹ {event.content}
 						</div>
+					{:else if event.type === 'execution_profile'}
+						<!-- Stored on the message by ChatStore; never rendered as message content. -->
 					{/if}
 				{/each}
 				{#if msg.streaming}

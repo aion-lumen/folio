@@ -20,9 +20,16 @@ ship every adjacent idea together.
 
 ## v0.4.1 — Context and traceability
 
-- Show the active model unambiguously wherever model output is presented.
-- Make Hermes context manifest-driven through `hermes-context.yaml`.
-- Link sessions and objectives so decisions and follow-up work remain traceable.
+- Stamp every assistant turn with a credential-free execution profile: exact configured model and
+  locally matched artifact, provider class, endpoint locality, quantisation, context limit, thinking
+  settings, and prompt/policy fingerprints.
+- Make Hermes context manifest-driven through a strictly validated `hermes-context.yaml`; the
+  manifest selects known Folio context sources but cannot grant filesystem capabilities.
+- Give each chat session and turn correlation IDs owned by Folio, and persist session-objective
+  links plus turn outcomes in Folio's audit database.
+- Publish and enforce the [Folio–Hermes adapter contract](hermes-adapter-contract.md).
+- Do not change a triage or cross-check model, nor publish performance claims for it, without a
+  fresh hermetic evaluation and checked-in result artifact.
 
 ## Required before v0.5.0 — Module foundation (08c)
 

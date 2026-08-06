@@ -3,15 +3,29 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { getHermesApiUrl, getHermesApiKey, getVaultPath } from '../env.js';
+import { getHermesApiUrl, getHermesApiKey, getHermesHomePath, getVaultPath } from '../env.js';
+import { readHermesExecutionProfile } from './execution-profile.js';
+import type { ExecutionProfile } from '$lib/types/execution-profile.js';
+import { finishHermesTurn, startHermesTurn } from '../folio-db/writer.js';
+import {
+	readHermesContextManifest,
+	renderManifestText,
+	type HermesContextManifest
+} from './context-manifest.js';
 
 // Per-vault conversation identity. The gateway keys stored history by this name;
 // deriving it from the ACTIVE vault root means the demo vault and a private vault
 // can NEVER share a conversation (and thus never replay each other's history).
 // A fixed name was the root cause of the cross-vault history leak.
-function vaultConversationName(): string {
-	const h = createHash('sha256').update(getVaultPath()).digest('hex').slice(0, 12);
-	return `folio-vault-${h}`;
+function vaultFingerprint(): string {
+	return createHash('sha256').update(getVaultPath()).digest('hex').slice(0, 12);
+}
+
+function vaultConversationName(sessionId?: string): string {
+	const vault = vaultFingerprint();
+	if (!sessionId) return `folio-vault-${vault}`;
+	const session = createHash('sha256').update(sessionId).digest('hex').slice(0, 12);
+	return `folio-vault-${vault}-${session}`;
 }
 import { loadCampaign, loadActiveChapter, loadAllChapters } from '../vault/reader.js';
 import { getLeuchtfeuer } from '../vault/leuchtfeuer.js';
@@ -23,17 +37,16 @@ export interface ChatContext {
 }
 
 export interface HermesEvent {
-	type: 'tool_call' | 'tool_result' | 'text' | 'error' | 'system_notice';
+	type: 'tool_call' | 'tool_result' | 'text' | 'error' | 'system_notice' | 'execution_profile';
 	content?: string;
 	name?: string;
 	args?: Record<string, unknown>;
 	output?: string;
+	profile?: ExecutionProfile;
 }
 
-const MAX_SYSTEM_PROMPT_CHARS = 30000;
-
 async function loadMemory(): Promise<string> {
-	const dir = join(process.env.HOME!, '.hermes', 'memories');
+	const dir = join(getHermesHomePath(), 'memories');
 	try {
 		const [user, memory] = await Promise.all([
 			readFile(join(dir, 'USER.md'), 'utf-8').catch(() => ''),
@@ -48,18 +61,24 @@ async function loadMemory(): Promise<string> {
 	}
 }
 
-async function buildSystemPrompt(context: ChatContext): Promise<string> {
+async function buildSystemPrompt(
+	context: ChatContext,
+	manifest: HermesContextManifest
+): Promise<string> {
 	// Active vault root (demo or the user's own) — NEVER hardcode a private path
 	// here. The gateway scopes the file tools to exactly this root (see the
 	// `vault_root` field below + the gateway-side jail), so prompt and tool
 	// surface must agree on the SAME active vault.
 	const vaultRoot = getVaultPath();
+	const needsCampaign = manifest.sources.campaign || manifest.sources.leuchtfeuer;
 	const [campaign, memory, leuchtfeuer] = await Promise.all([
-		loadCampaign(),
-		loadMemory(),
-		getLeuchtfeuer().catch(() => ({ ids: [], week: 0, year: 0 }))
+		needsCampaign ? loadCampaign() : Promise.resolve(null),
+		manifest.sources.memory ? loadMemory() : Promise.resolve(''),
+		manifest.sources.leuchtfeuer
+			? getLeuchtfeuer().catch(() => ({ ids: [], week: 0, year: 0 }))
+			: Promise.resolve(null)
 	]);
-	const activeChapter = await loadActiveChapter(campaign.current_chapter);
+	const activeChapter = campaign ? await loadActiveChapter(campaign.current_chapter) : null;
 
 	const inProgress = (activeChapter?.objectives ?? [])
 		.filter((o) => o.status === 'in_progress')
@@ -77,133 +96,71 @@ async function buildSystemPrompt(context: ChatContext): Promise<string> {
 		.map((o) => `- [${o.id}] ${o.title}`)
 		.join('\n');
 
-	const dashboardContext = `Du bist Hermes, der LIFE-Agent von Afschin. Du duzt ihn (Du, dein, dir).
+	const sections: string[] = [];
+	if (memory) sections.push(memory);
+	sections.push(manifest.identity);
+	sections.push(`## Antwort-Stil\n${manifest.responseStyle.map((item) => `- ${item}`).join('\n')}`);
+	sections.push(`## Was du NICHT tun sollst\n${manifest.prohibitions.map((item) => `- ${item}`).join('\n')}`);
 
-## Antwort-Stil
-- Kurz und sachlich, keine Floskeln
-- Maximal 3-4 Sätze wenn nicht explizit mehr verlangt
-- Konkrete Empfehlungen statt allgemeiner Aussagen
-- Auf Deutsch antworten
-
-## Was du NICHT tun sollst
-
-- KEIN execute_code für Vault-Operationen — nutze direkt read_file, write_file, patch, search_files
-- KEIN todo-Tool für LIFE-Objectives (nur für deine internen Arbeitsschritte)
-- KEIN Erfinden von Pfaden — wenn du den Pfad nicht kennst, nutze search_files
-- KEIN session_search — antworte direkt basierend auf Kontext und Vault-Dateien
-
-## Datei-Struktur des LIFE-Vaults
-
+	if (manifest.sources.vaultGuidance) {
+		const chapterFiles = manifest.vaultGuidance.chapterFiles
+			.map((file) => `${vaultRoot.replace(/\/$/, '')}/${file}`)
+			.join('\n');
+		sections.push(`## Datei-Struktur des LIFE-Vaults
 ROOT: ${vaultRoot}/
 
 Kapitel-Dateien (HIER leben die Objectives):
-${vaultRoot}/_campaign/chapters/01-repositionierung.md
-${vaultRoot}/_campaign/chapters/02-durchbruch.md
-${vaultRoot}/_campaign/chapters/03a-angestellt-etablierung.md
-${vaultRoot}/_campaign/chapters/03b-consultant-geschaeftsgrundlage.md
-${vaultRoot}/_campaign/chapters/03c-iran-orientierung.md
-${vaultRoot}/_campaign/chapters/04-hauskauf.md
-${vaultRoot}/_campaign/chapters/05-partner-weg.md
-${vaultRoot}/_campaign/chapters/06-zweites-einkommensfeld.md
-${vaultRoot}/_campaign/chapters/07-vermoegensstruktur.md
-${vaultRoot}/_campaign/chapters/08-unternehmerische-praesenz.md
-${vaultRoot}/_campaign/chapters/09-familienbasis.md
-${vaultRoot}/_campaign/chapters/10-produkt.md
+${chapterFiles}
 
 Akt-Dateien: ${vaultRoot}/_campaign/acts/01-fundament.md ... 05-vollbild.md
-Master: ${vaultRoot}/_campaign/campaign.md
+Master: ${vaultRoot}/_campaign/campaign.md`);
+		sections.push(
+			`## WICHTIG: Objectives sind KEINE eigenen Dateien\n${renderManifestText(manifest.vaultGuidance.objectiveModel, vaultRoot)}`
+		);
+		sections.push(
+			`## Workflow für Status-Änderungen mit patch\n${renderManifestText(manifest.vaultGuidance.statusWorkflow, vaultRoot)}`
+		);
+	}
 
-## WICHTIG: Objectives sind KEINE eigenen Dateien
+	if (leuchtfeuer) {
+		const priorities =
+			leuchtfeuer.ids.length > 0
+				? `Die drei Prioritäten dieser Woche:\n${leuchtfeuer.ids
+						.map((id) => {
+							const obj = (activeChapter?.objectives ?? []).find((o) => o.id === id);
+							return obj
+								? `- ${id} "${obj.title}" (Status: ${obj.status}${obj.deadline ? `, Deadline: ${obj.deadline}` : ''})`
+								: `- ${id}`;
+						})
+						.join('\n')}\n\nWenn der Nutzer "diese Woche", "Leuchtfeuer", "Prioritäten" o.ä. sagt, bezieht er sich auf diese Objectives.`
+				: '(noch keine Leuchtfeuer für diese Woche gesetzt)';
+		sections.push(`## Leuchtfeuer KW ${leuchtfeuer.week} (${leuchtfeuer.year})\n${priorities}`);
+	}
 
-Objectives (obj-01-06 etc.) sind SEKTIONEN INNERHALB der Kapitel-Dateien.
-
-Die erste Zahl im Objective-ID gibt die Kapitel-Nummer an:
-- obj-01-XX → ${vaultRoot}/_campaign/chapters/01-repositionierung.md
-- obj-02-XX → ${vaultRoot}/_campaign/chapters/02-durchbruch.md
-- obj-04-XX → ${vaultRoot}/_campaign/chapters/04-hauskauf.md
-- usw.
-
-Innerhalb der Datei sehen Objectives so aus:
-### obj-01-06: Partner's Weiterbildungsweg definiert
-- **threshold:** ...
-- **status:** in_progress
-- **weight:** 1.0
-- **related_goals:** [familie]
-
-## Workflow für Status-Änderungen mit patch
-
-Status-Werte (NUR diese): todo | not_started | in_progress | blocked | done | archived
-
-1. Kapitel-Datei ableiten: obj-XX-YY → chapters/XX-*.md
-   (Unbekannter Dateiname: search_files auf ${vaultRoot}/_campaign/chapters/)
-2. read_file auf die Kapitel-Datei
-3. patch mit EINDEUTIGEM old_string (siehe unten)
-4. Frontmatter "updated:" auf heute setzen (eigener patch)
-5. read_file zur Validierung
-
-WICHTIG — patch verlangt EINDEUTIGE old_string-Matches. Die Status-Zeile
-"- **status:** in_progress" kommt mehrfach in der Datei vor (mehrere Objectives).
-Du MUSST den ### Header plus threshold-Zeile mit einschliessen.
-
-Korrekte patch-Form — Beispiel obj-01-06 → done:
-
-old_string:
-### obj-01-06: Partner's Weiterbildungsweg definiert
-- **threshold:** Ein konkreter Weg ist identifiziert und besprochen (Ausbildung, Studium, Kurs, Einstieg), auch wenn noch nicht gestartet
-- **status:** in_progress
-
-new_string:
-### obj-01-06: Partner's Weiterbildungsweg definiert
-- **threshold:** Ein konkreter Weg ist identifiziert und besprochen (Ausbildung, Studium, Kurs, Einstieg), auch wenn noch nicht gestartet
-- **status:** done
-- **completed_at:** YYYY-MM-DD
-
-Regeln:
-- old_string MUSS die ### Header-Zeile enthalten (macht Match eindeutig)
-- threshold-Zeile ZEICHENGENAU aus read_file übernehmen
-- completed_at VOR -weight- einfügen
-- NICHT replace_all=True nutzen (gefährlich bei mehreren Objectives)
-- Wenn patch scheitert mit "Found N matches": old_string um mehr Zeilen nach oben erweitern
-
-Fallback (nur wenn patch nicht klappt): read_file → im Kopf ändern → write_file komplett zurück
-
-Bei reinen Beratungs-Fragen: Lies die relevante Vault-Datei bevor du antwortest.
-Verlasse dich nicht auf Memory allein — der aktuelle Stand steht im Vault.
-
-## Leuchtfeuer KW ${leuchtfeuer.week} (${leuchtfeuer.year})
-${
-	leuchtfeuer.ids.length > 0
-		? `Die drei Prioritäten dieser Woche:\n${leuchtfeuer.ids
-				.map((id) => {
-					const obj = (activeChapter?.objectives ?? []).find((o) => o.id === id);
-					return obj
-						? `- ${id} "${obj.title}" (Status: ${obj.status}${obj.deadline ? `, Deadline: ${obj.deadline}` : ''})`
-						: `- ${id}`;
-				})
-				.join('\n')}\n\nWenn der Nutzer "diese Woche", "Leuchtfeuer", "Prioritäten" o.ä. sagt, bezieht er sich auf diese Objectives.`
-		: '(noch keine Leuchtfeuer für diese Woche gesetzt)'
-}
-
-## Aktueller Dashboard-Kontext
+	if (manifest.sources.dashboard) {
+		sections.push(`## Aktueller Dashboard-Kontext
 View: ${context.view}${context.selectedItem ? `\nAusgewähltes Item: ${context.selectedItem}` : ''}
-Datum: ${new Date().toLocaleDateString('de-DE')}
+Datum: ${new Date().toLocaleDateString('de-DE')}`);
+	}
 
-## Aktive Kampagne
-Akt ${campaign.current_act}, Kapitel ${campaign.current_chapter}${activeChapter ? `: ${activeChapter.title}\n"${activeChapter.atmosphere}"` : ''}
+	if (manifest.sources.campaign && campaign) {
+		sections.push(`## Aktive Kampagne
+Akt ${campaign.current_act}, Kapitel ${campaign.current_chapter}${activeChapter ? `: ${activeChapter.title}\n"${activeChapter.atmosphere}"` : ''}`);
+		sections.push(`## Objectives in Bearbeitung (${inProgress.split('\n').filter(Boolean).length})
+${inProgress || '(keine in_progress)'}`);
+		sections.push(`## Nächste offene Objectives\n${todo || '(keine)'}`);
+	}
 
-## Objectives in Bearbeitung (${inProgress.split('\n').filter(Boolean).length})
-${inProgress || '(keine in_progress)'}
+	if (manifest.sources.vaultGuidance) {
+		sections.push(
+			`## Vault-Pfad\n${vaultRoot}/ — wenn du Details zu einem Objective brauchst, lies ${vaultRoot}/_campaign/chapters/`
+		);
+	}
 
-## Nächste offene Objectives
-${todo || '(keine)'}
-
-## Vault-Pfad
-${vaultRoot}/ — wenn du Details zu einem Objective brauchst, lies ${vaultRoot}/_campaign/chapters/`;
-
-	const full = memory ? `${memory}\n\n${dashboardContext}` : dashboardContext;
-	if (full.length > MAX_SYSTEM_PROMPT_CHARS) {
-		console.warn(`[hermes] system prompt truncated: ${full.length} → ${MAX_SYSTEM_PROMPT_CHARS}`);
-		return full.slice(0, MAX_SYSTEM_PROMPT_CHARS);
+	const full = sections.join('\n\n');
+	if (full.length > manifest.maxChars) {
+		console.warn(`[hermes] system prompt truncated: ${full.length} → ${manifest.maxChars}`);
+		return full.slice(0, manifest.maxChars);
 	}
 	return full;
 }
@@ -213,8 +170,16 @@ export interface HistoryMessage {
 	content: string;
 }
 
-async function buildSelectedContext(selectedObjectiveIds: string[]): Promise<string> {
-	if (selectedObjectiveIds.length === 0) return '';
+export interface HermesCorrelation {
+	sessionId: string;
+	turnId: string;
+}
+
+async function buildSelectedContext(
+	selectedObjectiveIds: string[],
+	manifest: HermesContextManifest
+): Promise<string> {
+	if (!manifest.sources.selectedObjectives || selectedObjectiveIds.length === 0) return '';
 	const chapters = await loadAllChapters();
 	const allObjectives = chapters.flatMap((c) => c.objectives);
 	const selected = selectedObjectiveIds
@@ -237,8 +202,10 @@ const IDLE_TIMEOUT_MS = 45_000;
 // Marker: the gateway's conversation pointer is orphaned (HTTP 404 before the
 // stream starts) → caller clears it and retries once.
 class StaleChainError extends Error {}
+class StreamAbortedError extends Error {}
 
-function connectionError(e: unknown): Error {
+function connectionError(e: unknown, externalSignal?: AbortSignal): Error {
+	if (externalSignal?.aborted) return new StreamAbortedError('client disconnected or cancelled');
 	if (e instanceof Error && e.name === 'AbortError') {
 		return new Error(
 			`Hermes stalled — no output for ${IDLE_TIMEOUT_MS / 1000}s. The model or gateway may be stuck.`
@@ -343,7 +310,7 @@ async function* openResponseStream(
 		});
 	} catch (e) {
 		if (idle) clearTimeout(idle);
-		throw connectionError(e);
+		throw connectionError(e, externalSignal);
 	}
 
 	if (!response.ok || !response.body) {
@@ -368,8 +335,8 @@ async function* openResponseStream(
 			try {
 				chunk = await reader.read();
 			} catch (e) {
-				if (controller.signal.aborted) throw connectionError(e);
-				throw connectionError(e);
+				if (controller.signal.aborted) throw connectionError(e, externalSignal);
+				throw connectionError(e, externalSignal);
 			}
 			armIdle(); // reset on ANY bytes — data event OR `: keepalive` comment
 			if (chunk.done) break;
@@ -403,41 +370,105 @@ export async function* sendMessage(
 	// is not sent in the body; kept in the signature for call-site compatibility.
 	_history: HistoryMessage[] = [],
 	selectedObjectiveIds: string[] = [],
+	correlation?: HermesCorrelation,
 	signal?: AbortSignal
 ): AsyncGenerator<HermesEvent> {
-	const [instructions, selectedContext] = await Promise.all([
-		buildSystemPrompt(context),
-		buildSelectedContext(selectedObjectiveIds)
-	]);
-	const fullInstructions = selectedContext ? `${instructions}${selectedContext}` : instructions;
+	const manifest = await readHermesContextManifest();
+	const executionProfile = await readHermesExecutionProfile({
+		version: manifest.promptVersion,
+		fingerprint: manifest.fingerprint
+	});
+	const conversation = vaultConversationName(correlation?.sessionId);
+	let turnStarted = false;
+	let turnFinished = false;
+	if (correlation) {
+		startHermesTurn({
+			session_id: correlation.sessionId,
+			turn_id: correlation.turnId,
+			conversation_id: conversation,
+			vault_fingerprint: vaultFingerprint(),
+			objective_ids: selectedObjectiveIds,
+			execution_profile: executionProfile
+		});
+		turnStarted = true;
+	}
 
-	const body = {
-		model: 'default',
-		input: message,
-		instructions: fullInstructions,
-		conversation: vaultConversationName(),
-		store: true,
-		stream: true,
-		// Scope the gateway's file tools to the ACTIVE vault. The gateway pins this
-		// as the per-request working root and jails read_file/write_file to it, so
-		// the agent cannot read or write outside the active (e.g. demo) vault — even
-		// if a prompt, the user, or an injection names an absolute/~ path elsewhere.
-		vault_root: getVaultPath()
-	};
-
+	// Stamp every assistant turn with the exact safe execution profile observed at
+	// request start. This survives later model switches and never contains credentials.
 	try {
-		yield* openResponseStream(body, signal);
-	} catch (e) {
-		if (!(e instanceof StaleChainError)) throw e;
-		// Orphan conversation pointer: clear it and retry once as a fresh thread.
-		console.warn('[hermes/client] orphan previous_response_id detected, clearing pointer + retrying');
-		clearHermesConversationPointer(body.conversation);
 		yield {
-			type: 'system_notice',
-			content:
-				'Chat-Verlauf zurückgesetzt (Hermes Response Chain unterbrochen). Antwort folgt als neuer Thread.'
+			type: 'execution_profile',
+			profile: executionProfile
 		};
-		yield* openResponseStream(body, signal);
+
+		const [instructions, selectedContext] = await Promise.all([
+			buildSystemPrompt(context, manifest),
+			buildSelectedContext(selectedObjectiveIds, manifest)
+		]);
+		const fullInstructions = selectedContext ? `${instructions}${selectedContext}` : instructions;
+
+		const body = {
+			model: 'default',
+			input: message,
+			instructions: fullInstructions,
+			conversation,
+			store: true,
+			stream: true,
+			// Scope the gateway's file tools to the ACTIVE vault. The gateway pins this
+			// as the per-request working root and jails read_file/write_file to it, so
+			// the agent cannot read or write outside the active (e.g. demo) vault — even
+			// if a prompt, the user, or an injection names an absolute/~ path elsewhere.
+			vault_root: getVaultPath()
+		};
+
+		let responseError: string | null = null;
+		try {
+			for await (const event of openResponseStream(body, signal)) {
+				if (event.type === 'error') responseError = event.content ?? 'Hermes stream failed';
+				yield event;
+			}
+		} catch (e) {
+			if (!(e instanceof StaleChainError)) throw e;
+			// Compatibility fallback for an orphaned Hermes response pointer. Folio's
+			// own session/turn audit remains authoritative and is not modified here.
+			console.warn(
+				'[hermes/client] orphan previous_response_id detected, clearing pointer + retrying'
+			);
+			clearHermesConversationPointer(body.conversation);
+			yield {
+				type: 'system_notice',
+				content:
+					'Chat-Verlauf zurückgesetzt (Hermes Response Chain unterbrochen). Antwort folgt als neuer Thread.'
+			};
+			for await (const event of openResponseStream(body, signal)) {
+				if (event.type === 'error') responseError = event.content ?? 'Hermes stream failed';
+				yield event;
+			}
+		}
+		if (turnStarted && correlation) {
+			finishHermesTurn(
+				correlation.turnId,
+				responseError ? 'failed' : 'completed',
+				responseError
+			);
+			turnFinished = true;
+		}
+	} catch (e) {
+		if (turnStarted && correlation) {
+			finishHermesTurn(
+				correlation.turnId,
+				e instanceof StreamAbortedError ? 'aborted' : 'failed',
+				e instanceof Error ? e.message : String(e)
+			);
+			turnFinished = true;
+		}
+		throw e;
+	} finally {
+		// Async-generator cancellation can bypass the catch block. Keep Folio's
+		// audit honest if the browser disconnects while the generator is suspended.
+		if (turnStarted && !turnFinished && correlation) {
+			finishHermesTurn(correlation.turnId, 'aborted', 'stream interrupted');
+		}
 	}
 }
 

@@ -59,7 +59,7 @@
 			<div class="head-actions">
 				<button
 					onclick={() => chatStore.newChat()}
-					title="Neuer Chat (setzt auch den Server-Verlauf zurück)"
+					title="Neue Folio-Session starten"
 					class="icon-btn"
 				>
 					<Trash2 size={14} />

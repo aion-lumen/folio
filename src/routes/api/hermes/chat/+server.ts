@@ -9,16 +9,29 @@ import type { RequestHandler } from './$types.js';
 // what drove the model-reload / token-burn loop.
 let chatInFlight = false;
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const OBJECTIVE_ID_RE = /^obj-\d+[a-z]?-\d+$/;
+
 export const POST: RequestHandler = async ({ request }) => {
 	const body = await request.json();
-	const { message, context, history, selectedObjectiveIds } = body as {
+	const { message, context, history, selectedObjectiveIds, sessionId, turnId } = body as {
 		message: string;
 		context: ChatContext;
 		history?: HistoryMessage[];
 		selectedObjectiveIds?: string[];
+		sessionId?: string;
+		turnId?: string;
 	};
 
-	if (!message) throw error(400, 'message required');
+	if (typeof message !== 'string' || !message.trim()) throw error(400, 'message required');
+	if (!sessionId || !UUID_RE.test(sessionId)) throw error(400, 'valid sessionId required');
+	if (!turnId || !UUID_RE.test(turnId)) throw error(400, 'valid turnId required');
+	if (
+		!Array.isArray(selectedObjectiveIds ?? []) ||
+		(selectedObjectiveIds ?? []).some((id) => typeof id !== 'string' || !OBJECTIVE_ID_RE.test(id))
+	) {
+		throw error(400, 'invalid selectedObjectiveIds');
+	}
 
 	if (chatInFlight) {
 		throw error(409, 'A chat request is already in progress. Wait for it to finish.');
@@ -42,6 +55,7 @@ export const POST: RequestHandler = async ({ request }) => {
 					context ?? { view: 'unknown' },
 					history ?? [],
 					selectedObjectiveIds ?? [],
+					{ sessionId, turnId },
 					ac.signal
 				)) {
 					enqueue(event);

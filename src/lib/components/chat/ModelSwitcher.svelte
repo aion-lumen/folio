@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import type { ExecutionProfile } from '$lib/types/execution-profile.js';
 
 	type Profile = { id: string; name: string; description: string };
 
@@ -7,6 +8,21 @@
 	let active = $state('unknown');
 	let switching = $state(false);
 	let lastError = $state('');
+	let executionProfile = $state<ExecutionProfile | null>(null);
+
+	function contextLabel(value: number | null): string {
+		if (!value) return 'ctx unbekannt';
+		return value >= 1024 && value % 1024 === 0 ? `${value / 1024}k ctx` : `${value} ctx`;
+	}
+
+	function artifactLabel(profile: ExecutionProfile): string {
+		const parts = [profile.artifact?.source];
+		if (profile.artifact?.engine && profile.artifact.engine !== 'unknown') {
+			parts.push(profile.artifact.engine.toUpperCase());
+		}
+		parts.push(profile.artifact?.quantization, contextLabel(profile.contextLength));
+		return parts.filter(Boolean).join(' · ');
+	}
 
 	async function loadProfiles() {
 		try {
@@ -14,6 +30,7 @@
 			const data = await r.json();
 			profiles = data.profiles;
 			active = data.active;
+			executionProfile = data.executionProfile ?? null;
 		} catch (e) {
 			lastError = String(e);
 		}
@@ -43,7 +60,12 @@
 	onMount(loadProfiles);
 </script>
 
-<div class="model-switcher" title={lastError || 'Modell wechseln'}>
+<div
+	class="model-switcher"
+	title={lastError || (executionProfile
+		? `${executionProfile.artifact?.id ?? 'Artefakt nicht lokal verifiziert'} · Fingerprint ${executionProfile.fingerprint}`
+		: 'Modell wechseln')}
+>
 	<select
 		value={active}
 		onchange={(e) => switchProfile(e.currentTarget.value)}
@@ -65,14 +87,48 @@
 	{:else if lastError}
 		<span class="error" title={lastError}>!</span>
 	{/if}
+	{#if executionProfile}
+		<span class="execution-profile" data-verification={executionProfile.verification}>
+			<span class="model-id">{executionProfile.modelId}</span>
+			<span class="artifact-meta">{artifactLabel(executionProfile)}</span>
+		</span>
+	{/if}
 </div>
 
 <style>
 	.model-switcher {
-		display: inline-flex;
+		display: flex;
 		align-items: center;
+		flex-wrap: wrap;
 		gap: 0.4rem;
 		font-size: 0.75rem;
+	}
+
+	.execution-profile {
+		flex-basis: 100%;
+		display: flex;
+		flex-direction: column;
+		gap: 1px;
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 0.62rem;
+		line-height: 1.25;
+		color: var(--color-muted-foreground);
+		overflow-wrap: anywhere;
+		white-space: normal;
+		max-width: 100%;
+	}
+
+	.model-id {
+		color: var(--color-foreground);
+	}
+
+	.artifact-meta {
+		opacity: 0.85;
+	}
+
+	.execution-profile[data-verification='config-only'],
+	.execution-profile[data-verification='unavailable'] {
+		color: var(--color-destructive, #dc2626);
 	}
 
 	select {
