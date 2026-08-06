@@ -4,7 +4,7 @@
 **Typ:** folio-Design-Entscheidung · **Dringlichkeit:** blockiert NICHT den folio-Release (Karte + Privacy gehen live und degradieren sauber); blockiert nur den **tatsächlichen Metrik-Datenfluss**.
 
 ## Die Entscheidung in einem Satz
-Wie kommen die Leuchtfeuer-Metrik-Aggregate vom VPS auf Afschins Mac zu folio — **privates VPS-Verzeichnis + SSH-Pull** (CCs Umsetzung) oder ein **authentifizierter HTTP-Endpoint** (Alternative)?
+Wie kommen die Leuchtfeuer-Metrik-Aggregate vom VPS auf des Stewards Mac zu folio — **privates VPS-Verzeichnis + SSH-Pull** (CCs Umsetzung) oder ein **authentifizierter HTTP-Endpoint** (Alternative)?
 
 ## Kontext: Was Leuchtfeuer ist (Release-Lauf #3)
 Neue Heute-Hub-Karte in folio, die Site-/Repo-Metriken zeigt — **ausschließlich aus Server-Logs**, kein Client-Tracking, keine Cookies, kein externer Dienst. Das 0-externe-Calls-Markenversprechen der Sites bleibt wörtlich wahr. Datenfluss:
@@ -47,7 +47,7 @@ CC hat das **bewusst NICHT getan** und begründet (ops/leuchtfeuer/README.md Z.3
 
 ## Was NICHT betroffen ist
 - Der **folio-Release v0.4.0** (Karte + `/leuchtfeuer` + Privacy-Kaskade) geht unabhängig live. Die Karte zeigt bis zum ersten Pull „Noch keine Metriken / letzter Stand mit Datum" (Degradation, by design). Kein Blocker.
-- **VPS-Apply** (Caddy-Logging, Collectors, Cron) ist ohnehin Afschins sudo-Schritt.
+- **VPS-Apply** (Caddy-Logging, Collectors, Cron) ist ohnehin des Stewards sudo-Schritt.
 
 ## Aktueller Release-Stand (Kontext)
 - folio `feat/leuchtfeuer` = `a13e377`, gepusht, Tests grün. G1 freigegeben.

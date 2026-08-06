@@ -20,6 +20,6 @@
 
 ## Konsequenz für die Zahlen-Kaskade
 
-Beim späteren Nachzug auf carta/aion-lumen gilt: **„… über 14 Fixtures"** (nicht 16, nicht 12). Die Accuracy/Score-Zahl selbst kommt aus Afschins 3-Modell-Voll-Eval (Platzhalter, siehe Phase 2).
+Beim späteren Nachzug auf carta/aion-lumen gilt: **„… über 14 Fixtures"** (nicht 16, nicht 12). Die Accuracy/Score-Zahl selbst kommt aus des Stewards 3-Modell-Voll-Eval (Platzhalter, siehe Phase 2).
 
 **Kein Korrektur-Commit am Manifest erforderlich.**

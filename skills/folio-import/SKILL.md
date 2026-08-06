@@ -17,7 +17,7 @@ Activate when the user asks to:
 **Never write to the vault path or `folio.db`.**  
 Only write `.md` files to the staging inbox: `~/.folio/inbox/` (or `FOLIO_INBOX_PATH`).
 
-Folio commits to the vault only after Afschin confirms in the UI.
+Folio commits to the vault only after der Steward confirms in the UI.
 
 ## Format authority
 

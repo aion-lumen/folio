@@ -3,7 +3,7 @@
 ## Anlass: ein Bericht, der niemanden erreichte
 
 Am 2026-07-12 meldete die Hermes-Wacht korrekt (Omars grünes Licht auf #34076-Umfeld),
-aber der Bericht löste **keinen Trigger** aus → ging unter, Afschin fand ihn erst
+aber der Bericht löste **keinen Trigger** aus → ging unter, der Steward fand ihn erst
 nachträglich. Bei 24-h-Reaktionsfenstern (Clean-Sweep-Regime des Upstream-Repos) ist ein
 Bericht, der niemanden erreicht, wirkungslos. Das ist der konkrete Auslöser für den Kanal.
 

@@ -1,6 +1,6 @@
 # Release v0.2.0 — Live-Check-Liste & Verbesserungsvorschläge
 
-**Datum:** 2026-07-09 · für Afschins eigene Live-Verifikation + Planung nächste Runde
+**Datum:** 2026-07-09 · für des Stewards eigene Live-Verifikation + Planung nächste Runde
 
 ---
 

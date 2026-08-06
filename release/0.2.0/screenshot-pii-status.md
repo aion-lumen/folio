@@ -18,7 +18,7 @@
 
 ## Git-Vollzug offen (in G2-Schrittfolge)
 
-`.git/index.lock` in der Session nicht entfernbar (Berechtigung) → Cowork kann keine Git-Mutation ausführen (konsistent mit Leitplanke „kein Commit durch Cowork"). Folgende Schritte macht Afschin bei G2:
+`.git/index.lock` in der Session nicht entfernbar (Berechtigung) → Cowork kann keine Git-Mutation ausführen (konsistent mit Leitplanke „kein Commit durch Cowork"). Folgende Schritte macht der Steward bei G2:
 
 ```
 # tote Lock entfernen, falls kein git-Prozess läuft:
@@ -33,4 +33,4 @@ Inhaltlich ist 01 bereits PII-frei (Platzhalter), falls es doch mitgepusht würd
 
 ## Info-Befund (kein Blocker, nächster Gesamtlauf)
 
-**folio-mail switcht bei Vault-Wechsel nicht** — Bug von Afschin gemeldet. Nicht Teil von v0.2.0-Scope, wird im nächsten Gesamtlauf behandelt. Hier nur dokumentiert (kein Scope-Zuwachs).
+**folio-mail switcht bei Vault-Wechsel nicht** — Bug von der Steward gemeldet. Nicht Teil von v0.2.0-Scope, wird im nächsten Gesamtlauf behandelt. Hier nur dokumentiert (kein Scope-Zuwachs).

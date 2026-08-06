@@ -1,6 +1,6 @@
 # Leuchtfeuer — privacy-statement drafts (one sentence per site)
 
-**Drafts only.** The actual site edits are Cowork's number/content cascade + Afschin's release; I do
+**Drafts only.** The actual site edits are Cowork's number/content cascade + der Steward's release; I do
 not touch the site repos. These go on the fresh Impressum / Datenschutz pages. Reflects the real
 setup: Caddy server logs, IP anonymised in-Caddy (last octet / IPv6 /48), 7-day retention, no cookies,
 no external services, no visitor profiles.

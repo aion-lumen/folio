@@ -69,7 +69,7 @@ rrsync the client addresses the **restricted root as `:/`**, not the absolute pa
 4. First pull populates `~/.folio/metrics/`; the Heute "Leuchtfeuer" card fills in. Until then it shows
    "Noch keine Metriken" (degradation, by design).
 
-## Betriebsstand (VPS-seitig ausgeführt; künftige Änderungen = Afschins sudo-Hand)
+## Betriebsstand (VPS-seitig ausgeführt; künftige Änderungen = des Stewards sudo-Hand)
 - **PAT creation + placement** — done (env file in place). ✅
 - **VPS apply** (steps above) — ausgeführt, produktiv. ✅ Künftige Änderungen brauchen sudo auf `185.143.100.222` (CC hat keinen VPS-Zugang).
 - **SSH host for the pull** — konfiguriert: Pull von `185.143.100.222` über den `leuchtfeuer-pull`-User mit `rrsync`-forced-command. ✅ (kein offener Platzhalter mehr)

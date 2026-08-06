@@ -1,4 +1,4 @@
-# ntfy self-hosted — Setup (Afschins sudo-Hand)
+# ntfy self-hosted — Setup (des Stewards sudo-Hand)
 
 0.4.0 Teil C. CC hat Config + Code vorbereitet; **die VPS-/Secret-/launchd-Schritte
 führst du aus** (CC legt keine Credentials/Tokens an, appliziert nichts auf dem VPS).
