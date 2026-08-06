@@ -11,7 +11,7 @@ tags: [release, v0.2.0, deploy, gate-g2]
 
 # Gesamtrelease v0.2.0 freigeben & pushen
 
-**Gate:** G2 (Go erteilt 2026-07-09) · **Deploy macht Afschin** (Knopfdruck), Cowork deployt nicht.
+**Gate:** G2 (Go erteilt 2026-07-09) · **Deploy macht der Steward** (Knopfdruck), Cowork deployt nicht.
 
 ## Schrittfolge (Push = Deploy überall, jeder Schritt einzeln bestätigen)
 1. multi-agent-lab: Merge-Split entscheiden, feat/lead-adapter → main, Tag v0.2.0, push

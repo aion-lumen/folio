@@ -42,7 +42,7 @@ Inbox: ~/.folio/inbox/
 - Auto-commit / watcher daemon
 - New objective creation (append `### obj-…`) — only patches existing objectives
 
-## Manual check (Afschin)
+## Manual check (der Steward)
 
 1. Drop a synthetic `.md` into `~/.folio/inbox/`
 2. Heute hub shows „Inbox: N wartend"

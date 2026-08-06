@@ -21,7 +21,7 @@ Site-/Repo-Metriken für die Folio-Heute-Hub-Karte, **ausschließlich aus Server
 | Neues Feature/Verhalten | **ja** | folio README/CHANGELOG; Heute-Karte (intern); **Privacy-Sätze auf 4 Sites** |
 | Agent/Triage berührt | **nein** | keine eval-Zahl, kein Injektor |
 | Interchange berührt | **nein** | Format unangetastet |
-| Install-/Betriebsrelevant | **ja** | VPS-Collector, Cron, launchd-Pull, Caddy-Log-Config — aber das sind **Afschins manuelle Ops-Schritte** (README „Blocked on Afschin"), nicht Teil des folio-Release-Pushes |
+| Install-/Betriebsrelevant | **ja** | VPS-Collector, Cron, launchd-Pull, Caddy-Log-Config — aber das sind **des Stewards manuelle Ops-Schritte** (README „Blocked on der Steward"), nicht Teil des folio-Release-Pushes |
 | Nur intern | nein | Privacy-Kaskade ist Außenfläche |
 
 ## Prozess-Tiefe
@@ -41,10 +41,10 @@ Keine Interchange-Prüfung, keine Zahlen-Prüfung. (Reviewer-Rotation: siehe Pha
 3. **Screenshot** — Leuchtfeuer-Karte im Heute-Hub. Degradation ist gebaut („Noch keine Metriken" / „Stand: … · letzter verfügbarer Stand"). Screenshot zeigt entweder Demo-Daten oder den Degradations-Zustand → PII-Check.
 
 ## Offener Design-Punkt (an G1)
-**metrics-Fluss weicht bewusst von der Direktive ab:** Die Direktive sagte „`metrics/` in die rsync-Whitelist". CC hat das **absichtlich NICHT** getan — Begründung (README Z.33–41): Die Whitelist steuert den Deploy-rsync (Mac→VPS, Webroot = **öffentlich**); Besucher-Aggregate dort wären öffentlich fetchbar. Metrics läuft daher in Gegenrichtung (VPS→Mac, SSH-Pull) aus einem **privaten** Verzeichnis `/var/lib/leuchtfeuer/`. **Braucht Afschins Bestätigung** (Alternative: authentifizierter Metrics-Endpoint = anderer Entwurf). → Cowork-Bewertung: CCs Entscheidung ist sicherheitstechnisch korrekt; die Direktiv-Formulierung war die Falle, nicht CCs Umsetzung.
+**metrics-Fluss weicht bewusst von der Direktive ab:** Die Direktive sagte „`metrics/` in die rsync-Whitelist". CC hat das **absichtlich NICHT** getan — Begründung (README Z.33–41): Die Whitelist steuert den Deploy-rsync (Mac→VPS, Webroot = **öffentlich**); Besucher-Aggregate dort wären öffentlich fetchbar. Metrics läuft daher in Gegenrichtung (VPS→Mac, SSH-Pull) aus einem **privaten** Verzeichnis `/var/lib/leuchtfeuer/`. **Braucht des Stewards Bestätigung** (Alternative: authentifizierter Metrics-Endpoint = anderer Entwurf). → Cowork-Bewertung: CCs Entscheidung ist sicherheitstechnisch korrekt; die Direktiv-Formulierung war die Falle, nicht CCs Umsetzung.
 
 ## Bewusst NICHT (nicht einsammeln)
-- VPS-Apply + Mac-launchd-Pull = Afschins sudo-Schritte (README).
+- VPS-Apply + Mac-launchd-Pull = des Stewards sudo-Schritte (README).
 - 08c / Modul-API-Migration (Karte ist bewusst „normal", zweiter Konsument später).
 - Kein `vite dev --host`.
 

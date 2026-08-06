@@ -14,7 +14,7 @@ Du hast Aufgabe 1 (Source-Trust-Policy) + Aufgabe 2 (Lead-Adapter) gebaut. Der C
 ## Schritt 1 — multi-agent-lab (Python)
 Repo: `aion-lumen/multi-agent-lab`, Branch `feat/lead-adapter` (2 Commits vor main: `95e9064` Kategorie-System, `3d01231` Lead-Adapter).
 
-**Merge-Checkpoint (Rückfrage an Afschin, VOR Push):** Bewerte, ob die zwei Commits zusammen als ein Release gemergt werden oder getrennt sinnvoller sind (Kategorie-System vs. Lead-Adapter). Schlag Afschin deine Empfehlung kurz vor und warte auf Bestätigung. Danach:
+**Merge-Checkpoint (Rückfrage an der Steward, VOR Push):** Bewerte, ob die zwei Commits zusammen als ein Release gemergt werden oder getrennt sinnvoller sind (Kategorie-System vs. Lead-Adapter). Schlag der Steward deine Empfehlung kurz vor und warte auf Bestätigung. Danach:
 
 ```
 cd multi-agent-lab

@@ -7,14 +7,14 @@
 
 | Check | Ergebnis |
 |---|---|
-| `VAULT_PATH` in `folio/.env` | `/Users/afschinmirhamed/Projects/life` (war `/Users/Shared/folio-demo`) |
+| `VAULT_PATH` in `folio/.env` | `~/Projects/life` (war `/Users/Shared/folio-demo`) |
 | Hermes-Patches applied | `hermes-vault-jail-ebene2.patch` + `hermes-folio-toolset.patch` — beide reverse-check grün |
 | Gateway | `127.0.0.1:8642` — health ok |
 | Vault-scoped conversation | `folio-vault-20c775948a3c` (SHA256 von LIFE-Vault-Pfad) |
 | Alte `folio-vault-chat`-Pointer | **nicht** in `~/.hermes/response_store.db` |
 | `vault_root` in Folio-Hermes-Client | `client.ts` sendet `getVaultPath()` pro Request |
 
-**Manuell durch Afschin (einmalig):**
+**Manuell durch der Steward (einmalig):**
 - Browser localStorage `folio-chat` leeren (nicht vault-scoped)
 - Im Folio-Chat „Neuer Chat" → `/api/hermes/reset` (frischer Thread)
 - Live-Jail-Test im Chat: `read_file` auf Pfad ausserhalb Vault → denied; kein Terminal-Tool
@@ -61,5 +61,5 @@ Recherchefragen (FsE, G-Bewilligung, BAföG, Versorgung Freiburg, BVG, Kündigun
 - [x] Folio lädt LIFE-Vault (`/api/vault` → `current_chapter: 1`)
 - [x] 8 neue Objectives im Parser
 - [x] Job-Digest geschrieben
-- [ ] Afschin: Browser localStorage + Live-Jail-Chat-Test
-- [ ] Afschin: Folio Dashboard öffnen → Kapitel 01 → obj-01-08..10 sichtbar
+- [ ] der Steward: Browser localStorage + Live-Jail-Chat-Test
+- [ ] der Steward: Folio Dashboard öffnen → Kapitel 01 → obj-01-08..10 sichtbar

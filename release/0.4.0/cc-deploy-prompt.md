@@ -47,7 +47,7 @@ Tag `v0.4.0` auf diesen Commit. **Nicht pushen.**
 ## Schritt 4 — vorlegen und anhalten
 
 `git log --oneline` und `git status` je Repo, dazu die Tag-Liste von multi-agent.
-**Der Push ist Afschins Hand, in beiden Repos.**
+**Der Push ist des Stewards Hand, in beiden Repos.**
 
 ## Schritt 5 — nach dem Push: Inbox-Transfer
 
@@ -75,5 +75,5 @@ cp nc-familien-zuordnung-0-4-0-2026-08-02.md \
 
 ## Verbote
 
-Kein Push ohne Afschins Wort. Kein folio-Tag. Keine Screenshot-Commits ohne PII-Sichtung. Keine
+Kein Push ohne des Stewards Wort. Kein folio-Tag. Keine Screenshot-Commits ohne PII-Sichtung. Keine
 Änderung an `aion-lumen.com` oder `carta`. Kein Wildcard-`cp` in den Inbox.

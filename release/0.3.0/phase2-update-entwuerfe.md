@@ -47,7 +47,7 @@ Begründung: Council-Trennung + Eval-Infrastruktur sind Feature-Umfang (Vault-Sc
 
 - Injektor ist gebaut + getestet (Slim-Verify). Cowork zeigt `--file` künftig auf `carta/src/lib/data/cv.json` und `aion-lumen.com/multi-agent/index.html`.
 - **In 0.3.0 NICHT ausführen:** `results-2026-07-09.json` = 1 Modell (Slim-Verify), beweist nur Mechanik. Außenflächen tragen bereits belastbare 93 %/14 (Lauf #1). **Keine Außenzahl-Änderung.**
-- Sobald Afschins 3-Modell-Lauf eine neue `results-<date>.json` liefert: `npx tsx evals/triage/inject-eval-numbers.ts --file <site-datei> --write` → dann als eigener Mini-Nachzug oder Teil des nächsten Laufs.
+- Sobald des Stewards 3-Modell-Lauf eine neue `results-<date>.json` liefert: `npx tsx evals/triage/inject-eval-numbers.ts --file <site-datei> --write` → dann als eigener Mini-Nachzug oder Teil des nächsten Laufs.
 
 ## 2.5 Screenshots (Belege 08b) — ALLE vor G1 auf private Labels prüfen
 
@@ -57,7 +57,7 @@ Kandidaten für 0.3.0 (belegen die 08b-Änderungen sichtbar):
 3. **Detail-Pillen nur `immo`** — belegt Aufgabe 4. **Neu** (oder aus vorhandenem Detail-Panel).
 4. **„→ Übernommen" gated** (Council nicht registriert → 409) — optional, betrieblich.
 
-**Aufnahme-Weg:** an Kimi/Afschin auslagern (Lehre aus Portfolio-Set), mit spezifischer Anweisung. **PII-Gegenprüfung durch cowork bleibt Pflicht** — jeder neue Shot vor G1 auf reale Konten/Mails/Adressen prüfen, nicht nur den bekannten.
+**Aufnahme-Weg:** an Kimi/der Steward auslagern (Lehre aus Portfolio-Set), mit spezifischer Anweisung. **PII-Gegenprüfung durch cowork bleibt Pflicht** — jeder neue Shot vor G1 auf reale Konten/Mails/Adressen prüfen, nicht nur den bekannten.
 
 ## Zusammenfassung offener Punkte für G1
 

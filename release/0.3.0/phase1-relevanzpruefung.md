@@ -47,7 +47,7 @@ multi-agent: `make eval-full` (40-Mail-E2E, `evals/full/`), Golden Labels `demo_
 
 - Öffentlich gezeigte Zahl = **Triage-Accuracy (14 Fixtures)**. Die 40-Mail-E2E-Zahl (`eval-full`) ist **interne Betriebskennzahl**, NICHT die Website-Zahl. Bedeutung nicht unbemerkt wechseln.
 - `results-2026-07-09.json` enthält aktuell nur **1 Modell** (`qwen3-30b-a3b-thinking-2507`, acc 0.9286) = CCs **Slim-Verify**, beweist nur die Mechanik.
-- Der belastbare **3-Modell-Voll-Lauf steht aus** (Afschin fährt ihn thermisch). **Bis dahin keine vorläufige Zahl auf die Außenfläche.**
+- Der belastbare **3-Modell-Voll-Lauf steht aus** (der Steward fährt ihn thermisch). **Bis dahin keine vorläufige Zahl auf die Außenfläche.**
 - Praktisch: Außenflächen zeigen bereits 93 %/14 (Lauf #1). → In 0.3.0 **keine Außenzahl-Änderung**; Injektor bleibt bereit, wird erst mit dem 3-Modell-Ergebnis scharf.
 
 ## Bewusst NICHT Teil dieses Laufs (nicht einsammeln → 08c)
@@ -58,7 +58,7 @@ multi-agent: `make eval-full` (40-Mail-E2E, `evals/full/`), Golden Labels `demo_
 
 Diese sind im 08b-Field-Note inventarisiert; kein Scope-Zuwachs während des Laufs.
 
-## Prozess-Tiefe (Entscheid Afschin)
+## Prozess-Tiefe (Entscheid der Steward)
 
 **Volle Runde inkl. Kimi-Gesamtreview** — bewusst gewählt als Test der Selbstverbesserung: Prüfen, ob wiederkehrende Befunde aus Lauf #1 / der Sites-Gesamtreview inzwischen behoben sind oder erneut gemeldet werden.
 

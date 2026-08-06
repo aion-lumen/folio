@@ -22,7 +22,7 @@ Begründung: additive Features (neuer Typ `lead`, Trust-Policy, Heute-Hub-Karte)
 
 ## 2.3 Zahlen-Kaskade (Außenflächen) — PLATZHALTER, wartet auf 3-Modell-Voll-Eval
 
-**Belastbare Fixture-Zahl steht fest: 14** (siehe `fixture-klaerung.md`). Die **Accuracy/Score** kommt aus Afschins lokaler 3-Modell-Voll-Eval. Bis dahin bleiben die Außenflächen auf dem alten Stand — **nichts live ändern**.
+**Belastbare Fixture-Zahl steht fest: 14** (siehe `fixture-klaerung.md`). Die **Accuracy/Score** kommt aus des Stewards lokaler 3-Modell-Voll-Eval. Bis dahin bleiben die Außenflächen auf dem alten Stand — **nichts live ändern**.
 
 Platzhalter-Konvention: `{{EVAL_ACCURACY}}` (z.B. „88 %"), `{{EVAL_SCORE}}` (z.B. „0.87"), Fixtures fix = **14**, false auto-commits = **0** (unverändert, Trust-Gate).
 
@@ -59,6 +59,6 @@ carta CV-PDF mit Datumsstempel neu erzeugen — **erst nachdem** die Zahl gesetz
 ## Zusammenfassung offener Punkte für G1
 
 1. package.json + pyproject.toml auf 0.2.0, CHANGELOG-Überschrift datieren (kann sofort).
-2. Zahlen-Kaskade A/B/C — Platzhalter gesetzt, wartet auf Afschins Eval-Zahl.
+2. Zahlen-Kaskade A/B/C — Platzhalter gesetzt, wartet auf des Stewards Eval-Zahl.
 3. Screenshot-10 PII-Befund („mirhamed"-Label) — an Kimi/G1.
 4. CV-PDF neu — nach Zahl.

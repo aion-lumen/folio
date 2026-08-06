@@ -23,7 +23,7 @@ grep -rnE "\{\{EVAL_|v1-strict|92 ?%" ../aion-lumen.com/multi-agent/index.html .
 ```
 Muss leer sein. Zusätzlich sichtprüfen: beide Sätze DE+EN tragen „93 %" + „14 Fixtures" + „0 Fehlalarme/null false auto-commits", kein Varianten-Label.
 
-## Aufgabe 3 — Deploy (Afschins Knopfdruck, Live-Site-Push)
+## Aufgabe 3 — Deploy (des Stewards Knopfdruck, Live-Site-Push)
 - `carta` → mirhamed.ch pushen; CV-PDF nur regenerieren, falls die PDF-Pipeline die Zahl trägt (aktuell nicht — separater Zyklus, siehe direktive-carta-cv-pdf-pipeline). Sonst nur Web-Karte.
 - `aion-lumen.com` → aion-lumen.ch pushen.
 - **Live-Check ausgeloggt:** aion-lumen.ch/multi-agent Beleg 07 + mirhamed.ch CV-Karte zeigen „93 % / 14 Fixtures / 0 Fehlalarme", kein `v1-strict`. Cowork kann den Live-Check per Browser übernehmen.

@@ -34,7 +34,7 @@
 2. **Versions-Nachzug** (W1): README + aion-lumen.ch/folio v0.1.0 → aktuell — nach deiner Entscheidung.
 3. **v1/v1-strict** (W2): mit 3-Modell-Lauf klären.
 4. README-Absätze Council + Demo-IMAP (Export A).
-5. Screenshots 08b — Aufnahme via ChatGPT/Afschin, **PII-Gegenprüfung cowork vor G1**.
+5. Screenshots 08b — Aufnahme via ChatGPT/der Steward, **PII-Gegenprüfung cowork vor G1**.
 
 ## Offene Entscheidungen für dich (G1)
 1. **Freigabe** der Empfehlung?

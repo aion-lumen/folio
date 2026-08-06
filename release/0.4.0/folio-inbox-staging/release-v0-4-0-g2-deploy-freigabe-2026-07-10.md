@@ -11,7 +11,7 @@ tags: [release, v0.4.0, deploy, gate-g2]
 
 # Gesamtrelease v0.4.0 (Leuchtfeuer) freigeben & pushen
 
-**Gate:** G2 (Go 2026-07-10) · **Deploy macht Afschin/CC** (Knopfdruck), Cowork deployt nicht.
+**Gate:** G2 (Go 2026-07-10) · **Deploy macht der Steward/CC** (Knopfdruck), Cowork deployt nicht.
 
 ## Schrittfolge (jeder Schritt einzeln bestätigen)
 1. folio: package.json 0.4.0, CHANGELOG [0.4.0], README-Absatz; privacy-drafts.md Quell-Fix; feat/leuchtfeuer → main; Tag v0.4.0; push
@@ -27,6 +27,6 @@ tags: [release, v0.4.0, deploy, gate-g2]
 - 4 Sites: Datenschutz konsistent mit Server-Log-Reichweitenmessung
 - Markenversprechen 0-externe-Calls wörtlich wahr (kein Client-Tracking)
 
-## NICHT Teil des folio-Push (Afschins separate Ops-Schritte)
+## NICHT Teil des folio-Push (des Stewards separate Ops-Schritte)
 - VPS-Apply (Caddy-Logging, Collectors, Cron), Mac-launchd-Pull
 - metrics-Fluss-Design (SSH-Pull vs Endpoint) — beim aion-lumen-Architekten

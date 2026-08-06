@@ -335,7 +335,7 @@ Bestätigen?
 
 | Eckdatum | Wert |
 |---|---|
-| Spec-ZIP empfangen | 2026-06-07, `/Users/afschinmirhamed/Projects/Pipeline redisign.zip` |
+| Spec-ZIP empfangen | 2026-06-07, `~/Projects/Pipeline redisign.zip` |
 | ZIP-Inhalt | 15 Files, 768 KB, `design_handoff_pipeline_fluss/` |
 | Existing `worker_runs`-Schema | unverändert seit folio-init.ts ursprünglich, 13 Spalten |
 | Existing `hauskauf_workflow`-Schema | refactored 2026-06-05 (commit `7b0182a`), append-only |

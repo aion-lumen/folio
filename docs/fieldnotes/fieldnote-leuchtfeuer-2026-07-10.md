@@ -22,7 +22,7 @@ Two separate traps:
   following the instruction into a leak.
 
 ## 3. The credentials boundary is a hard line the engineer does not cross
-CC creates no tokens and places none. The PAT was created by Afschin, stored in his password manager,
+CC creates no tokens and places none. The PAT was created by der Steward, stored in his password manager,
 and placed on the VPS by his hand; the code references only the env-var **names**
 (`LEUCHTFEUER_GH_PAT_AION`, `LEUCHTFEUER_GH_PAT_NOBLECAUSE`). Placement guidance mattered too:
 `install -m 600 /dev/null` + paste in an editor — never `echo "TOKEN=…" >>`, which leaks into shell
@@ -36,5 +36,5 @@ is a clean "Noch keine Metriken". Build the empty/stale path first — it is the
 
 ## Boundary respected
 CC has no VPS access (the SSH host alias is a placeholder) — so everything VPS-side is delivered as
-**artifacts** (collectors, Caddy snippet, cron, launchd plist, README) for Afschin to apply, not applied
+**artifacts** (collectors, Caddy snippet, cron, launchd plist, README) for der Steward to apply, not applied
 by CC. The folio card is the only part that lands through code review + the release pilot.

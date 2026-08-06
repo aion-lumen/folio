@@ -1,7 +1,7 @@
 # Release 0.4.0 — Phase 2, Update-Entwürfe
 
 **Von:** Leitstand (Release-Pilot, Lauf #4) · **Datum:** 2026-08-02
-**Prozess-Tiefe:** enger Check (Afschin bestätigt) · **Zahlen-Regel:** greift nicht, Triage unberührt
+**Prozess-Tiefe:** enger Check (der Steward bestätigt) · **Zahlen-Regel:** greift nicht, Triage unberührt
 **Gliederung:** A geht an die aion-lumen-Session, B an die Karriere-Session, C an CC.
 
 ---

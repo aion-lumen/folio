@@ -29,7 +29,7 @@ Zutreffende Zeilen (mehrere gleichzeitig):
 ## Betroffene Flächen (Ergebnis)
 
 1. **folio-Repo** — README + CHANGELOG bereits im Branch enthalten; Version `0.1.0 → 0.2.0` (semver **minor**: additive Features, kein Breaking Change). `package.json` version anheben (offen, im Branch noch `0.1.0`).
-2. **multi-agent-Repo** — PILOT.md aktualisiert (im Branch); Version `0.1.0 → 0.2.0` (minor). Merge-Split-Frage (95e9064 vs. 3d01231) → G2-Checkpoint mit Afschin.
+2. **multi-agent-Repo** — PILOT.md aktualisiert (im Branch); Version `0.1.0 → 0.2.0` (minor). Merge-Split-Frage (95e9064 vs. 3d01231) → G2-Checkpoint mit der Steward.
 3. **FOLIO-IMPORT.md / Spec** — additiv erweitert (im Branch). Mirror aion-lumen.ch/folio/import-spec.md zieht per Deploy.
 4. **eval:triage** — Voll-Eval über 3 Modelle ausstehend (Phase 2). Aktuelle schlanke Zahl 86 % / 0.857 ist Einzelmodell (qwen3-30b-a3b-thinking-2507).
 5. **carta (mirhamed.ch) CV-Karte DE+EN** — trägt aktuell **„92 % Accuracy über 12 Fixtures"** (`carta/src/lib/data/cv.json` Z. 235/236). Muss auf neuen Stand — **erst nach Voll-Eval**.
@@ -43,5 +43,5 @@ Zutreffende Zeilen (mehrere gleichzeitig):
 ## Offene Entscheidungen (an G1/G2 delegiert)
 
 1. Per-Repo Merge/Push-Go für beide Branches nach main (G2).
-2. `95e9064`-Split in multi-agent (Kategorie-System vs. Lead-Commit zusammen/getrennt) — Merge-Checkpoint mit Afschin (G2).
+2. `95e9064`-Split in multi-agent (Kategorie-System vs. Lead-Commit zusammen/getrennt) — Merge-Checkpoint mit der Steward (G2).
 3. carta/aion-lumen eval-Zahl-Nachzug — abhängig von Voll-Eval-Ergebnis.

@@ -1,19 +1,19 @@
-# CC-Prompt — Leuchtfeuer VPS-Ops (mit sudo, Afschin überwacht)
+# CC-Prompt — Leuchtfeuer VPS-Ops (mit sudo, der Steward überwacht)
 
-Du bist per SSH auf dem VPS `185.143.100.222` (Admin/sudo). Richte die Leuchtfeuer-Server-Seite ein: Caddy-Access-Logging mit IP-Anonymisierung, die Collectors, den Cron, und einen minimalen Read-only-User für den späteren Mac-Pull. **Afschin überwacht jeden Schritt.**
+Du bist per SSH auf dem VPS `185.143.100.222` (Admin/sudo). Richte die Leuchtfeuer-Server-Seite ein: Caddy-Access-Logging mit IP-Anonymisierung, die Collectors, den Cron, und einen minimalen Read-only-User für den späteren Mac-Pull. **der Steward überwacht jeden Schritt.**
 
 ## Eiserne Regeln
-- **Keine Credentials anlegen.** Das Token-Env (`/etc/leuchtfeuer/env`, `LEUCHTFEUER_GH_PAT_*`) ist Afschins Hand — nur VERIFIZIEREN, dass es existiert, nie neu erstellen/anzeigen.
+- **Keine Credentials anlegen.** Das Token-Env (`/etc/leuchtfeuer/env`, `LEUCHTFEUER_GH_PAT_*`) ist des Stewards Hand — nur VERIFIZIEREN, dass es existiert, nie neu erstellen/anzeigen.
 - **Jeden riskanten Schritt absichern:** Caddyfile VOR Änderung sichern, `caddy validate` VOR reload, nach reload alle 4 Sites auf HTTP 200 prüfen.
 - **Die IP-Maskierung ist die Kern-Zusage** — sie muss an einer echten Log-Zeile NACHGEWIESEN werden (letztes Oktett `.0`), bevor der Schritt als fertig gilt.
-- Nach jedem Block: kurz Ergebnis melden, auf Afschins „weiter" warten.
+- Nach jedem Block: kurz Ergebnis melden, auf des Stewards „weiter" warten.
 
 ## Schritt 0 — Ops-Dateien auf den VPS bringen (falls noch nicht da)
-Die Collector-Dateien liegen im folio-Repo auf Afschins Mac unter `ops/leuchtfeuer/`. Prüfe zuerst, ob sie schon auf dem VPS sind (die frühere Reorg-Session hat evtl. schon etwas abgelegt):
+Die Collector-Dateien liegen im folio-Repo auf des Stewards Mac unter `ops/leuchtfeuer/`. Prüfe zuerst, ob sie schon auf dem VPS sind (die frühere Reorg-Session hat evtl. schon etwas abgelegt):
 ```
 ls -la /opt/leuchtfeuer/ 2>/dev/null; ls -la /etc/leuchtfeuer/ 2>/dev/null
 ```
-Falls die `collect_*.py` / `run-collectors.sh` fehlen → **Afschin überträgt sie** (von seinem Mac, ein Befehl):
+Falls die `collect_*.py` / `run-collectors.sh` fehlen → **der Steward überträgt sie** (von seinem Mac, ein Befehl):
 ```
 scp -i ~/.ssh/aion_vps_key ~/Projects/folio/ops/leuchtfeuer/{collect_caddy.py,collect_github.py,run-collectors.sh,cron.d-leuchtfeuer,caddy-logging.snippet.caddy} ubuntu@185.143.100.222:/tmp/leuchtfeuer/
 ```
@@ -60,10 +60,10 @@ sudo mkdir -p /var/lib/leuchtfeuer/metrics
 
 ## Schritt 3 — Token-Env NUR verifizieren (nicht anlegen)
 ```
-sudo test -r /etc/leuchtfeuer/env && echo "env vorhanden" || echo "FEHLT — Afschin legt es an (PAT), nicht CC"
+sudo test -r /etc/leuchtfeuer/env && echo "env vorhanden" || echo "FEHLT — der Steward legt es an (PAT), nicht CC"
 sudo stat -c '%U:%G %a' /etc/leuchtfeuer/env   # soll root:root 600
 ```
-Falls es fehlt: **Afschin** legt `/etc/leuchtfeuer/env` mit `LEUCHTFEUER_GH_PAT_AION=…` + `LEUCHTFEUER_GH_PAT_NOBLECAUSE=…` an (chmod 600). Du referenzierst nur den Namen.
+Falls es fehlt: **der Steward** legt `/etc/leuchtfeuer/env` mit `LEUCHTFEUER_GH_PAT_AION=…` + `LEUCHTFEUER_GH_PAT_NOBLECAUSE=…` an (chmod 600). Du referenzierst nur den Namen.
 
 ## Schritt 4 — Smoke-Run (erster Aggregat, ohne aufs Cron zu warten)
 ```
@@ -96,7 +96,7 @@ sudo chgrp -R leuchtfeuer-pull /var/lib/leuchtfeuer/metrics
 sudo chmod -R g+rX,o-rwx /var/lib/leuchtfeuer/metrics
 sudo chmod o-rwx /var/lib/leuchtfeuer
 
-# 3. .ssh vorbereiten (Key trägt Afschin ein):
+# 3. .ssh vorbereiten (Key trägt der Steward ein):
 sudo -u leuchtfeuer-pull mkdir -p /var/lib/leuchtfeuer-pull/.ssh
 sudo -u leuchtfeuer-pull chmod 700 /var/lib/leuchtfeuer-pull/.ssh
 
@@ -105,7 +105,7 @@ which rrsync || ls /usr/bin/rrsync /usr/share/doc/rsync/scripts/rrsync* 2>/dev/n
 # falls nur unter docs: sudo cp <pfad>/rrsync /usr/local/bin/ && sudo chmod +x /usr/local/bin/rrsync
 ```
 
-**SSH-Key-Autorisierung = Afschins Hand.** Afschin trägt den **Public-Key** des Mac-Pull-Schlüssels in `/var/lib/leuchtfeuer-pull/.ssh/authorized_keys` ein, mit forced command davor (read-only, ein Pfad, kein Shell/Forwarding):
+**SSH-Key-Autorisierung = des Stewards Hand.** der Steward trägt den **Public-Key** des Mac-Pull-Schlüssels in `/var/lib/leuchtfeuer-pull/.ssh/authorized_keys` ein, mit forced command davor (read-only, ein Pfad, kein Shell/Forwarding):
 ```
 command="rrsync -ro /var/lib/leuchtfeuer/metrics",restrict ssh-ed25519 AAAA…<mac-pull-pubkey>
 ```
@@ -113,8 +113,8 @@ Dann: `sudo chown leuchtfeuer-pull:leuchtfeuer-pull /var/lib/leuchtfeuer-pull/.s
 
 > `restrict` sperrt Port-/X11-/Agent-Forwarding + PTY; `command=` erlaubt ausschließlich den read-only-rrsync auf genau diesen Pfad. Trotz `/bin/bash` bekommt der Key nie eine Shell.
 
-## Danach (Afschins Mac, nicht diese SSH-Session)
+## Danach (des Stewards Mac, nicht diese SSH-Session)
 `com.folio.leuchtfeuer-pull.plist`: `METRICS_HOST` = `leuchtfeuer-pull@185.143.100.222`, Pfad `/var/lib/leuchtfeuer/metrics/`, `__HOME__` ersetzen → `launchctl load`. Erster Pull füllt `~/.folio/metrics/` → Karte leuchtet.
 
-## Abschluss-Meldung an Afschin/Cowork
+## Abschluss-Meldung an der Steward/Cowork
 Pro Schritt: erledigt/Abweichung. Besonders: (1) Caddy validate „valid" + 4 Sites 200, (2) **IP nachweislich maskiert** (Beispielzeile), (3) Smoke-Run erzeugte Dateien, (4) Read-User angelegt (oder an infra-reorg verwiesen). Kein `vite dev --host`, keine Credentials angelegt.

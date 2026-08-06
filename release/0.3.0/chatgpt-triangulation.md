@@ -12,7 +12,7 @@
 | **W1** README + aion-lumen.ch/folio zeigen „v0.1.0 public preview", während Repos auf 0.2.0 getaggt sind | **ECHT.** `folio/README.md:23` „Status: v0.1.0 public preview"; `aion-lumen.com/folio/index.html` Z.681/697/865/938 mehrfach „v0.1.0 / Public preview". Repos sind v0.2.0. Außenflächen hinken 2 Releases hinterher. | **Wichtig** — echter Konsistenzfehler |
 | **W2** Site sagt „v1-strict", results-Datei sagt `variant: "v1"` | **ECHT.** `results-2026-07-09.json` → `variant: "v1"` (nicht v1-strict). `manifest.yaml` kennt beide (`v1`, `v1-strict`). Öffentlicher Claim nennt andere Variante als der Beleg. | **Wichtig** — Claim ↔ Beleg-Diskrepanz |
 | **W3/Statushinweis** Release 0.3.0 noch nicht geschnürt | **Korrekt als Statushinweis gekennzeichnet** (nicht als Fehler) — genau wie in der Direktive angewiesen. Reihenfolge-Artefakt (G2-Schritt). | kein Befund |
-| **Kür** mirhamed.ch Footer-Link Impressum im Textauszug nicht sichtbar; Direktaufruf blockiert | Afschin hat mirhamed.ch/impressum **live als sauber bestätigt**. Footer-Link existiert im Repo (`Footer.svelte`). ChatGPT leitete korrekt KEIN Fehlen ab. | kein Befund (Footer ggf. im Web-Tool-Textauszug nicht erfasst) |
+| **Kür** mirhamed.ch Footer-Link Impressum im Textauszug nicht sichtbar; Direktaufruf blockiert | der Steward hat mirhamed.ch/impressum **live als sauber bestätigt**. Footer-Link existiert im Repo (`Footer.svelte`). ChatGPT leitete korrekt KEIN Fehlen ab. | kein Befund (Footer ggf. im Web-Tool-Textauszug nicht erfasst) |
 | **Kür** Spec-Mirror `.md` nicht ladbar (400) | „konnte nicht prüfen" — korrekt. Repo-Spec v1 frozen bestätigt. | kein Befund |
 
 ## Bestätigungen (ChatGPT, ohne Befund) — decken sich mit eigener Prüfung

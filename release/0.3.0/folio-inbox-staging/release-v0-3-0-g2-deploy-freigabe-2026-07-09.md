@@ -11,7 +11,7 @@ tags: [release, v0.3.0, deploy, gate-g2]
 
 # Gesamtrelease v0.3.0 freigeben & pushen
 
-**Gate:** G2 (Go 2026-07-09) · **Deploy macht Afschin** (Knopfdruck), Cowork deployt nicht.
+**Gate:** G2 (Go 2026-07-09) · **Deploy macht der Steward** (Knopfdruck), Cowork deployt nicht.
 **Besonderheit:** 08b ist bereits auf main → KEIN Merge. Release = Version-Bump + CHANGELOG + Tag + Push + Außenflächen-Nachzug.
 
 ## Schrittfolge (jeder Schritt einzeln bestätigen)

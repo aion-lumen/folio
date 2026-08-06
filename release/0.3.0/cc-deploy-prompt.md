@@ -36,7 +36,7 @@ git push origin main --tags
 CI-Health-Check abwarten.
 
 ## Schritt 3 — aion-lumen.ch Versions-Nachzug (Außenfläche)
-Repo `aion-lumen/aion-lumen.com`, `main`. In `folio/index.html` stehen **6 Fundstellen** „v0.1.0" bzw. „Public preview" (Zeilen ~681, 682, 697, 711, 865, 938) — auf aktuellen Stand ziehen (v0.3.0; „Public preview" nur ändern, falls gewünscht — mit Afschin kurz abstimmen, ob Reifegrad-Label bleibt).
+Repo `aion-lumen/aion-lumen.com`, `main`. In `folio/index.html` stehen **6 Fundstellen** „v0.1.0" bzw. „Public preview" (Zeilen ~681, 682, 697, 711, 865, 938) — auf aktuellen Stand ziehen (v0.3.0; „Public preview" nur ändern, falls gewünscht — mit der Steward kurz abstimmen, ob Reifegrad-Label bleibt).
 ```
 cd aion-lumen.com
 # folio/index.html: v0.1.0 -> v0.3.0 (6 Stellen)
