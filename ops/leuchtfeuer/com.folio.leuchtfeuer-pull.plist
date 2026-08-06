@@ -9,8 +9,9 @@
        is restricted to read-only rsync of exactly that dir; the client therefore addresses the
        RESTRICTED ROOT as `:/` (NOT the absolute path — rrsync interprets the client path relative
        to its locked dir).
-    1. Replace __VPS_HOST__ (e.g. 185.143.100.222) and __HOME__ (your home dir; launchd does not
-       expand ~). The key is a dedicated Mac pull key (~/.ssh/leuchtfeuer_pull).
+    1. Replace __VPS_HOST__ (e.g. 185.143.100.222), __HOME__ (your home dir; launchd does not
+       expand ~), and __RSYNC__ (`command -v rsync`; rsync 3.x is required for the VPS rrsync
+       wrapper). The key is a dedicated Mac pull key (~/.ssh/leuchtfeuer_pull).
     2. mkdir -p ~/.folio/cache && cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/
     3. launchctl load ~/Library/LaunchAgents/com.folio.leuchtfeuer-pull.plist
        (RunAtLoad triggers an immediate pull; check ~/.folio/cache/leuchtfeuer-pull.log)
@@ -24,11 +25,11 @@
 	<string>com.folio.leuchtfeuer-pull</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/usr/bin/rsync</string>
+		<string>__RSYNC__</string>
 		<string>-az</string>
 		<string>-e</string>
 		<!-- dedicated read-only pull key; IdentitiesOnly avoids offering other keys -->
-		<string>ssh -i __HOME__/.ssh/leuchtfeuer_pull -o IdentitiesOnly=yes</string>
+		<string>ssh -i __HOME__/.ssh/leuchtfeuer_pull -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15</string>
 		<!-- rrsync forced command locks the root → address it as ":/", not the absolute path -->
 		<string>leuchtfeuer-pull@__VPS_HOST__:/</string>
 		<string>__HOME__/.folio/metrics/</string>

@@ -185,6 +185,25 @@ export async function runInboxTriage(
 	};
 }
 
+/** Build a one-document scan for request-scoped triage without accepting arbitrary paths. */
+export function selectInboxItemForTriage(
+	scan: InboxScanResult,
+	filename: string
+): InboxScanResult | null {
+	const item = scan.items.find((candidate) => candidate.filename === filename);
+	if (!item || item.status !== 'valid') return null;
+
+	return {
+		...scan,
+		pending: 1,
+		valid: 1,
+		invalid: 0,
+		duplicate: 0,
+		items: [item],
+		byType: item.type ? { [item.type]: 1 } : {}
+	};
+}
+
 /** Attach cached assessments only (no LLM calls). */
 export async function attachCachedAssessments(
 	scan: InboxScanResult,
@@ -200,5 +219,16 @@ export async function attachCachedAssessments(
 		const cached = await getCachedAssessment(item.filename, hashContent(raw));
 		items.push({ ...item, triage: cached ?? undefined });
 	}
-	return { ...scan, items };
+	return {
+		...scan,
+		items,
+		triage: {
+			auto_committed: items.filter((item) => item.triage?.auto_committed).length,
+			awaiting_review: items.filter(
+				(item) =>
+					item.status === 'valid' &&
+					(!item.triage || item.triage.verdict === 'unclear' || item.triage.verdict === 'task')
+			).length
+		}
+	};
 }

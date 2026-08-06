@@ -62,10 +62,12 @@ Prereq: the VPS read-only pull user `leuchtfeuer-pull` exists with an authorized
 rrsync the client addresses the **restricted root as `:/`**, not the absolute path.
 1. Dedicated pull key: `ssh-keygen -t ed25519 -f ~/.ssh/leuchtfeuer_pull -N ""`. Add its **public** key
    (with the forced command above) to `/var/lib/leuchtfeuer-pull/.ssh/authorized_keys` on the VPS.
-2. In `com.folio.leuchtfeuer-pull.plist` replace `__VPS_HOST__` and `__HOME__`. Then:
+2. In `com.folio.leuchtfeuer-pull.plist` replace `__VPS_HOST__`, `__HOME__`, and `__RSYNC__`
+   (`command -v rsync`; use rsync 3.x — macOS `/usr/bin/rsync`/openrsync is incompatible with the
+   VPS `rrsync` wrapper). Then:
    `mkdir -p ~/.folio/cache && cp com.folio.leuchtfeuer-pull.plist ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.folio.leuchtfeuer-pull.plist`
 3. Verify the immediate pull: `cat ~/.folio/cache/leuchtfeuer-pull.log` (no errors), `ls -R ~/.folio/metrics/`.
-   Manual test form: `rsync -az -e "ssh -i ~/.ssh/leuchtfeuer_pull -o IdentitiesOnly=yes" leuchtfeuer-pull@<vps>:/ ~/.folio/metrics/`.
+   Manual test form: `rsync -az -e "ssh -i ~/.ssh/leuchtfeuer_pull -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=15" leuchtfeuer-pull@<vps>:/ ~/.folio/metrics/`.
 4. First pull populates `~/.folio/metrics/`; the Heute "Leuchtfeuer" card fills in. Until then it shows
    "Noch keine Metriken" (degradation, by design).
 

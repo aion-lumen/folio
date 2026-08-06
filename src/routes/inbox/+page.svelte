@@ -13,6 +13,7 @@
 	let error = $state<string | null>(null);
 	let preflight = $state<TriagePreflight>(data.triagePreflight);
 	let lastActivity = $state<RecentInboxActivity | null>(data.lastActivity);
+	let triageProgress = $state<{ done: number; total: number; current: string } | null>(null);
 
 	const validItems = $derived(data.scan.items.filter((i: InboxScanItem) => i.status === 'valid'));
 
@@ -76,42 +77,52 @@
 
 	async function runTriage() {
 		if (validItems.length === 0) return;
+		const queue = validItems.map((item: InboxScanItem) => ({
+			filename: item.filename,
+			label: item.title ?? item.filename
+		}));
+		let assessed = 0;
+		let autoCommitted = 0;
+		let awaitingReview = 0;
+		let skipped = 0;
 		triageBusy = true;
 		message = null;
 		error = null;
 		try {
-			const controller = new AbortController();
-			const timer = setTimeout(() => controller.abort(), 95_000);
-			const res = await fetch('/api/inbox/triage', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ autoCommit: true }),
-				signal: controller.signal
-			});
-			clearTimeout(timer);
-			const payload = await res.json();
-			if (payload.preflight) preflight = payload.preflight;
-			if (payload.lastActivity) lastActivity = payload.lastActivity;
-			if (!res.ok) {
-				throw new Error(payload?.error ?? payload?.preflight?.message ?? `HTTP ${res.status}`);
+			for (const [index, item] of queue.entries()) {
+				triageProgress = { done: index, total: queue.length, current: item.label };
+				const res = await fetch('/api/inbox/triage', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ autoCommit: true, filename: item.filename })
+				});
+				const payload = await res.json();
+				if (payload.preflight) preflight = payload.preflight;
+				if (payload.lastActivity) lastActivity = payload.lastActivity;
+				if (!res.ok) {
+					throw new Error(payload?.error ?? payload?.preflight?.message ?? `HTTP ${res.status}`);
+				}
+
+				const result = payload.result;
+				assessed += result.assessed ?? 0;
+				autoCommitted += result.auto_committed?.length ?? 0;
+				awaitingReview += result.awaiting_review?.length ?? 0;
+				skipped += result.skipped?.length ?? 0;
+				triageProgress = { done: index + 1, total: queue.length, current: item.label };
+				message = `Triage ${index + 1}/${queue.length}: ${autoCommitted} auto-angelegt, ${awaitingReview} Review`;
 			}
-			const r = payload.result;
-			const committed = r.auto_committed?.[0];
-			if (committed?.objective_id) {
-				message = `Objective ${committed.objective_id} in ${committed.message?.split(' in ')[1] ?? 'Kampagne'} angelegt.`;
-			} else {
-				message = `Triage: ${r.assessed} beurteilt, ${r.auto_committed?.length ?? 0} auto-angelegt, ${r.awaiting_review?.length ?? 0} Review`;
-			}
-			await invalidateAll();
-			lastActivity = payload.lastActivity ?? lastActivity;
+
+			message = `Triage abgeschlossen: ${assessed} beurteilt, ${autoCommitted} auto-angelegt, ${awaitingReview} Review${skipped > 0 ? `, ${skipped} übersprungen` : ''}`;
 		} catch (e) {
-			if (e instanceof DOMException && e.name === 'AbortError') {
-				error = 'Triage-Timeout (90s) — LM Studio antwortet nicht rechtzeitig';
-			} else {
-				error = e instanceof Error ? e.message : String(e);
-			}
+			const completed = triageProgress?.done ?? 0;
+			error = `Triage nach ${completed}/${queue.length} Dokumenten unterbrochen: ${e instanceof Error ? e.message : String(e)}`;
 		} finally {
-			triageBusy = false;
+			try {
+				await invalidateAll();
+			} finally {
+				triageProgress = null;
+				triageBusy = false;
+			}
 		}
 	}
 
@@ -144,6 +155,12 @@
 
 	{#if message}<p class="msg ok">{message}</p>{/if}
 	{#if error}<p class="msg err">{error}</p>{/if}
+	{#if triageProgress}
+		<div class="triage-progress" aria-live="polite">
+			<progress value={triageProgress.done} max={triageProgress.total}></progress>
+			<span>{triageProgress.done}/{triageProgress.total} · {triageProgress.current}</span>
+		</div>
+	{/if}
 
 	{#if lastActivity && data.scan.pending === 0}
 		<section class="last-activity">
@@ -162,7 +179,7 @@
 
 	<div class="actions">
 		<button class="triage" type="button" disabled={triageBusy || validItems.length === 0} onclick={runTriage}>
-			{triageBusy ? 'Triage läuft…' : 'LLM-Triage ausführen'}
+			{triageBusy && triageProgress ? `Triage ${triageProgress.done}/${triageProgress.total}…` : 'LLM-Triage ausführen'}
 		</button>
 		{#if validItems.length > 0}
 			<button class="commit" type="button" disabled={busy} onclick={commitAll}>
@@ -275,6 +292,11 @@
 		background: var(--color-foreground); color: var(--color-background);
 	}
 	.triage:disabled, .commit:disabled { opacity: 0.6; cursor: wait; }
+	.triage-progress {
+		display: grid; grid-template-columns: minmax(120px, 1fr) auto; align-items: center; gap: 10px;
+		margin: 0 0 16px; color: var(--color-muted-foreground); font-size: 12px;
+	}
+	.triage-progress progress { width: 100%; accent-color: hsl(210 60% 45%); }
 	.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
 	.item {
 		padding: 14px 16px; border: 1px solid var(--color-border);

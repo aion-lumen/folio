@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { runInboxTriage } from '$lib/server/agent/triage.js';
+import { runInboxTriage, selectInboxItemForTriage } from '$lib/server/agent/triage.js';
 import { checkTriagePreflight } from '$lib/server/agent/preflight.js';
 import { getRecentInboxActivity } from '$lib/server/agent/recent.js';
 import { resolveInboxDirs, scanInbox, scanInboxForDisplay } from '$lib/server/inbox/scanner.js';
@@ -9,6 +9,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const preflight = await checkTriagePreflight();
 	const body = (await request.json().catch(() => ({}))) as {
 		autoCommit?: boolean;
+		filename?: string;
 		model?: string;
 		promptVariant?: 'v1' | 'v1-strict';
 	};
@@ -27,7 +28,19 @@ export const POST: RequestHandler = async ({ request }) => {
 
 	const dirs = resolveInboxDirs();
 	const scan = await scanInbox(dirs);
-	const { scan: enriched, result } = await runInboxTriage(scan, dirs, {
+	const selectedScan = body.filename ? selectInboxItemForTriage(scan, body.filename) : scan;
+	if (!selectedScan) {
+		return json(
+			{
+				error: `Inbox-Datei nicht mehr zur Triage verfügbar: ${body.filename}`,
+				preflight,
+				scan: await scanInboxForDisplay()
+			},
+			{ status: 409 }
+		);
+	}
+
+	const { scan: enriched, result } = await runInboxTriage(selectedScan, dirs, {
 		autoCommit: body.autoCommit !== false,
 		model: body.model ?? preflight.resolved_model ?? undefined,
 		promptVariant: body.promptVariant

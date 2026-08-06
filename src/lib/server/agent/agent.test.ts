@@ -2,8 +2,13 @@ import { cp, mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { clearTriageCache } from './cache.js';
-import { assessDocument, runInboxTriage } from './triage.js';
+import { clearTriageCache, hashContent, setCachedAssessment } from './cache.js';
+import {
+	assessDocument,
+	attachCachedAssessments,
+	runInboxTriage,
+	selectInboxItemForTriage
+} from './triage.js';
 import { validateGuardrails } from './guardrails.js';
 import { _resetTrustedSourcesCache } from './trusted-sources.js';
 import { createObjective } from '../vault/writer.js';
@@ -226,7 +231,7 @@ ${body}`;
 	});
 
 	it('skips not-a-task without commit', async () => {
-		await writeInboxDoc('triage-note.md', '# Beobachtung\n\nNur Info.');
+		const raw = await writeInboxDoc('triage-note.md', '# Beobachtung\n\nNur Info.');
 
 		const scan = await scanInbox(dirs, ledgerPath);
 		const { result, scan: enriched } = await runInboxTriage(scan, dirs, {
@@ -237,6 +242,21 @@ ${body}`;
 		expect(result.auto_committed).toHaveLength(0);
 		expect(enriched.items[0].triage?.verdict).toBe('not-a-task');
 		expect(enriched.valid).toBe(1);
+
+		await setCachedAssessment('triage-note.md', hashContent(raw), enriched.items[0].triage!);
+		const displayScan = await attachCachedAssessments(await scanInbox(dirs, ledgerPath), dirs);
+		expect(displayScan.triage?.awaiting_review).toBe(0);
+	});
+
+	it('selects exactly one valid inbox item for request-scoped triage', async () => {
+		await writeInboxDoc('triage-first.md', '# Erstes Dokument');
+		await writeInboxDoc('triage-second.md', '# Zweites Dokument');
+		const scan = await scanInbox(dirs, ledgerPath);
+
+		const selected = selectInboxItemForTriage(scan, 'triage-second.md');
+		expect(selected?.items.map((item) => item.filename)).toEqual(['triage-second.md']);
+		expect(selected?.valid).toBe(1);
+		expect(selectInboxItemForTriage(scan, '../triage-second.md')).toBeNull();
 	});
 
 	it('assessDocument returns unclear when LLM unavailable', async () => {
