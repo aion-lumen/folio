@@ -35,7 +35,7 @@
 	{#if lf.sites.length === 0 && !lf.github}
 		<p class="empty">
 			Sobald der VPS-Collector Tages-Aggregate nach <code>~/.folio/metrics/</code> liefert, erscheinen
-				hier Seitenaufrufe, Tür-Verhältnis und Repo-Metriken.
+			hier Seitenaufrufe, Tür-Verhältnis und Repo-Metriken.
 		</p>
 	{:else}
 		<section class="sites">
