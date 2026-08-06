@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Council opt-in via `active-vault.json`, default off — P0.2-Entkopplung
 - ntfy self-hosted channel, folio-ops error trigger (`928d022`)
 - Leuchtfeuer pull plist corrected for rrsync forced command (`a94e861`) and made launchd-safe
-  with an explicit rsync-3 binary plus non-interactive SSH options
+  with an explicit rsync-3 binary plus non-interactive SSH options; the UI now labels the site
+  metric accurately as server page requests and discloses possible automated probe traffic
 - Import-Inbox triage now processes one document per request with visible progress, durable partial
   results, and correct cached Review counts; large batches no longer hit the browser-wide timeout
 - Wacht marker watcher: separate archive dir

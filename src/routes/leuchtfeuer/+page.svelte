@@ -23,7 +23,7 @@
 		</button>
 		<h1>Leuchtfeuer</h1>
 		<p class="sub">
-			Server-Log-Aggregate · kein Client-Tracking.
+			Server-Seitenaufrufe nach UA-Botfilter · automatisierte Scans können enthalten sein · kein Client-Tracking.
 			{#if lf.generatedFrom}
 				Stand: {lf.generatedFrom}{#if lf.stale} (letzter verfügbarer Stand){/if}
 			{:else}
@@ -35,7 +35,7 @@
 	{#if lf.sites.length === 0 && !lf.github}
 		<p class="empty">
 			Sobald der VPS-Collector Tages-Aggregate nach <code>~/.folio/metrics/</code> liefert, erscheinen
-			hier Besuche, Tür-Verhältnis und Repo-Metriken.
+				hier Seitenaufrufe, Tür-Verhältnis und Repo-Metriken.
 		</p>
 	{:else}
 		<section class="sites">
@@ -43,7 +43,7 @@
 				<article class="site">
 					<header class="site-head">
 						<h2>{s.site}</h2>
-						<span class="visits">{visitsTotal(s.visits)} Besuche · {s.dates.length} T</span>
+						<span class="visits">{visitsTotal(s.visits)} Aufrufe · {s.dates.length} T</span>
 					</header>
 					<p class="door">Tür — Story {s.door7.story} : System {s.door7.folio} (7 T)</p>
 					<div class="cols">

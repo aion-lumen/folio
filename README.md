@@ -33,7 +33,7 @@ Cloud AI forgets you at the end of every session. You start over. Every time. Fo
 
 ## Leuchtfeuer
 
-The Heute hub carries a **Leuchtfeuer** card: site & repo reach metrics derived from
+The Heute hub carries a **Leuchtfeuer** card: site page-request & repo reach metrics derived from
 **server logs only** — no client-side tracking, no cookies, no external analytics, so the
 sites' zero-external-calls promise stays literally true. IP addresses are anonymised at parse
 time and raw logs are dropped after 7 days. folio reads the aggregates read-only from

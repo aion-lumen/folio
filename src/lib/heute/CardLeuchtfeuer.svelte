@@ -53,7 +53,7 @@
 	{:else}
 		<div class="metrics">
 			<div class="metric">
-				<span class="m-label">Besuche · 7 T</span>
+				<span class="m-label">Server-Seitenaufrufe · 7 T</span>
 				<span class="m-value">{visits7Sum}</span>
 				<svg class="spark" viewBox="0 0 80 20" preserveAspectRatio="none" aria-hidden="true">
 					<polyline points={sparklinePoints(visits7, 80, 20, 2)} />
