@@ -80,6 +80,8 @@ Development status (unreleased): the minimal capability-broker slice now include
 manifest validation, deny-by-default registry, global/per-module kill switches, Council route and
 database guards, a path-free registry endpoint, and Leuchtfeuer as the second consumer. Full
 third-party package loading remains deliberately outside this foundation and is not implied by it.
+Sonar is the first non-mail consumer: its initial read/review surface keeps imported external notes
+immutable, records human decisions append-only, and has no external publishing capability.
 
 ## v0.5.0 — Redaction Gate, T2 first
 

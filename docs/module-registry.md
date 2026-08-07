@@ -29,7 +29,7 @@ FOLIO_MODULES_DISABLED=true npm run dev
 Individual modules can be stopped with a comma-separated list:
 
 ```sh
-FOLIO_DISABLED_MODULES=council,leuchtfeuer npm run dev
+FOLIO_DISABLED_MODULES=council,leuchtfeuer,sonar npm run dev
 ```
 
 Both switches are evaluated dynamically. Unknown module and capability names are
@@ -51,6 +51,14 @@ Leuchtfeuer is the second registry consumer. Its aggregate-only metrics reader
 resolves the filesystem store through the registry and degrades to empty/stale
 when its capability is stopped. This does not change the privacy boundary:
 Leuchtfeuer continues to use server-log aggregates and no client tracking.
+
+Sonar is the first non-mail reference module built on the boundary. It reads
+schema-guarded, external-derived notes from the active vault and renders their
+content as text, never as trusted HTML. Explicit human decisions are appended to
+a private `reviews.ndjson` audit ledger; the imported source notes remain
+unchanged. Demo runs keep that mutable ledger in demo-scoped Folio state rather
+than writing into the bundled fixture tree. No capability in this slice can
+publish, follow, like, or reply on an external service.
 
 ## Deliberate limits of the first gate
 
