@@ -21,6 +21,10 @@ AION_LUMEN_PATH=/path/to/multi-agent-lab    # optional, defaults to ~/Projects/a
 
 ## Demo path (no real data)
 
+For a fresh second Mac, use the assisted [second-device demo guide](second-device-demo.md). It
+provides a read-only preflight plus one setup/start command while keeping the two repositories and
+all generated demo state explicit.
+
 `bash scripts/demo-server.sh` on port 5174 against the isolated `*-demo.db` files:
 
 | File | Owned by | Content after `make demo` |

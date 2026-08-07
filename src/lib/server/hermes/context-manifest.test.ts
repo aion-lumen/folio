@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { parseHermesContextManifest, renderManifestText } from './context-manifest.js';
 
 function manifest(chapter = '_campaign/chapters/01-test.md'): string {
@@ -50,5 +52,18 @@ describe('hermes-context.yaml', () => {
 		expect(renderManifestText('Read {{vault_root}}/objectives', '/vault/')).toBe(
 			'Read /vault/objectives'
 		);
+	});
+
+	it('keeps the bundled demo manifest separate from private Hermes memory', () => {
+		const parsed = parseHermesContextManifest(
+			readFileSync(join(process.cwd(), 'templates/demo-vault/hermes-context.yaml'), 'utf-8')
+		);
+		expect(parsed.promptVersion).toBe('folio-hermes-demo-context-v1');
+		expect(parsed.sources.memory).toBe(false);
+		expect(parsed.vaultGuidance.chapterFiles).toEqual([
+			'_campaign/chapters/01-neustart.md',
+			'_campaign/chapters/02-integration.md',
+			'_campaign/chapters/03-etablierung.md'
+		]);
 	});
 });

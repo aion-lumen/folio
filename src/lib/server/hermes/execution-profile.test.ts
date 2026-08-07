@@ -4,6 +4,7 @@ import {
 	resolveExecutionProfileFromConfig,
 	type InstalledModel
 } from './execution-profile.js';
+import { parseModelRoutingManifest } from './model-routing.js';
 
 const installed: InstalledModel[] = [
 	{
@@ -18,6 +19,15 @@ const installed: InstalledModel[] = [
 
 describe('Hermes execution profile', () => {
 	it('resolves the exact local artifact without exposing config secrets', () => {
+		const routing = parseModelRoutingManifest(`
+schema_version: 1
+device_profile: test-device
+default_slot: heavy
+slots:
+  small: { hermes_profiles: [ollama], model_ids: [small-model], purpose: [routine] }
+  heavy: { hermes_profiles: [architect], model_ids: [qwen3.6-35b-a3b-ud-mlx], purpose: [reasoning] }
+policy: { max_loaded_models: 1, auto_switch: false }
+`);
 		const profile = resolveExecutionProfileFromConfig(
 			`model:
   default: qwen3.6-35b-a3b-ud-mlx
@@ -31,7 +41,9 @@ profiles:
   architect:
     model: qwen3.6-35b-a3b-ud-mlx
 `,
-			installed
+			installed,
+			undefined,
+			routing
 		);
 
 		expect(profile).toMatchObject({
@@ -46,7 +58,8 @@ profiles:
 				engine: 'mlx',
 				quantization: '4-bit'
 			},
-			verification: 'local-artifact'
+			verification: 'local-artifact',
+			routing: { deviceProfileId: 'test-device', slot: 'heavy' }
 		});
 		expect(JSON.stringify(profile)).not.toContain('top-secret');
 		expect(profile.fingerprint).toMatch(/^[a-f0-9]{16}$/);

@@ -37,7 +37,7 @@
 				{#if msg.role === 'assistant' && msg.executionProfile}
 					<div
 						class="px-1 text-[10px] text-muted-foreground"
-						title={`Profil ${msg.executionProfile.profileId} · ${msg.executionProfile.artifact?.id ?? 'Artefakt nicht lokal verifiziert'} · Fingerprint ${msg.executionProfile.fingerprint} · Prompt ${msg.executionProfile.promptVersion}@${msg.executionProfile.promptFingerprint} · Policy ${msg.executionProfile.policyVersion}`}
+						title={`Profil ${msg.executionProfile.profileId} · ${msg.executionProfile.artifact?.id ?? 'Artefakt nicht lokal verifiziert'} · Fingerprint ${msg.executionProfile.fingerprint} · Prompt ${msg.executionProfile.promptVersion}@${msg.executionProfile.promptFingerprint} · Policy ${msg.executionProfile.policyVersion}${msg.executionProfile.routing ? ` · Gerät ${msg.executionProfile.routing.deviceProfileId}/${msg.executionProfile.routing.slot}` : ''}`}
 					>
 						{executionProfileLabel(msg.executionProfile)}
 					</div>

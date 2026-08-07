@@ -3,7 +3,13 @@ import { homedir } from 'os';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
 import Database from 'better-sqlite3';
-import { getHermesApiUrl, getHermesApiKey, getHermesHomePath, getVaultPath } from '../env.js';
+import {
+	getHermesApiUrl,
+	getHermesApiKey,
+	getHermesHomePath,
+	getVaultPath,
+	isDemoVaultActive
+} from '../env.js';
 import { readHermesExecutionProfile } from './execution-profile.js';
 import type { ExecutionProfile } from '$lib/types/execution-profile.js';
 import { finishHermesTurn, startHermesTurn } from '../folio-db/writer.js';
@@ -73,7 +79,7 @@ async function buildSystemPrompt(
 	const needsCampaign = manifest.sources.campaign || manifest.sources.leuchtfeuer;
 	const [campaign, memory, leuchtfeuer] = await Promise.all([
 		needsCampaign ? loadCampaign() : Promise.resolve(null),
-		manifest.sources.memory ? loadMemory() : Promise.resolve(''),
+		manifest.sources.memory && !isDemoVaultActive() ? loadMemory() : Promise.resolve(''),
 		manifest.sources.leuchtfeuer
 			? getLeuchtfeuer().catch(() => ({ ids: [], week: 0, year: 0 }))
 			: Promise.resolve(null)

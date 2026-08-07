@@ -18,6 +18,18 @@ ship every adjacent idea together.
 - The four established cross-database writes from the mail-side agent are documented in the
   [multi-agent repository](https://github.com/aion-lumen/multi-agent-lab/blob/main/docs/cross-db-write-ausnahmen.md).
 
+## Required before public reach reporting — Leuchtfeuer evidence hardening
+
+- Count only `GET` requests that returned `200` for a route present in the deployed static site
+  tree; user-agent heuristics remain a secondary filter, not the definition of a visit.
+- Apply the same eligibility rule to paths, referrers, door measurements, and estimated uniques.
+- Report excluded probe traffic separately as operational scan noise rather than folding it into
+  audience reach or silently discarding it.
+- Recompute the 28-day baseline after the rule change and check in a before/after evidence artifact
+  that attributes differences to missing routes, non-200 responses, non-GET requests, and bot
+  filtering. No pre-hardening reach number is used publicly.
+- Name the structural counting rule in the UI and keep the no-client-tracking promise unchanged.
+
 ## v0.4.1 — Context and traceability
 
 - Stamp every assistant turn with a credential-free execution profile: exact configured model and
@@ -31,9 +43,32 @@ ship every adjacent idea together.
 - Do not change a triage or cross-check model, nor publish performance claims for it, without a
   fresh hermetic evaluation and checked-in result artifact.
 
+## Time-boxed milestone — Second-device demo by the end of August 2026
+
+This milestone is an owner-operated demonstration on a second Apple Silicon Mac, not a third-party
+installation. It therefore does not bypass the 08c gate below.
+
+- Provide a reproducible, non-developer-oriented quickstart that can be completed and tested within
+  one to two days. Installing documented prerequisites and using the two existing repositories is
+  acceptable; undocumented source edits or environment guesswork are not.
+- Start Folio with one documented demo command against the bundled demo vault and deterministic
+  demo fixtures. The baseline demo must work without IMAP credentials, real data, Hermes, or a
+  loaded model; optional local-AI capability is configured separately.
+- Make demo isolation fail closed: use only demo-scoped state paths, never discover or fall back to
+  real vaults or databases, and display the active demo mode unambiguously.
+- Add a credential-free, per-device model-routing configuration with small always-on and heavy
+  on-demand slots. Exact model assignments follow only after the second Mac's hardware is known;
+  changing triage or cross-check models still requires the hermetic evaluation gate above.
+- Keep generated demo databases out of Git. Record both source commits, runtime versions, and the
+  fixture fingerprint for diagnosis.
+- Acceptance is a cold-start run by the project owner on the fresh Mac: documented steps to a
+  working demo within the planned setup window, with an evidence checklist covering startup, demo
+  isolation, the core screens, restart, and clean removal.
+
 ## Required before v0.5.0 — Module foundation (08c)
 
-08c is a hard gate before any third-party installation and before v0.5.0:
+08c is a hard gate before any third-party installation and before v0.5.0. The owner-operated
+second-device demo above is explicitly not permission for external installation:
 
 - Introduce a registry API for module domains, panel fields, capabilities, and databases.
 - Extract Council into `modules/council/` as the first reference module.

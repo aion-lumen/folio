@@ -99,6 +99,9 @@ Then open `http://localhost:5174/pipeline` (Pipeline page).
 
 Full pipeline demo (folio UI + multi-agent worker simulation) — no IMAP, no LLM, no real data. Reproducible end-to-end against a fictional Alex + Maya household in the Algarve.
 
+For an assisted cold start on a second Apple Silicon Mac, follow
+[`docs/second-device-demo.md`](docs/second-device-demo.md).
+
 1. **Clone both repos** side-by-side:
    ```bash
    git clone https://github.com/aion-lumen/folio.git
