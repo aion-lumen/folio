@@ -4,9 +4,11 @@
 
 import { error, json } from '@sveltejs/kit';
 import { upsertObjectView } from '$lib/server/folio-db/writer.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 import type { RequestHandler } from './$types.js';
 
 export const POST: RequestHandler = async ({ params, locals }) => {
+	requireModuleCapability('council', 'records.write');
 	const objectId = params.id;
 	if (!objectId) throw error(400, 'missing object id');
 	const view = upsertObjectView(objectId, locals.user.id);

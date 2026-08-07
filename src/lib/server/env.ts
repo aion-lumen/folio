@@ -30,31 +30,56 @@ export function isDemoVaultPath(p: string | null | undefined): boolean {
  * `demo` is the explicit flag written by the switcher, falling back to a path heuristic
  * so pre-existing active-vault.json files (no flag) still scope correctly.
  */
-export function readActiveVaultMeta(): { path: string | null; demo: boolean; council: boolean } {
+export function readActiveVaultMeta(): {
+	path: string | null;
+	demo: boolean;
+	council: boolean;
+	modules: Readonly<Record<string, boolean>>;
+} {
 	try {
 		const raw = readFileSync(join(homedir(), '.folio', 'active-vault.json'), 'utf-8');
-		const parsed = JSON.parse(raw) as { path?: string; demo?: boolean; council?: boolean };
+		const parsed = JSON.parse(raw) as {
+			path?: string;
+			demo?: boolean;
+			council?: boolean;
+			modules?: Record<string, unknown>;
+		};
 		const p = parsed.path?.trim() || null;
+		const modules: Record<string, boolean> = {};
+		if (parsed.modules && typeof parsed.modules === 'object' && !Array.isArray(parsed.modules)) {
+			for (const [id, enabled] of Object.entries(parsed.modules)) {
+				if (/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/.test(id) && typeof enabled === 'boolean') {
+					modules[id] = enabled;
+				}
+			}
+		}
 		// `council` is opt-in (Default AUS): only an explicit `true` registers Council on a
 		// real vault. Mirrored 1:1 in the Python pipeline (multi-agent/scripts/council_state.py);
 		// a cross-language parity test locks the two against divergence.
-		return { path: p, demo: parsed.demo === true || isDemoVaultPath(p), council: parsed.council === true };
+		return {
+			path: p,
+			demo: parsed.demo === true || isDemoVaultPath(p),
+			council: parsed.council === true,
+			modules
+		};
 	} catch {
-		return { path: null, demo: false, council: false };
+		return { path: null, demo: false, council: false, modules: {} };
 	}
 }
 
 /** True when the active vault is a demo vault → stores must resolve to *-demo.db. */
 export function isDemoVaultActive(): boolean {
+	// A process-scoped override is used by hermetic evals and the isolated demo
+	// launcher. It must beat a persisted real-vault selection without rewriting it.
+	const override = process.env.FOLIO_VAULT_OVERRIDE;
+	if (override) return isDemoVaultPath(override);
 	return readActiveVaultMeta().demo;
 }
 
 export function getVaultPath(): string {
-	// 0) FOLIO_VAULT_OVERRIDE — hermetic override, highest precedence. Only the eval harness
-	//    sets it. It forces the vault regardless of active-vault.json, WITHOUT writing any user
-	//    state — so an eval run measures against the vault it declares, not "whichever vault
-	//    happened to be active". Fixes the non-hermetic eval (active-vault.json used to win over
-	//    the harness's process.env.VAULT_PATH, silently deciding what got measured).
+	// 0) FOLIO_VAULT_OVERRIDE — process-scoped override for hermetic evals and the isolated
+	//    demo launcher. It forces the vault regardless of active-vault.json, WITHOUT writing
+	//    user state.
 	// 1) ~/.folio/active-vault.json — explicit user choice (switcher), survives Vite restart
 	// 2) Live process.env (setup wizard hot-set)
 	// 3) $env/dynamic/private snapshot from .env at server start
@@ -121,7 +146,8 @@ export function getHermesApiKey(): string {
 export function getFeedbackDbPath(): string {
 	// Vault-scoped: a demo vault binds to the demo mail store (never the real feedback.db).
 	if (isDemoVaultActive()) return join(getAionLumenPath(), 'state/feedback-demo.db');
-	return kitEnv().FEEDBACK_DB_PATH
+	return process.env.FEEDBACK_DB_PATH
+		?? kitEnv().FEEDBACK_DB_PATH
 		?? join(homedir(), 'Projects/aion-lumen/multi-agent/state/feedback.db');
 }
 
@@ -148,7 +174,9 @@ export function getTrustedSourcesPath(): string {
 
 /** Root of aion-lumen/multi-agent (Python pipeline). Override: AION_LUMEN_PATH */
 export function getAionLumenPath(): string {
-	return kitEnv().AION_LUMEN_PATH ?? join(homedir(), 'Projects/aion-lumen/multi-agent');
+	return process.env.AION_LUMEN_PATH
+		?? kitEnv().AION_LUMEN_PATH
+		?? join(homedir(), 'Projects/aion-lumen/multi-agent');
 }
 
 /**
@@ -162,11 +190,18 @@ export function isCouncilRegistered(): boolean {
 	return readActiveVaultMeta().council;
 }
 
+/** Vault opt-in for optional modules. Unknown and malformed entries are denied. */
+export function isVaultModuleEnabled(moduleId: string): boolean {
+	return readActiveVaultMeta().modules[moduleId] === true;
+}
+
 export function getCouncilDbPath(): string | null {
 	// Aufgabe 4(b): a demo vault does NOT register Council — capability removal at the
 	// data-access layer (not display filtering). null ⇒ readers return empty, no council.
 	if (!isCouncilRegistered()) return null;
-	return kitEnv().COUNCIL_DB_PATH ?? join(homedir(), '.council/council.db');
+	return process.env.COUNCIL_DB_PATH
+		?? kitEnv().COUNCIL_DB_PATH
+		?? join(homedir(), '.council/council.db');
 }
 
 export function getCouncilConfigPath(): string {
@@ -178,6 +213,23 @@ export function getCouncilConfigPath(): string {
 // run rows) so a Council-free mail-only screenshot can be taken. Off by default.
 export function getHideCouncil(): boolean {
 	return kitEnv().HIDE_COUNCIL === '1' || kitEnv().HIDE_COUNCIL === 'true';
+}
+
+/** Emergency stop for every optional module. This always wins over registration. */
+export function areModulesDisabled(): boolean {
+	const value = process.env.FOLIO_MODULES_DISABLED ?? kitEnv().FOLIO_MODULES_DISABLED ?? '';
+	return value === '1' || value === 'true';
+}
+
+/** Comma-separated per-module emergency stops. Unknown ids are harmless and remain denied. */
+export function getDisabledModuleIds(): ReadonlySet<string> {
+	const value = process.env.FOLIO_DISABLED_MODULES ?? kitEnv().FOLIO_DISABLED_MODULES ?? '';
+	return new Set(
+		value
+			.split(',')
+			.map((item) => item.trim().toLowerCase())
+			.filter(Boolean)
+	);
 }
 
 export function getLifeMailPath(): string {
@@ -199,7 +251,24 @@ export function getHermesContextPath(): string {
 	if (override) return override;
 	const vaultManifest = join(getVaultPath(), 'hermes-context.yaml');
 	if (existsSync(vaultManifest)) return vaultManifest;
+	if (isDemoVaultActive()) {
+		const bundledDemoManifest = join(
+			process.cwd(),
+			'templates',
+			'demo-vault',
+			'hermes-context.yaml'
+		);
+		if (existsSync(bundledDemoManifest)) return bundledDemoManifest;
+	}
 	return join(process.cwd(), 'config', 'hermes-context.yaml');
+}
+
+/** Credential-free per-device routing declaration. The file may select only
+ * registered Hermes profile/model identifiers; it never carries commands. */
+export function getModelRoutingPath(): string {
+	const override = process.env.FOLIO_MODEL_ROUTING_PATH ?? kitEnv().FOLIO_MODEL_ROUTING_PATH;
+	if (override) return override;
+	return join(homedir(), '.folio', 'model-routing.yaml');
 }
 
 export function getRegelwerkPath(): string {
@@ -216,12 +285,17 @@ export function getPythonBinPath(): string {
 
 /** Staging inbox for Folio Interchange Format v1 (outside vault). */
 export function getInboxPath(): string {
-	return kitEnv().FOLIO_INBOX_PATH ?? join(homedir(), '.folio/inbox');
+	return process.env.FOLIO_INBOX_PATH
+		?? kitEnv().FOLIO_INBOX_PATH
+		?? join(homedir(), isDemoVaultActive() ? '.folio/demo-inbox' : '.folio/inbox');
 }
 
 /** Idempotency ledger for imported document ids. */
 export function getImportLedgerPath(): string {
-	return join(homedir(), '.folio/import-ledger.json');
+	return join(
+		homedir(),
+		isDemoVaultActive() ? '.folio/import-ledger-demo.json' : '.folio/import-ledger.json'
+	);
 }
 
 /** LM Studio base URL for Folio inbox triage agent. */
@@ -253,7 +327,10 @@ export function getFolioAgentAuto(): boolean {
 
 /** Audit log for triage auto-decisions (JSONL). */
 export function getTriageLogPath(): string {
-	return join(homedir(), '.folio/triage-log.jsonl');
+	return join(
+		homedir(),
+		isDemoVaultActive() ? '.folio/triage-log-demo.jsonl' : '.folio/triage-log.jsonl'
+	);
 }
 
 /** Cached LLM assessments keyed by file content hash. */
@@ -272,11 +349,11 @@ export interface HomePlz {
 }
 
 export function getHomePlz(): HomePlz | null {
-	const plz = kitEnv().FOLIO_HOME_PLZ;
+	const plz = process.env.FOLIO_HOME_PLZ ?? kitEnv().FOLIO_HOME_PLZ;
 	if (!plz) return null;
-	const latEnv = kitEnv().FOLIO_HOME_LAT;
-	const lngEnv = kitEnv().FOLIO_HOME_LNG;
-	const cityEnv = kitEnv().FOLIO_HOME_CITY;
+	const latEnv = process.env.FOLIO_HOME_LAT ?? kitEnv().FOLIO_HOME_LAT;
+	const lngEnv = process.env.FOLIO_HOME_LNG ?? kitEnv().FOLIO_HOME_LNG;
+	const cityEnv = process.env.FOLIO_HOME_CITY ?? kitEnv().FOLIO_HOME_CITY;
 	if (latEnv && lngEnv) {
 		return {
 			plz,

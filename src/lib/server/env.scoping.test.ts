@@ -6,6 +6,10 @@ import {
 	getFeedbackDbPath,
 	getFolioDbPath,
 	getCouncilDbPath,
+	getImportLedgerPath,
+	getInboxPath,
+	getHermesContextPath,
+	getTriageLogPath,
 	getVaultPath,
 	isCouncilRegistered,
 	isDemoVaultActive,
@@ -33,6 +37,8 @@ describe('vault-scoped DB paths', () => {
 		else process.env.HOME = prevHome;
 		delete process.env.FOLIO_VAULT_OVERRIDE;
 		delete process.env.VAULT_PATH;
+		delete process.env.AION_LUMEN_PATH;
+		delete process.env.FOLIO_INBOX_PATH;
 		rmSync(home, { recursive: true, force: true });
 	});
 
@@ -77,6 +83,11 @@ describe('vault-scoped DB paths', () => {
 		expect(getCouncilDbPath()).toContain('council.db');
 	});
 
+	it('generic module declarations cannot bypass the cross-runtime Council opt-in', () => {
+		writeActiveVault({ path: join(home, 'Projects/life'), modules: { council: true } });
+		expect(isCouncilRegistered()).toBe(false);
+	});
+
 	// PARITY LOCK — must match multi-agent/tests/test_council_state.py CASES exactly.
 	// If you change one table, change the other; else the TS gate and the Python
 	// move-pipeline gate diverge silently.
@@ -107,9 +118,18 @@ describe('vault-scoped DB paths', () => {
 	// Hermetic eval: FOLIO_VAULT_OVERRIDE wins over active-vault.json, so a run measures
 	// against the vault the harness declares — never "whichever vault happened to be active".
 	it('FOLIO_VAULT_OVERRIDE takes precedence over active-vault.json (eval hermeticity)', () => {
-		writeActiveVault({ path: '/some/other/active/vault', demo: true });
+		writeActiveVault({ path: '/some/other/active/vault' });
 		process.env.FOLIO_VAULT_OVERRIDE = '/repo/folio/templates/demo-vault';
+		process.env.AION_LUMEN_PATH = '/checkout/multi-agent-lab';
 		expect(getVaultPath()).toBe('/repo/folio/templates/demo-vault');
+		expect(isDemoVaultActive()).toBe(true);
+		expect(getFeedbackDbPath()).toBe('/checkout/multi-agent-lab/state/feedback-demo.db');
+		expect(getFolioDbPath()).toContain('folio-demo.db');
+		expect(getCouncilDbPath()).toBeNull();
+		expect(getInboxPath()).toContain('.folio/demo-inbox');
+		expect(getImportLedgerPath()).toContain('import-ledger-demo.json');
+		expect(getTriageLogPath()).toContain('triage-log-demo.jsonl');
+		expect(getHermesContextPath()).toContain('templates/demo-vault/hermes-context.yaml');
 	});
 
 	it('without the override, active-vault.json still wins over process.env.VAULT_PATH', () => {

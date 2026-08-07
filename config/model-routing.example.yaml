@@ -1,0 +1,30 @@
+schema_version: 1
+device_profile: generic-apple-silicon
+default_slot: heavy
+
+# Declarative identifiers only. Model loading/switching remains behind Folio's
+# registered helpers; this file can never introduce an executable command.
+slots:
+  small:
+    hermes_profiles:
+      - ollama
+    model_ids:
+      - qwen3:30b-a3b
+    purpose:
+      - routine
+      - short-chat
+  heavy:
+    hermes_profiles:
+      - architect
+      - thinking
+      - mlx
+    model_ids:
+      - qwen3.6-35b-a3b-ud-mlx
+      - qwen3-coder-30b-a3b-instruct-mlx
+    purpose:
+      - deep-reasoning
+      - coding
+
+policy:
+  max_loaded_models: 1
+  auto_switch: false

@@ -24,6 +24,11 @@
 		return parts.filter(Boolean).join(' · ');
 	}
 
+	function routingLabel(profile: ExecutionProfile): string {
+		if (!profile.routing) return '';
+		return `${profile.routing.deviceProfileId} · ${profile.routing.slot}`;
+	}
+
 	async function loadProfiles() {
 		try {
 			const r = await fetch('/api/hermes/model');
@@ -91,6 +96,9 @@
 		<span class="execution-profile" data-verification={executionProfile.verification}>
 			<span class="model-id">{executionProfile.modelId}</span>
 			<span class="artifact-meta">{artifactLabel(executionProfile)}</span>
+			{#if executionProfile.routing}
+				<span class="artifact-meta">{routingLabel(executionProfile)}</span>
+			{/if}
 		</span>
 	{/if}
 </div>

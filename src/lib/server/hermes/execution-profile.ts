@@ -6,6 +6,11 @@ import YAML from 'yaml';
 import type { ExecutionProfile, ModelArtifact } from '$lib/types/execution-profile.js';
 import { getHermesHomePath } from '$lib/server/env.js';
 import { readHermesContextManifest } from './context-manifest.js';
+import {
+	readModelRoutingManifest,
+	resolveModelRoutingSlot,
+	type ModelRoutingManifest
+} from './model-routing.js';
 
 export const HERMES_PROMPT_VERSION = 'inline-v1';
 export const HERMES_PROMPT_FINGERPRINT = 'legacy-inline';
@@ -67,7 +72,8 @@ function unavailableProfile(
 	prompt: PromptIdentity = {
 		version: HERMES_PROMPT_VERSION,
 		fingerprint: HERMES_PROMPT_FINGERPRINT
-	}
+	},
+	routing?: ModelRoutingManifest
 ): ExecutionProfile {
 	const base: Omit<ExecutionProfile, 'fingerprint'> = {
 		schemaVersion: 1,
@@ -82,7 +88,16 @@ function unavailableProfile(
 		promptFingerprint: prompt.fingerprint,
 		policyVersion: HERMES_POLICY_VERSION,
 		artifact: null,
-		verification: 'unavailable'
+		verification: 'unavailable',
+		...(routing
+			? {
+				routing: {
+					deviceProfileId: routing.deviceProfileId,
+					slot: 'unassigned' as const,
+					manifestFingerprint: routing.fingerprint
+				}
+			}
+			: {})
 	};
 	return { ...base, fingerprint: fingerprint(base) };
 }
@@ -93,20 +108,21 @@ export function resolveExecutionProfileFromConfig(
 	prompt: PromptIdentity = {
 		version: HERMES_PROMPT_VERSION,
 		fingerprint: HERMES_PROMPT_FINGERPRINT
-	}
+	},
+	routing?: ModelRoutingManifest
 ): ExecutionProfile {
 	let root: UnknownRecord;
 	try {
 		root = asRecord(YAML.parse(configYaml));
 	} catch {
-		return unavailableProfile(prompt);
+		return unavailableProfile(prompt, routing);
 	}
 
 	const model = asRecord(root.model);
 	const agent = asRecord(root.agent);
 	const profiles = asRecord(root.profiles);
 	const modelId = asString(model.default);
-	if (!modelId) return unavailableProfile(prompt);
+	if (!modelId) return unavailableProfile(prompt, routing);
 
 	const matchingProfile = Object.entries(profiles).find(([, value]) => {
 		return asString(asRecord(value).model) === modelId;
@@ -139,7 +155,16 @@ export function resolveExecutionProfileFromConfig(
 		promptFingerprint: prompt.fingerprint,
 		policyVersion: HERMES_POLICY_VERSION,
 		artifact,
-		verification: artifact ? 'local-artifact' : 'config-only'
+		verification: artifact ? 'local-artifact' : 'config-only',
+		...(routing
+			? {
+				routing: {
+					deviceProfileId: routing.deviceProfileId,
+					slot: resolveModelRoutingSlot(routing, matchingProfile?.[0] ?? 'default', modelId),
+					manifestFingerprint: routing.fingerprint
+				}
+			}
+			: {})
 	};
 	return { ...base, fingerprint: fingerprint(base) };
 }
@@ -192,17 +217,21 @@ export async function scanInstalledModels(
 
 export async function readHermesExecutionProfile(prompt?: PromptIdentity): Promise<ExecutionProfile> {
 	try {
-		const [config, installed, manifest] = await Promise.all([
+		const [config, installed, manifest, routing] = await Promise.all([
 			readFile(join(getHermesHomePath(), 'config.yaml'), 'utf-8'),
 			scanInstalledModels(),
-			prompt ? Promise.resolve(null) : readHermesContextManifest()
+			prompt ? Promise.resolve(null) : readHermesContextManifest(),
+			readModelRoutingManifest().catch((error) => {
+				console.warn('[hermes] model routing disabled:', error);
+				return null;
+			})
 		]);
 		const promptIdentity =
 			prompt ??
 			(manifest
 				? { version: manifest.promptVersion, fingerprint: manifest.fingerprint }
 				: { version: HERMES_PROMPT_VERSION, fingerprint: HERMES_PROMPT_FINGERPRINT });
-		return resolveExecutionProfileFromConfig(config, installed, promptIdentity);
+		return resolveExecutionProfileFromConfig(config, installed, promptIdentity, routing ?? undefined);
 	} catch {
 		return unavailableProfile(prompt);
 	}

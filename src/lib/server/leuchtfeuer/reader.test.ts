@@ -7,6 +7,7 @@ import { readLeuchtfeuer } from './reader.js';
 describe('readLeuchtfeuer', () => {
 	let home: string;
 	let prevHome: string | undefined;
+	let prevDisabled: string | undefined;
 
 	function writeSite(site: string, date: string, obj: Record<string, unknown>) {
 		const dir = join(home, '.folio', 'metrics', site);
@@ -18,12 +19,16 @@ describe('readLeuchtfeuer', () => {
 		home = join(tmpdir(), `folio-lf-${Date.now()}-${Math.random().toString(36).slice(2)}`);
 		mkdirSync(home, { recursive: true });
 		prevHome = process.env.HOME;
+		prevDisabled = process.env.FOLIO_DISABLED_MODULES;
 		process.env.HOME = home;
+		delete process.env.FOLIO_DISABLED_MODULES;
 	});
 
 	afterEach(() => {
 		if (prevHome === undefined) delete process.env.HOME;
 		else process.env.HOME = prevHome;
+		if (prevDisabled === undefined) delete process.env.FOLIO_DISABLED_MODULES;
+		else process.env.FOLIO_DISABLED_MODULES = prevDisabled;
 		rmSync(home, { recursive: true, force: true });
 	});
 
@@ -87,5 +92,18 @@ describe('readLeuchtfeuer', () => {
 		const d = readLeuchtfeuer(new Date('2026-07-10T12:00:00Z'));
 		expect(d.github?.starsTotal).toEqual([16]);
 		expect(d.github?.viewsTotal).toEqual([40]);
+	});
+
+	it('returns no metrics when the module kill switch is active', () => {
+		writeSite('aion-lumen.ch', '2026-07-10', {
+			site: 'aion-lumen.ch',
+			date: '2026-07-10',
+			visits: 15
+		});
+		process.env.FOLIO_DISABLED_MODULES = 'leuchtfeuer';
+		const d = readLeuchtfeuer(new Date('2026-07-10T12:00:00Z'));
+		expect(d.sites).toEqual([]);
+		expect(d.github).toBeNull();
+		expect(d.stale).toBe(true);
 	});
 });

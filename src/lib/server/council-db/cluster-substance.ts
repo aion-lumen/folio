@@ -7,13 +7,13 @@
 import Database from 'better-sqlite3';
 import { existsSync } from 'fs';
 import { getFolioDb } from '../folio-db/init.js';
-import { getCouncilDbPath } from '../env.js';
+import { getModuleDatabasePath } from '../modules/index.js';
 
 let _councilConn: Database.Database | null = null;
 let _councilConnPath: string | null = null;
 
 function getCouncilDb(): Database.Database | null {
-	const dbPath = getCouncilDbPath();
+	const dbPath = getModuleDatabasePath('council', 'primary', 'records.read');
 	// null ⇒ Council not registered (demo vault). Drop cached connection, report absence.
 	if (!dbPath || !existsSync(dbPath)) {
 		if (_councilConn) {

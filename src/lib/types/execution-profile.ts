@@ -25,6 +25,11 @@ export interface ExecutionProfile {
 	policyVersion: string;
 	artifact: ModelArtifact | null;
 	verification: 'local-artifact' | 'config-only' | 'unavailable';
+	routing?: {
+		deviceProfileId: string;
+		slot: 'small' | 'heavy' | 'unassigned';
+		manifestFingerprint: string;
+	};
 	fingerprint: string;
 }
 
@@ -41,6 +46,9 @@ export function executionProfileLabel(profile: ExecutionProfile): string {
 				? `${profile.contextLength / 1024}k ctx`
 				: `${profile.contextLength} ctx`;
 		parts.push(context);
+	}
+	if (profile.routing?.slot && profile.routing.slot !== 'unassigned') {
+		parts.push(profile.routing.slot);
 	}
 	return parts.join(' · ');
 }

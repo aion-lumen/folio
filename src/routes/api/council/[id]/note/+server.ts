@@ -4,6 +4,7 @@
 
 import { error, json } from '@sveltejs/kit';
 import { insertObjectNote } from '$lib/server/folio-db/writer.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 import type { RequestHandler } from './$types.js';
 
 interface PostBody {
@@ -11,6 +12,7 @@ interface PostBody {
 }
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
+	requireModuleCapability('council', 'records.write');
 	const objectId = params.id;
 	if (!objectId) throw error(400, 'missing object id');
 	let body: PostBody;

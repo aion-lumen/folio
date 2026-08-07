@@ -64,7 +64,9 @@ HERMES_API_URL=http://localhost:8642
 HERMES_API_KEY=your-key-here
 ```
 
-For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and [docs/MAIL.md](docs/MAIL.md).
+For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and
+[docs/MAIL.md](docs/MAIL.md). Optional domains are constrained by the
+[module registry and capability boundary](docs/module-registry.md).
 
 ## Import inbox & LLM triage
 
@@ -98,6 +100,9 @@ Then open `http://localhost:5174/pipeline` (Pipeline page).
 ## Demo (full stack)
 
 Full pipeline demo (folio UI + multi-agent worker simulation) — no IMAP, no LLM, no real data. Reproducible end-to-end against a fictional Alex + Maya household in the Algarve.
+
+For an assisted cold start on a second Apple Silicon Mac, follow
+[`docs/second-device-demo.md`](docs/second-device-demo.md).
 
 1. **Clone both repos** side-by-side:
    ```bash
