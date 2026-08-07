@@ -6,6 +6,7 @@ name: meta-guard
 # neu hinzugefuegten Dateinamen), keine Heuristik.
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -15,7 +16,7 @@ jobs:
   no-process-docs:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - name: Reject newly-added process/meta documents

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Credential-free, per-device model routing with separate always-on and on-demand slots, plus a
+  fail-closed second-device demo setup that keeps its vault and mutable state isolated from real
+  installations.
+- Deny-by-default module registry with validated manifests, global and per-module kill switches,
+  guarded Council routes and databases, and Leuchtfeuer as a second registry consumer.
+- Sonar preview: a local review workspace for already imported external-derived notes, with
+  immutable source notes, explicit human decisions in an append-only audit ledger, and no external
+  publishing capability.
+
+## [0.4.1] - 2026-08-07
+
+### Added
+
+- Credential-free execution profiles for Hermes turns, including model and local artifact identity,
+  provider class, endpoint locality, quantisation, context and thinking settings, and prompt/policy
+  fingerprints with explicit verification state.
+- Strictly validated `hermes-context.yaml` manifests that select known Folio context sources without
+  granting filesystem capabilities.
+- Folio-owned session and turn correlation IDs, objective links, turn outcomes, and an auditable
+  `running` / `completed` / `failed` / `aborted` lifecycle.
+- Published Folio–Hermes adapter contract: Folio owns state, policy, approvals, and audit; Hermes is
+  a replaceable execution runtime.
+
+### Changed
+
 - Council opt-in via `active-vault.json`, default off — P0.2-Entkopplung
 - ntfy self-hosted channel, folio-ops error trigger (`928d022`)
 - Leuchtfeuer pull plist corrected for rrsync forced command (`a94e861`) and made launchd-safe
