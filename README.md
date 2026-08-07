@@ -66,7 +66,8 @@ HERMES_API_KEY=your-key-here
 
 For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and
 [docs/MAIL.md](docs/MAIL.md). Optional domains are constrained by the
-[module registry and capability boundary](docs/module-registry.md).
+[module registry and capability boundary](docs/module-registry.md). Dependency audit policy and
+reviewed upstream constraints are documented in [docs/dependency-security.md](docs/dependency-security.md).
 
 ## Import inbox & LLM triage
 
