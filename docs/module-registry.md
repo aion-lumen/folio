@@ -60,6 +60,11 @@ unchanged. Demo runs keep that mutable ledger in demo-scoped Folio state rather
 than writing into the bundled fixture tree. No capability in this slice can
 publish, follow, like, or reply on an external service.
 
+Sonar is deliberately a built-in reviewer with `enabled: () => true`, not a
+vault-opt-in module like Council. A vault without `internal/sonar/inbox` gets an
+empty workspace; the global or per-module kill switch remains the explicit way
+to disable the module.
+
 ## Deliberate limits of the first gate
 
 - Retention is declared and inspectable; only policies already enforced by the

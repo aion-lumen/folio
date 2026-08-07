@@ -238,7 +238,7 @@ export function appendSonarReview(
 		throw new SonarStoreError('Invalid Sonar review decision');
 	}
 	// Refuse to extend an audit trail that cannot be parsed completely.
-	reviewLedger(resolvedReviewRoot);
+	const reviews = reviewLedger(resolvedReviewRoot);
 	const inbox = safeInbox(resolvedNoteRoot);
 	if (!inbox) throw new SonarStoreError('Sonar inbox is unavailable');
 	const notePath = join(inbox, `twitter-${postId}.md`);
@@ -248,6 +248,8 @@ export function appendSonarReview(
 		throw new SonarStoreError('Unsafe Sonar note path');
 	}
 	parseNote(resolvedNote, postId);
+	const existing = reviews.get(postId);
+	if (existing?.status === status) return existing;
 
 	const record: ReviewRecord = {
 		schema: REVIEW_SCHEMA,

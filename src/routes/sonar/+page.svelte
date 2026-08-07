@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onDestroy } from 'svelte';
 	import { ExternalLink, Radar, ShieldCheck } from 'lucide-svelte';
 	import type { SonarDomain, SonarReviewStatus } from '$lib/server/modules/sonar/store.js';
 
@@ -12,6 +13,8 @@
 	let overrides = $state<Record<string, SonarReviewStatus>>({});
 	let saving = $state(false);
 	let feedback = $state('');
+	let feedbackError = $state(false);
+	let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const notes = $derived(
 		data.sonar.notes.map((note) => ({ ...note, status: overrides[note.postId] ?? note.status }))
@@ -29,10 +32,26 @@
 	);
 	const selected = $derived(visibleNotes.find((note) => note.postId === selectedId) ?? visibleNotes[0] ?? null);
 
+	function clearFeedback() {
+		if (feedbackTimer) clearTimeout(feedbackTimer);
+		feedbackTimer = null;
+		feedback = '';
+		feedbackError = false;
+	}
+
+	function showFeedback(message: string, isError = false) {
+		clearFeedback();
+		feedback = message;
+		feedbackError = isError;
+		feedbackTimer = setTimeout(clearFeedback, isError ? 5000 : 2800);
+	}
+
+	onDestroy(clearFeedback);
+
 	function chooseView(next: View) {
 		view = next;
 		selectedId = null;
-		feedback = '';
+		clearFeedback();
 	}
 
 	function formatDate(value: string | null): string {
@@ -45,25 +64,28 @@
 
 	async function review(status: 'accepted' | 'deferred' | 'rejected') {
 		if (!selected || saving || !data.canReview) return;
+		const reviewedPostId = selected.postId;
 		saving = true;
-		feedback = '';
+		clearFeedback();
 		try {
 			const response = await fetch('/api/sonar/review', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ post_id: selected.postId, status })
+				body: JSON.stringify({ post_id: reviewedPostId, status })
 			});
 			if (!response.ok) throw new Error('review failed');
-			overrides[selected.postId] = status;
+			overrides[reviewedPostId] = status;
 			overrides = { ...overrides };
 			selectedId = null;
-			feedback = status === 'accepted'
-				? 'Als Wissen bestätigt.'
-				: status === 'deferred'
-					? 'Für später zurückgestellt.'
-					: 'Aus dem Eingang verworfen; der Audit-Eintrag bleibt erhalten.';
+			showFeedback(
+				status === 'accepted'
+					? 'Als Wissen bestätigt.'
+					: status === 'deferred'
+						? 'Für später zurückgestellt.'
+						: 'Aus dem Eingang verworfen; der Audit-Eintrag bleibt erhalten.'
+			);
 		} catch {
-			feedback = 'Die Entscheidung wurde nicht gespeichert. Der Eingang blieb unverändert.';
+			showFeedback('Die Entscheidung wurde nicht gespeichert. Der Eingang blieb unverändert.', true);
 		} finally {
 			saving = false;
 		}
@@ -93,7 +115,11 @@
 	{/if}
 
 	<nav class="tabs" aria-label="Sonar-Bereiche">
-		<button type="button" class:active={view === 'inbox'} aria-current={view === 'inbox' ? 'page' : undefined} onclick={() => chooseView('inbox')}>Eingang <span>{pendingCount}</span></button>
+		<button type="button" class:active={view === 'inbox'} aria-current={view === 'inbox' ? 'page' : undefined} onclick={() => chooseView('inbox')}>
+			Eingang
+			{#if pendingCount > 0}<span class="tab-indicator" aria-label="Offene Signale"></span>{/if}
+			<span>{pendingCount}</span>
+		</button>
 		<button type="button" class:active={view === 'knowledge'} aria-current={view === 'knowledge' ? 'page' : undefined} onclick={() => chooseView('knowledge')}>Wissen <span>{knowledgeCount}</span></button>
 		<button type="button" class:active={view === 'drafts'} aria-current={view === 'drafts' ? 'page' : undefined} onclick={() => chooseView('drafts')}>Entwürfe <span>0</span></button>
 		<button type="button" class:active={view === 'sources'} aria-current={view === 'sources' ? 'page' : undefined} onclick={() => chooseView('sources')}>Quellen</button>
@@ -163,7 +189,7 @@
 		</section>
 	{/if}
 
-	{#if feedback}<p class="feedback" role="status">{feedback}</p>{/if}
+	{#if feedback}<p class="feedback" class:error={feedbackError} role={feedbackError ? 'alert' : 'status'}>{feedback}</p>{/if}
 </div>
 
 <style>
@@ -180,6 +206,7 @@
 	.tabs button.active { color: var(--color-foreground); }
 	.tabs button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--sonar); }
 	.tabs span { margin-left: 4px; color: var(--color-muted-foreground); }
+	.tabs .tab-indicator { display: inline-block; width: 6px; height: 6px; margin: 0 0 1px 6px; border-radius: 50%; background: var(--sonar); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sonar) 14%, transparent); }
 	.toolbar { display: flex; align-items: center; gap: 8px; margin: 18px 0 12px; }
 	.toolbar button { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-muted-foreground); background: var(--color-card); cursor: pointer; }
 	.toolbar button.active { color: var(--color-foreground); border-color: var(--sonar); }
@@ -225,6 +252,7 @@
 	.sources-panel dt { color: var(--color-muted-foreground); font-size: 12px; }
 	.sources-panel dd { margin: 5px 0 0; font-size: 18px; }
 	.feedback { margin: 12px 0 0; padding: 9px 11px; border-radius: 7px; background: color-mix(in srgb, var(--sonar) 10%, var(--color-card)); color: var(--sonar); font-size: 13px; }
+	.feedback.error { background: hsl(0 80% 96%); color: hsl(0 65% 36%); }
 	@media (max-width: 700px) {
 		.sonar-page { padding: 20px 0 40px; }
 		.sonar-heading { flex-wrap: wrap; }

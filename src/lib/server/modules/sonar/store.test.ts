@@ -64,8 +64,10 @@ describe('Sonar vault store', () => {
 		writeFileSync(join(root, 'inbox', 'twitter-20.md'), note('20'), { mode: 0o600 });
 		appendSonarReview('20', 'deferred', root);
 		appendSonarReview('20', 'accepted', root);
+		appendSonarReview('20', 'accepted', root);
 		const state = readSonarState(root);
 		expect(state.notes[0].status).toBe('accepted');
+		// Identical retries are idempotent; a changed decision remains auditable.
 		expect(readFileSync(join(root, 'reviews.ndjson'), 'utf8').trim().split('\n')).toHaveLength(2);
 		expect(statSync(join(root, 'reviews.ndjson')).mode & 0o777).toBe(0o600);
 	});
