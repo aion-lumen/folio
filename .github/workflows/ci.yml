@@ -17,5 +17,6 @@ jobs:
           node-version: '20'
           cache: npm
       - run: npm ci
+      - run: npm run audit:dependencies
       - run: npm run check
       - run: npm run test

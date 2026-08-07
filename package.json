@@ -2,7 +2,7 @@
 	"name": "folio",
 	"homepage": "https://aion-lumen.ch/folio",
 	"private": true,
-	"version": "0.4.0",
+	"version": "0.4.2",
 	"type": "module",
 	"engines": {
 		"node": ">=20"
@@ -14,6 +14,7 @@
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"audit:dependencies": "npm audit --audit-level=moderate",
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"eval:triage": "tsx evals/triage/run.ts"
