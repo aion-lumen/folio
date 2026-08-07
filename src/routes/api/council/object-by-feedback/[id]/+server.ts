@@ -10,9 +10,11 @@ import {
 	getCouncilObjectByFirstFeedbackId,
 	getInseratMarkersForFeedback
 } from '$lib/server/council-db/reader.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 import type { RequestHandler } from './$types.js';
 
 export const GET: RequestHandler = async ({ params }) => {
+	requireModuleCapability('council', 'records.read');
 	const feedbackId = parseInt(params.id, 10);
 	if (!Number.isFinite(feedbackId)) throw error(400, 'feedback_id must be int');
 	const obj = getCouncilObjectByFirstFeedbackId(feedbackId);

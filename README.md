@@ -64,7 +64,9 @@ HERMES_API_URL=http://localhost:8642
 HERMES_API_KEY=your-key-here
 ```
 
-For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and [docs/MAIL.md](docs/MAIL.md).
+For vault layout and mail integration, see [docs/VAULT.md](docs/VAULT.md) and
+[docs/MAIL.md](docs/MAIL.md). Optional domains are constrained by the
+[module registry and capability boundary](docs/module-registry.md).
 
 ## Import inbox & LLM triage
 

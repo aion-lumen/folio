@@ -14,7 +14,8 @@ import {
 import { applyTimeDecay, loadUserContext } from '$lib/server/feedback/time-decay.js';
 import { loadRegelwerk } from '$lib/server/regelwerk/loader.js';
 import { computeActiveRules } from '$lib/server/regelwerk/active-rules.js';
-import { getHomePlz, isCouncilRegistered } from '$lib/server/env.js';
+import { getHomePlz } from '$lib/server/env.js';
+import { hasModuleCapability } from '$lib/server/modules/index.js';
 import { buildVotesForFeedback, stripeState } from '$lib/server/lenses/voices.js';
 // F.8 BUG-F1 Fix: Mock-Hydration aus normalem Lade-Pfad entfernt.
 // getStressRows bleibt für ?stress=N (Performance-Smoke). getMockRows nicht
@@ -181,6 +182,6 @@ export const load: PageServerLoad = async ({ url }) => {
 		filters,
 		unreviewedOnly,
 		// Council capability for this vault — gates the "→ Übernommen" action (demo = not registered).
-		councilRegistered: isCouncilRegistered()
+		councilRegistered: hasModuleCapability('council', 'ingest.write')
 	};
 };

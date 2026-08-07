@@ -30,17 +30,40 @@ export function isDemoVaultPath(p: string | null | undefined): boolean {
  * `demo` is the explicit flag written by the switcher, falling back to a path heuristic
  * so pre-existing active-vault.json files (no flag) still scope correctly.
  */
-export function readActiveVaultMeta(): { path: string | null; demo: boolean; council: boolean } {
+export function readActiveVaultMeta(): {
+	path: string | null;
+	demo: boolean;
+	council: boolean;
+	modules: Readonly<Record<string, boolean>>;
+} {
 	try {
 		const raw = readFileSync(join(homedir(), '.folio', 'active-vault.json'), 'utf-8');
-		const parsed = JSON.parse(raw) as { path?: string; demo?: boolean; council?: boolean };
+		const parsed = JSON.parse(raw) as {
+			path?: string;
+			demo?: boolean;
+			council?: boolean;
+			modules?: Record<string, unknown>;
+		};
 		const p = parsed.path?.trim() || null;
+		const modules: Record<string, boolean> = {};
+		if (parsed.modules && typeof parsed.modules === 'object' && !Array.isArray(parsed.modules)) {
+			for (const [id, enabled] of Object.entries(parsed.modules)) {
+				if (/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$/.test(id) && typeof enabled === 'boolean') {
+					modules[id] = enabled;
+				}
+			}
+		}
 		// `council` is opt-in (Default AUS): only an explicit `true` registers Council on a
 		// real vault. Mirrored 1:1 in the Python pipeline (multi-agent/scripts/council_state.py);
 		// a cross-language parity test locks the two against divergence.
-		return { path: p, demo: parsed.demo === true || isDemoVaultPath(p), council: parsed.council === true };
+		return {
+			path: p,
+			demo: parsed.demo === true || isDemoVaultPath(p),
+			council: parsed.council === true,
+			modules
+		};
 	} catch {
-		return { path: null, demo: false, council: false };
+		return { path: null, demo: false, council: false, modules: {} };
 	}
 }
 
@@ -167,6 +190,11 @@ export function isCouncilRegistered(): boolean {
 	return readActiveVaultMeta().council;
 }
 
+/** Vault opt-in for optional modules. Unknown and malformed entries are denied. */
+export function isVaultModuleEnabled(moduleId: string): boolean {
+	return readActiveVaultMeta().modules[moduleId] === true;
+}
+
 export function getCouncilDbPath(): string | null {
 	// Aufgabe 4(b): a demo vault does NOT register Council — capability removal at the
 	// data-access layer (not display filtering). null ⇒ readers return empty, no council.
@@ -185,6 +213,23 @@ export function getCouncilConfigPath(): string {
 // run rows) so a Council-free mail-only screenshot can be taken. Off by default.
 export function getHideCouncil(): boolean {
 	return kitEnv().HIDE_COUNCIL === '1' || kitEnv().HIDE_COUNCIL === 'true';
+}
+
+/** Emergency stop for every optional module. This always wins over registration. */
+export function areModulesDisabled(): boolean {
+	const value = process.env.FOLIO_MODULES_DISABLED ?? kitEnv().FOLIO_MODULES_DISABLED ?? '';
+	return value === '1' || value === 'true';
+}
+
+/** Comma-separated per-module emergency stops. Unknown ids are harmless and remain denied. */
+export function getDisabledModuleIds(): ReadonlySet<string> {
+	const value = process.env.FOLIO_DISABLED_MODULES ?? kitEnv().FOLIO_DISABLED_MODULES ?? '';
+	return new Set(
+		value
+			.split(',')
+			.map((item) => item.trim().toLowerCase())
+			.filter(Boolean)
+	);
 }
 
 export function getLifeMailPath(): string {

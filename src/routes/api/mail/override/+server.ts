@@ -17,7 +17,7 @@
 
 import { error, json } from '@sveltejs/kit';
 import { insertMailActionabilityOverride } from '$lib/server/folio-db/writer.js';
-import { isCouncilRegistered } from '$lib/server/env.js';
+import { hasModuleCapability } from '$lib/server/modules/index.js';
 import type { MailActionabilityOverride } from '$lib/server/folio-db/types.js';
 import type { RequestHandler } from './$types.js';
 
@@ -48,7 +48,10 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	// 'uebernommen' = "please ingest into Council". If the active vault does not register
 	// Council (demo), the target does not exist — remove the capability at the data-access
 	// layer, not just in the UI. Guard the action against its own precondition.
-	if (body.overridden_actionability === 'uebernommen' && !isCouncilRegistered()) {
+	if (
+		body.overridden_actionability === 'uebernommen' &&
+		!hasModuleCapability('council', 'ingest.write')
+	) {
 		throw error(409, 'Council ist in diesem Vault nicht registriert — „Übernommen" nicht verfügbar.');
 	}
 

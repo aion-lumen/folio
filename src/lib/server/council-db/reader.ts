@@ -23,7 +23,8 @@ import type {
 } from './types.js';
 import { getHeuristicMarkersForFeedbackId } from '../feedback/reader.js';
 import { extractPlzInfo, haversineKm } from '$lib/util/distance.js';
-import { getCouncilConfigPath, getCouncilDbPath, getHomePlz } from '../env.js';
+import { getCouncilConfigPath, getHomePlz } from '../env.js';
+import { getModuleDatabasePath } from '../modules/index.js';
 import {
 	resolveEffectiveSubstanceMap,
 	type SubstanceProvenance
@@ -72,7 +73,7 @@ export function getRecentIngestAcks(): IngestAckRow[] {
 let _conn: Database.Database | null = null;
 let _connPath: string | null = null;
 function getCouncilDb(): Database.Database | null {
-	const dbPath = getCouncilDbPath();
+	const dbPath = getModuleDatabasePath('council', 'primary', 'records.read');
 	// null ⇒ Council not registered for the active vault (demo). Drop any cached
 	// real-vault connection and report absence — all readers handle null gracefully.
 	if (!dbPath || !existsSync(dbPath)) {

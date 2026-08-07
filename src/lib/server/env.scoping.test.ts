@@ -83,6 +83,11 @@ describe('vault-scoped DB paths', () => {
 		expect(getCouncilDbPath()).toContain('council.db');
 	});
 
+	it('generic module declarations cannot bypass the cross-runtime Council opt-in', () => {
+		writeActiveVault({ path: join(home, 'Projects/life'), modules: { council: true } });
+		expect(isCouncilRegistered()).toBe(false);
+	});
+
 	// PARITY LOCK — must match multi-agent/tests/test_council_state.py CASES exactly.
 	// If you change one table, change the other; else the TS gate and the Python
 	// move-pipeline gate diverge silently.

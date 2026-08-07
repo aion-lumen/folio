@@ -6,6 +6,7 @@
 import { error, json } from '@sveltejs/kit';
 import { isSupportedPortalUrl } from '$lib/server/council-db/portals.js';
 import { insertPendingIngest } from '$lib/server/folio-db/writer.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 import type { RequestHandler } from './$types.js';
 
 interface PostBody {
@@ -13,6 +14,7 @@ interface PostBody {
 }
 
 export const POST: RequestHandler = async ({ request, locals }) => {
+	requireModuleCapability('council', 'ingest.write');
 	let body: PostBody;
 	try {
 		body = await request.json();

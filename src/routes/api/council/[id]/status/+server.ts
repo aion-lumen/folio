@@ -5,6 +5,7 @@
 import { error, json } from '@sveltejs/kit';
 import { insertStatusOverride } from '$lib/server/folio-db/writer.js';
 import type { CouncilStatusTagAll } from '$lib/server/folio-db/types.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 import type { RequestHandler } from './$types.js';
 
 const ALLOWED: CouncilStatusTagAll[] = [
@@ -27,6 +28,7 @@ interface PostBody {
 }
 
 export const POST: RequestHandler = async ({ params, request, locals }) => {
+	requireModuleCapability('council', 'records.write');
 	const objectId = params.id;
 	if (!objectId) throw error(400, 'missing object id');
 	let body: PostBody;

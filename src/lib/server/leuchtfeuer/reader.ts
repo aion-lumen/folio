@@ -2,12 +2,9 @@
 // Read-only, aggregate-only. No client-side tracking: the source is Caddy server logs (see
 // docs/leuchtfeuer-metrics-schema.md). Degradation is first-class — missing files are not an error.
 //
-// 08c migration note: Leuchtfeuer is built as a NORMAL card, not via the module-registry API. Once
-// 08c lands the registration API, this reader becomes its SECOND consumer (a test, not a blocker) —
-// move metrics access behind the registered-module boundary then. Do not add that dependency now.
 import { readdirSync, readFileSync } from 'fs';
-import { homedir } from 'os';
 import { join } from 'path';
+import { getModuleDatabasePath } from '../modules/index.js';
 import type {
 	DailyGithubMetric,
 	DailySiteMetric,
@@ -27,15 +24,17 @@ export type {
 const SITES = ['aion-lumen.ch', 'frag-shifu.ch', 'noblecause.ai', 'mirhamed.ch'] as const;
 const WINDOW = 30; // days of history kept for the 30-day sparkline (7-day is a slice of it)
 
-function metricsDir(): string {
-	return join(homedir(), '.folio', 'metrics');
+function metricsDir(): string | null {
+	return getModuleDatabasePath('leuchtfeuer', 'metrics', 'metrics.read');
 }
 
 /** Read + parse the last WINDOW daily json files in a metrics subdir, ascending by date. */
 function readDaily<T>(subdir: string): T[] {
+	const root = metricsDir();
+	if (!root) return [];
 	let files: string[];
 	try {
-		files = readdirSync(join(metricsDir(), subdir));
+		files = readdirSync(join(root, subdir));
 	} catch {
 		return []; // dir missing → degradation, not an error
 	}
@@ -44,7 +43,7 @@ function readDaily<T>(subdir: string): T[] {
 	const out: T[] = [];
 	for (const f of recent) {
 		try {
-			out.push(JSON.parse(readFileSync(join(metricsDir(), subdir, f), 'utf-8')) as T);
+			out.push(JSON.parse(readFileSync(join(root, subdir, f), 'utf-8')) as T);
 		} catch {
 			// skip a corrupt/partial file rather than failing the whole card
 		}

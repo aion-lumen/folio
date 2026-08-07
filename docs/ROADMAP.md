@@ -76,6 +76,11 @@ second-device demo above is explicitly not permission for external installation:
 - Replace domain-name conditionals with registered capabilities.
 - Migrate Leuchtfeuer as the second registry consumer.
 
+Development status (unreleased): the minimal capability-broker slice now includes
+manifest validation, deny-by-default registry, global/per-module kill switches, Council route and
+database guards, a path-free registry endpoint, and Leuchtfeuer as the second consumer. Full
+third-party package loading remains deliberately outside this foundation and is not implied by it.
+
 ## v0.5.0 — Redaction Gate, T2 first
 
 The first release of the Redaction Gate is deliberately human-carried and has no outbound network

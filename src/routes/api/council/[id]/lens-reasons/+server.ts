@@ -5,8 +5,10 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types.js';
 import { getLensReasonsForObject } from '$lib/server/council-db/reader.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 
 export const GET: RequestHandler = async ({ params }) => {
+	requireModuleCapability('council', 'records.read');
 	const id = params.id;
 	if (!id) {
 		return json({ error: 'missing id' }, { status: 400 });
