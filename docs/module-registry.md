@@ -14,6 +14,11 @@ Each `folio/module-manifest/v1` declaration contains:
 - sensitivity and retention declarations; and
 - the standard global and per-module emergency stops.
 
+Retention metadata is descriptive unless a data class explicitly declares `enforced: true`.
+For `enforced: false`, the registry neither schedules deletion nor verifies compliance: the module
+owner remains responsible for documenting and implementing the data lifecycle. Installers and
+module authors must not treat a declared policy as a runtime guarantee.
+
 Runtime filesystem paths are separate from the manifest. `GET /api/modules`
 returns declarations and current enabled/killed state, but never returns those
 paths.
@@ -64,6 +69,11 @@ Sonar is deliberately a built-in reviewer with `enabled: () => true`, not a
 vault-opt-in module like Council. A vault without `internal/sonar/inbox` gets an
 empty workspace; the global or per-module kill switch remains the explicit way
 to disable the module.
+
+Sonar's trust invariant applies to every future importer and routine: external-derived signals
+enter as review-required notes and cannot be auto-accepted, auto-committed, or published. Only an
+explicit human decision may change their review status; adding a fetcher, classifier, or draft
+generator does not weaken that boundary.
 
 ## Deliberate limits of the first gate
 
