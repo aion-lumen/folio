@@ -1,6 +1,6 @@
 # Session Relay
 
-Session Relay is Folio's provider-neutral handoff boundary between an incoming case and the session responsible for its domain. The first foundation slice stages a reviewed request and writes it into a target-specific filesystem inbox. Receiving responses is the next slice; it is not part of this implementation yet.
+Session Relay is Folio's provider-neutral handoff boundary between an incoming case and the session responsible for its domain. Folio stages a reviewed request in a target-specific filesystem inbox and accepts a response through the matching outbox.
 
 ## Trust boundary
 
@@ -30,11 +30,29 @@ Folio validates these declarations before a case can be staged. Target adapters 
 ```text
 ~/.folio/session-exchange/
 ├── staging/<case-id>/payload.json
-└── <domain>/inbox/<case-id>/request.md
+├── <domain>/inbox/<case-id>/request.md
+└── <domain>/outbox/<case-id>/response.json
 ```
 
-`payload.json` is the exact human-reviewed version. `request.md` is the provider-neutral handoff artifact consumed by a Cowork filesystem integration or a local Hermes adapter.
+`payload.json` is the exact human-reviewed version. `request.md` is the provider-neutral handoff artifact consumed by a Cowork filesystem integration or a local Hermes adapter. `response.json` uses `folio/session-relay-response/v1` and is bound to the case ID, request hash and target ID.
 
 ## Current scope
 
-This slice provides staging, exact-version egress approval, delivery and an append-only audit trail. The next slice adds the provider-neutral response envelope and the human review path back into Folio. It will support response drafts, requests for more context and proposed Objectives without giving an external session direct write access to mail or campaign state.
+The response envelope supports reply drafts, requests for more context and proposed Objectives. Folio rejects unknown fields, mismatched request versions and changed responses. An external session never receives direct write access to mail or campaign state: its result becomes effective only after a human action in Folio. Accepted reply drafts remain available as Folio mail templates; accepted Objective proposals use Folio's existing Objective writer.
+
+The generated `request.md` contains the exact response path, request hash and schema name. A minimal reply looks like this:
+
+```json
+{
+  "schema": "folio/session-relay-response/v1",
+  "case_id": "<case-id>",
+  "request_hash": "<request-sha256>",
+  "target_id": "career-cowork",
+  "result": {
+    "kind": "reply_draft",
+    "subject": "Re: …",
+    "body": "…"
+  },
+  "created_at": "2026-08-08T12:00:00.000Z"
+}
+```

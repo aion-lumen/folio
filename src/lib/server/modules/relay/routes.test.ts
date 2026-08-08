@@ -1,0 +1,19 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+describe('Session Relay route guards', () => {
+	it('guards the panel and every mutation capability at the HTTP boundary', () => {
+		const source = readFileSync(join(process.cwd(), 'src/routes/relay/+page.server.ts'), 'utf8');
+		for (const capability of [
+			'panel.render',
+			'cases.read',
+			'egress.approve',
+			'cases.share',
+			'responses.read',
+			'responses.apply'
+		]) {
+			expect(source).toContain(`requireModuleCapability('relay', '${capability}')`);
+		}
+	});
+});

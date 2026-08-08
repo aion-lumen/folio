@@ -447,6 +447,18 @@ CREATE TRIGGER IF NOT EXISTS relay_events_no_delete
     BEFORE DELETE ON relay_events BEGIN
         SELECT RAISE(ABORT, 'relay_events is append-only');
     END;
+
+CREATE TABLE IF NOT EXISTS relay_applications (
+    application_id  TEXT PRIMARY KEY,
+    case_id          TEXT NOT NULL UNIQUE,
+    artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request')),
+    target_ref       TEXT NOT NULL,
+    applied_by       TEXT NOT NULL,
+    applied_at       TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_applications_case
+    ON relay_applications(case_id, applied_at DESC);
 `;
 
 export function getFolioDb(): Database.Database {

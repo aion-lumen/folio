@@ -41,6 +41,7 @@ describe('built-in module registry', () => {
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(true);
 		expect(hasModuleCapability('sonar', 'notes.read')).toBe(true);
 		expect(hasModuleCapability('relay', 'egress.approve')).toBe(true);
+		expect(hasModuleCapability('relay', 'responses.apply')).toBe(true);
 		writeFileSync(
 			join(home, '.folio', 'active-vault.json'),
 			JSON.stringify({ path: join(home, 'vault'), council: true })
@@ -54,6 +55,9 @@ describe('built-in module registry', () => {
 	it('applies global and per-module emergency stops dynamically', () => {
 		process.env.FOLIO_DISABLED_MODULES = 'leuchtfeuer';
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(false);
+		process.env.FOLIO_DISABLED_MODULES = 'relay';
+		expect(hasModuleCapability('relay', 'responses.read')).toBe(false);
+		expect(getModuleDatabasePath('relay', 'exchange', 'responses.read')).toBeNull();
 		process.env.FOLIO_DISABLED_MODULES = '';
 		process.env.FOLIO_MODULES_DISABLED = 'true';
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(false);

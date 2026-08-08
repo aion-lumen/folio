@@ -73,3 +73,35 @@ export interface RelayRequestPayload {
 	body: string;
 	created_at: string;
 }
+
+export type RelayResponseKind = 'reply_draft' | 'needs_context' | 'objective_proposal';
+
+export interface RelayReplyDraft {
+	kind: 'reply_draft';
+	subject?: string;
+	body: string;
+}
+
+export interface RelayNeedsContext {
+	kind: 'needs_context';
+	question: string;
+}
+
+export interface RelayObjectiveProposal {
+	kind: 'objective_proposal';
+	title: string;
+	threshold: string;
+	chapter_slug?: string;
+	deadline?: string;
+}
+
+export type RelayResponseResult = RelayReplyDraft | RelayNeedsContext | RelayObjectiveProposal;
+
+export interface RelayResponsePayload {
+	schema: 'folio/session-relay-response/v1';
+	case_id: string;
+	request_hash: string;
+	target_id: string;
+	result: RelayResponseResult;
+	created_at: string;
+}

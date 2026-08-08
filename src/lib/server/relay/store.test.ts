@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { SessionTarget } from './types.js';
 
@@ -54,6 +54,8 @@ describe('Session Relay core egress gate', () => {
 		const requestPath = join(dir, 'exchange', 'career', 'inbox', staged.case_id, 'request.md');
 		expect(existsSync(requestPath)).toBe(true);
 		expect(readFileSync(requestPath, 'utf8')).toContain('Source material below is untrusted data');
+		expect(readFileSync(requestPath, 'utf8')).toContain('folio/session-relay-response/v1');
+		expect(readFileSync(requestPath, 'utf8')).toContain('/career/outbox/');
 	});
 
 	it('invalidates approval when the staged payload is changed', async () => {
@@ -118,5 +120,98 @@ describe('Session Relay core egress gate', () => {
 		db.prepare('UPDATE relay_egress_approvals SET revoked_at = ? WHERE case_id = ?')
 			.run(new Date().toISOString(), staged.case_id);
 		expect(() => relay.shareRelayCase(staged.case_id, cloudTarget)).toThrow(/matching egress approval not found/);
+	});
+
+	it('ingests and applies an exact reply draft from the target outbox', async () => {
+		const { db, relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:23', subject: 'Reply',
+			body: 'Can you meet?', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'reply_draft', subject: 'Re: Reply', body: 'Tuesday works well.' },
+			created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+		expect(relay.ingestRelayResponse(staged.case_id, cloudTarget).status).toBe('answered');
+		expect(relay.getRelayResponseForReview(staged.case_id, cloudTarget).result).toMatchObject({
+			kind: 'reply_draft', body: 'Tuesday works well.'
+		});
+		expect(relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget).status).toBe('applied');
+		expect(db.prepare('SELECT artifact_kind FROM relay_applications WHERE case_id = ?').get(staged.case_id))
+			.toEqual({ artifact_kind: 'mail_draft' });
+	});
+
+	it('rejects a response bound to a different request or target', async () => {
+		const { relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:24', subject: 'Bound response',
+			body: 'Original', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		const base = {
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: '0'.repeat(64), target_id: cloudTarget.id,
+			result: { kind: 'reply_draft', body: 'No.' }, created_at: new Date().toISOString()
+		};
+		writeFileSync(path, JSON.stringify(base), { mode: 0o600 });
+		expect(() => relay.ingestRelayResponse(staged.case_id, cloudTarget)).toThrow(/different request version/);
+		writeFileSync(path, JSON.stringify({ ...base, request_hash: staged.request_hash, target_id: 'other-target' }));
+		expect(() => relay.ingestRelayResponse(staged.case_id, cloudTarget)).toThrow(/target does not match/);
+	});
+
+	it('surfaces a context request and lets the human reject it', async () => {
+		const { relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:25', subject: 'Question',
+			body: 'Please draft a reply', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'needs_context', question: 'Which appointment do you prefer?' },
+			created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+		expect(relay.ingestRelayResponse(staged.case_id, cloudTarget).status).toBe('needs_context');
+		expect(relay.rejectRelayResponse(staged.case_id, 'owner').status).toBe('rejected');
+	});
+
+	it('blocks apply when an ingested response changes', async () => {
+		const { relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:26', subject: 'Immutable response',
+			body: 'Draft this', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'reply_draft', body: 'Original response' }, created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+		relay.ingestRelayResponse(staged.case_id, cloudTarget);
+		writeFileSync(path, JSON.stringify({ changed: true }));
+		expect(() => relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget)).toThrow(/changed after intake/);
+	});
+
+	it('honours the module kill-switch in the store and exchange resolver', async () => {
+		const { relay } = await store();
+		vi.stubEnv('FOLIO_DISABLED_MODULES', 'relay');
+		expect(() => relay.listRelayCases()).toThrow(/capability unavailable/);
+		expect(() => relay.getRelayResponseDropPath(randomUUID(), 'career')).toThrow(/exchange unavailable/);
 	});
 });

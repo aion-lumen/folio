@@ -1,13 +1,24 @@
 import { fail } from '@sveltejs/kit';
+import { randomUUID } from 'node:crypto';
+import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { isDemoVaultActive } from '$lib/server/env.js';
+import { requireModuleCapability } from '$lib/server/modules/http.js';
 import {
+	applyRelayResponse,
 	approveRelayEgress,
 	getRelayPayloadForReview,
+	getRelayResponseDropPath,
+	getRelayResponseForReview,
+	ingestAvailableRelayResponses,
+	ingestRelayResponse,
 	listRelayCases,
+	rejectRelayResponse,
 	shareRelayCase,
 	stageRelayCase
 } from '$lib/server/relay/store.js';
 import { DEMO_CAREER_TARGET, loadSessionTargets } from '$lib/server/relay/targets.js';
+import { createObjective } from '$lib/server/vault/writer.js';
 import type { Actions, PageServerLoad } from './$types.js';
 
 function ensureDemoCase(): void {
@@ -26,19 +37,36 @@ function ensureDemoCase(): void {
 }
 
 export const load: PageServerLoad = async () => {
+	requireModuleCapability('relay', 'panel.render');
+	requireModuleCapability('relay', 'cases.read');
+	requireModuleCapability('relay', 'responses.read');
 	ensureDemoCase();
 	const targets = loadSessionTargets();
+	const responseErrors = ingestAvailableRelayResponses(targets);
 	const labels = Object.fromEntries(targets.map((target) => [target.id, target.label]));
 	const cases = listRelayCases().map((item) => ({
 		...item,
 		target_label: labels[item.target_id] ?? item.target_id,
-		preview: getRelayPayloadForReview(item.case_id).body
+		preview: getRelayPayloadForReview(item.case_id).body,
+		response: (() => {
+			if (!['answered', 'needs_context', 'applied', 'rejected'].includes(item.status)) return null;
+			const target = targets.find((candidate) => candidate.id === item.target_id);
+			if (!target) return null;
+			try {
+				return getRelayResponseForReview(item.case_id, target).result;
+			} catch {
+				return null;
+			}
+		})()
 	}));
-	return { cases, targetsConfigured: targets.length > 0 };
+	return { cases, targetsConfigured: targets.length > 0, responseErrors, demo: isDemoVaultActive() };
 };
 
 export const actions: Actions = {
 	share: async ({ request }) => {
+		requireModuleCapability('relay', 'cases.read');
+		requireModuleCapability('relay', 'egress.approve');
+		requireModuleCapability('relay', 'cases.share');
 		const data = await request.formData();
 		const caseId = String(data.get('case_id') ?? '');
 		try {
@@ -51,6 +79,80 @@ export const actions: Actions = {
 			return { success: true, caseId };
 		} catch (error) {
 			return fail(409, { message: error instanceof Error ? error.message : 'Freigabe fehlgeschlagen.' });
+		}
+	},
+	demoResponse: async ({ request }) => {
+		requireModuleCapability('relay', 'cases.read');
+		requireModuleCapability('relay', 'responses.read');
+		if (!isDemoVaultActive()) return fail(404, { message: 'Nur im Demo-Vault verfügbar.' });
+		const data = await request.formData();
+		const caseId = String(data.get('case_id') ?? '');
+		try {
+			const relayCase = listRelayCases().find((item) => item.case_id === caseId);
+			if (!relayCase) return fail(404, { message: 'Übergabe nicht gefunden.' });
+			if (relayCase.status !== 'shared') return fail(409, { message: 'Die Demo-Session wartet noch nicht auf diesen Fall.' });
+			const path = getRelayResponseDropPath(caseId, relayCase.domain);
+			mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+			const temp = `${path}.${randomUUID()}.tmp`;
+			writeFileSync(temp, JSON.stringify({
+				schema: 'folio/session-relay-response/v1',
+				case_id: caseId,
+				request_hash: relayCase.request_hash,
+				target_id: DEMO_CAREER_TARGET.id,
+				result: {
+					kind: 'reply_draft',
+					subject: `Re: ${relayCase.subject}`,
+					body: 'Guten Tag Frau Keller\n\nvielen Dank für die Einladung. Dienstag um 10:00 Uhr passt mir sehr gut. Ich freue mich auf das zweite Gespräch.\n\nFreundliche Grüsse\nAlex'
+				},
+				created_at: new Date().toISOString()
+			}), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+			renameSync(temp, path);
+			ingestRelayResponse(caseId, DEMO_CAREER_TARGET);
+			return { success: true, caseId, demoResponse: true };
+		} catch (error) {
+			return fail(409, { message: error instanceof Error ? error.message : 'Demo-Antwort fehlgeschlagen.' });
+		}
+	},
+	apply: async ({ request }) => {
+		requireModuleCapability('relay', 'cases.read');
+		requireModuleCapability('relay', 'responses.read');
+		requireModuleCapability('relay', 'responses.apply');
+		const data = await request.formData();
+		const caseId = String(data.get('case_id') ?? '');
+		try {
+			const relayCase = listRelayCases().find((item) => item.case_id === caseId);
+			if (!relayCase) return fail(404, { message: 'Übergabe nicht gefunden.' });
+			const target = loadSessionTargets().find((item) => item.id === relayCase.target_id);
+			if (!target) return fail(409, { message: 'Ziel ist nicht mehr konfiguriert.' });
+			const response = getRelayResponseForReview(caseId, target);
+			let targetRef: string | undefined;
+			if (response.result.kind === 'objective_proposal') {
+				if (!response.result.chapter_slug) return fail(409, { message: 'Der Objective-Vorschlag nennt kein Kapitel.' });
+				const objectiveId = await createObjective(response.result.chapter_slug, {
+					title: response.result.title,
+					threshold: response.result.threshold,
+					weight: 1,
+					related_goals: [],
+					deadline: response.result.deadline,
+					historyNote: `created from relay case ${caseId}`
+				});
+				targetRef = `objective:${objectiveId}`;
+			}
+			applyRelayResponse(caseId, 'owner', target, targetRef);
+			return { success: true, caseId, applied: true };
+		} catch (error) {
+			return fail(409, { message: error instanceof Error ? error.message : 'Übernahme fehlgeschlagen.' });
+		}
+	},
+	reject: async ({ request }) => {
+		requireModuleCapability('relay', 'responses.apply');
+		const data = await request.formData();
+		const caseId = String(data.get('case_id') ?? '');
+		try {
+			rejectRelayResponse(caseId, 'owner');
+			return { success: true, caseId, rejected: true };
+		} catch (error) {
+			return fail(409, { message: error instanceof Error ? error.message : 'Verwerfen fehlgeschlagen.' });
 		}
 	}
 };
