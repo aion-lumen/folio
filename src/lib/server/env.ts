@@ -160,6 +160,14 @@ export function getFolioDbPath(): string {
 		?? join(homedir(), '.folio/folio.db');
 }
 
+/** Runtime-only Session Relay files. Never stored in the repository or vault. */
+export function getSessionExchangePath(): string {
+	if (isDemoVaultActive()) return join(homedir(), '.folio', 'session-exchange-demo');
+	return process.env.FOLIO_SESSION_EXCHANGE_PATH
+		?? kitEnv().FOLIO_SESSION_EXCHANGE_PATH
+		?? join(homedir(), '.folio', 'session-exchange');
+}
+
 export function getMoveActionsPath(): string {
 	return kitEnv().MOVE_ACTIONS_PATH
 		?? join(homedir(), 'Projects/folio/config/move_actions.yaml');

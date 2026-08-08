@@ -1,0 +1,13 @@
+schema: folio/session-targets/v1
+
+# Cloud targets are deliberately absent from a fresh installation. Add one only
+# after choosing its domain, capabilities and permitted data classes.
+targets:
+  - id: career-hermes
+    label: Local career agent
+    domain: career
+    adapter: hermes-local
+    locality: local
+    capabilities: [analyze, reply_draft, needs_context]
+    allowed_data_classes: [mail_metadata, mail_body, memory_context]
+    retention_days: 14

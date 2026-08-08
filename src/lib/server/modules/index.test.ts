@@ -36,10 +36,11 @@ describe('built-in module registry', () => {
 		rmSync(home, { recursive: true, force: true });
 	});
 
-	it('keeps Council opt-in while Leuchtfeuer and Sonar are registered built-ins', () => {
+	it('keeps Council opt-in while core built-ins are registered', () => {
 		expect(hasModuleCapability('council', 'records.read')).toBe(false);
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(true);
 		expect(hasModuleCapability('sonar', 'notes.read')).toBe(true);
+		expect(hasModuleCapability('relay', 'egress.approve')).toBe(true);
 		writeFileSync(
 			join(home, '.folio', 'active-vault.json'),
 			JSON.stringify({ path: join(home, 'vault'), council: true })
@@ -70,7 +71,7 @@ describe('built-in module registry', () => {
 
 	it('registry snapshot contains both reference consumers and no paths', () => {
 		const snapshot = getModuleRegistrySnapshot();
-		expect(snapshot.map((item) => item.manifest.id)).toEqual(['council', 'leuchtfeuer', 'sonar']);
+		expect(snapshot.map((item) => item.manifest.id)).toEqual(['council', 'leuchtfeuer', 'relay', 'sonar']);
 		expect(JSON.stringify(snapshot)).not.toContain(home);
 	});
 });
