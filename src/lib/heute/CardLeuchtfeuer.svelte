@@ -24,13 +24,20 @@
 	});
 	const visits7 = $derived(lastN(totalVisits, 7));
 	const visits7Sum = $derived(visits7.reduce((a, b) => a + b, 0));
-
-	const door = $derived(
-		data.sites.reduce(
-			(acc, s) => ({ story: acc.story + s.door7.story, folio: acc.folio + s.door7.folio }),
-			{ story: 0, folio: 0 }
-		)
+	const hasVerifiedVisits = $derived(data.verifiedThrough !== null);
+	const siteRows = $derived(
+		data.sites
+			.filter((site) => site.dates.length > 0)
+			.map((site) => ({ site: site.site, total: site.visits.reduce((a, b) => a + b, 0) }))
+			.sort((a, b) => b.total - a.total)
 	);
+	const siteMax = $derived(Math.max(1, ...siteRows.map((row) => row.total)));
+	const siteLabel: Record<string, string> = {
+		'mirhamed.ch': 'Karriere',
+		'aion-lumen.ch': 'Werkstatt',
+		'noblecause.ai': 'Experiment',
+		'frag-shifu.ch': 'Lernprodukt'
+	};
 
 	const starsTotal = $derived(data.github?.starsTotal ?? []);
 	const starsNow = $derived(starsTotal.length ? starsTotal[starsTotal.length - 1] : 0);
@@ -51,39 +58,25 @@
 		<p class="primary muted">Noch keine Metriken</p>
 		<p class="hint">Tages-Aggregate landen unter ~/.folio/metrics/ (VPS-Pull)</p>
 	{:else}
-		<div class="metrics">
-			<div class="metric">
-				<span class="m-label">Server-Seitenaufrufe · 7 T</span>
-				<span class="m-value">{visits7Sum}</span>
-				<svg class="spark" viewBox="0 0 80 20" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points={sparklinePoints(visits7, 80, 20, 2)} />
+		<div class="resonance">
+			<div class="primary-signal">
+				<span><strong>{hasVerifiedVisits ? visits7Sum : '—'}</strong> geprüfte Aufrufe · 7 Tage</span>
+				<svg class="spark" viewBox="0 0 160 34" preserveAspectRatio="none" aria-hidden="true">
+					<polyline points={sparklinePoints(visits7, 160, 34, 3)} />
 				</svg>
 			</div>
-			<div class="metric">
-				<span class="m-label">Tür · Story:System</span>
-				<span class="m-value">{door.story} : {door.folio}</span>
-				<div class="door" aria-hidden="true">
-					<span class="door-a" style="flex:{door.story || 0.001}"></span>
-					<span class="door-b" style="flex:{door.folio || 0.001}"></span>
-				</div>
-			</div>
-			<div class="metric">
-				<span class="m-label">Stars</span>
-				<span class="m-value">{starsNow}</span>
-				<svg class="spark" viewBox="0 0 80 20" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points={sparklinePoints(lastN(starsTotal, 30), 80, 20, 2)} />
-				</svg>
-			</div>
-			<div class="metric">
-				<span class="m-label">Repo-Views · 7 T</span>
-				<span class="m-value">{views7Sum}</span>
-				<svg class="spark" viewBox="0 0 80 20" preserveAspectRatio="none" aria-hidden="true">
-					<polyline points={sparklinePoints(views7, 80, 20, 2)} />
-				</svg>
+			<div class="site-bars">
+				{#each siteRows as row (row.site)}
+					<div><span>{siteLabel[row.site] ?? row.site}</span><i><b class={row.site.replaceAll('.', '-')} style={`width:${(row.total / siteMax) * 100}%`}></b></i></div>
+				{/each}
 			</div>
 		</div>
 		<p class="hint">
-			Stand: {data.generatedFrom}{#if data.stale} · letzter verfügbarer Stand{/if}
+			{#if data.verifiedThrough}
+				GitHub: ★ {starsNow} · {views7Sum} interessierte Aufrufe · geprüft bis {data.verifiedThrough}
+			{:else}
+				Site-Zählung wartet auf den ersten gehärteten Tageslauf.
+			{/if}
 		</p>
 	{/if}
 </button>
@@ -132,28 +125,12 @@
 		opacity: 1;
 		transform: translateX(2px);
 	}
-	.metrics {
-		display: grid;
-		grid-template-columns: 1fr 1fr;
-		gap: 12px 16px;
-	}
-	.metric {
-		display: flex;
-		flex-direction: column;
-		gap: 3px;
-	}
-	.m-label {
-		font-size: 11px;
-		color: var(--color-muted-foreground);
-	}
-	.m-value {
-		font-size: 18px;
-		font-weight: 600;
-		color: var(--color-foreground);
-	}
+	.resonance { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; align-items: end; }
+	.primary-signal { display: flex; flex-direction: column; gap: 6px; color: var(--color-muted-foreground); font-size: 11px; }
+	.primary-signal strong { color: var(--color-foreground); font-size: 21px; }
 	.spark {
 		width: 100%;
-		height: 20px;
+		height: 34px;
 	}
 	.spark polyline {
 		fill: none;
@@ -161,20 +138,13 @@
 		stroke-width: 1.5;
 		vector-effect: non-scaling-stroke;
 	}
-	.door {
-		display: flex;
-		height: 6px;
-		border-radius: 3px;
-		overflow: hidden;
-		gap: 1px;
-	}
-	.door-a {
-		background: var(--color-lumen-warm, hsl(28 92% 58%));
-	}
-	.door-b {
-		background: var(--color-muted-foreground);
-		opacity: 0.5;
-	}
+	.site-bars { display: flex; flex-direction: column; gap: 5px; }
+	.site-bars > div { display: grid; grid-template-columns: 62px 1fr; gap: 7px; align-items: center; font-size: 9px; color: var(--color-muted-foreground); }
+	.site-bars i { display: block; height: 6px; overflow: hidden; border-radius: 999px; background: var(--color-muted); }
+	.site-bars b { display: block; height: 100%; border-radius: inherit; background: hsl(28 92% 58%); }
+	.site-bars b.mirhamed-ch { background: hsl(158 62% 38%); }
+	.site-bars b.noblecause-ai { background: hsl(268 58% 58%); }
+	.site-bars b.frag-shifu-ch { background: hsl(210 72% 52%); }
 	.hint {
 		font-size: 12px;
 		color: var(--color-muted-foreground);

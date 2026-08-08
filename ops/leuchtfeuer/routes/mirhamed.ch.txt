@@ -1,0 +1,4 @@
+# Public page routes of the server-rendered app.
+/
+/impressum
+/print
