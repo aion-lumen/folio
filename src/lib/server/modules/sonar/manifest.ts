@@ -42,7 +42,9 @@ export const SONAR_MODULE: ModuleRegistration = {
 					{ id: 'note.signal', label: 'Signal', data_class: 'external-note' },
 					{ id: 'note.context', label: 'Context', data_class: 'external-note' },
 					{ id: 'note.review', label: 'Review', data_class: 'review-decision' },
-					{ id: 'archive.summary', label: 'Archive summary', data_class: 'archive-metadata' }
+					{ id: 'archive.summary', label: 'Archive summary', data_class: 'archive-metadata' },
+					{ id: 'archive.following', label: 'Following profiles', data_class: 'archive-metadata' },
+					{ id: 'archive.following-review', label: 'Following review', data_class: 'review-decision' }
 				]
 			}
 		],

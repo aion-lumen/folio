@@ -63,7 +63,10 @@ content as text, never as trusted HTML. Explicit human decisions are appended to
 a private `reviews.ndjson` audit ledger; the imported source notes remain
 unchanged. Its Sources view reads only aggregate counts from the newest local,
 normalized X-archive manifest; it does not open post, following, or account
-records. Demo runs keep mutable review state separate and use a clearly labelled
+records. A separate, locally prepared profile cache may expose the user's current
+following list for an explicit AI/politics/both/drop review. Folio does not call X
+from this view, and these decisions only build a local migration list: they never
+follow or unfollow accounts. Demo runs keep mutable review state separate and use a clearly labelled
 synthetic archive summary from the bundled fixture rather
 than writing into the bundled fixture tree. No capability in this slice can
 publish, follow, like, or reply on an external service.

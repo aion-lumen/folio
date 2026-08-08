@@ -1,11 +1,13 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { Archive, ArrowRight, Bookmark, ExternalLink, Heart, LockKeyhole, Radar, ShieldCheck, Users } from 'lucide-svelte';
+	import { Archive, ArrowRight, Bookmark, ChevronLeft, ExternalLink, Heart, Landmark, LockKeyhole, Radar, ShieldCheck, Trash2, UserRound, Users } from 'lucide-svelte';
 	import type { SonarDomain, SonarReviewStatus } from '$lib/server/modules/sonar/store.js';
+	import type { SonarFollowingCategory } from '$lib/server/modules/sonar/following.js';
 
 	let { data } = $props();
 	type View = 'inbox' | 'knowledge' | 'drafts' | 'sources';
 	type DomainFilter = 'all' | SonarDomain;
+	type FollowingFilter = 'open' | SonarFollowingCategory;
 
 	let view = $state<View>('inbox');
 	let domain = $state<DomainFilter>('all');
@@ -15,6 +17,10 @@
 	let feedback = $state('');
 	let feedbackError = $state(false);
 	let feedbackTimer: ReturnType<typeof setTimeout> | null = null;
+	let sourceMode = $state<'overview' | 'following'>('overview');
+	let followingFilter = $state<FollowingFilter>('open');
+	let followingSelectedId = $state<string | null>(null);
+	let followingOverrides = $state<Record<string, SonarFollowingCategory>>({});
 
 	const notes = $derived(
 		data.sonar.notes.map((note) => ({ ...note, status: overrides[note.postId] ?? note.status }))
@@ -24,6 +30,21 @@
 	const rejectedCount = $derived(notes.filter((note) => note.status === 'rejected').length);
 	const reviewedCount = $derived(knowledgeCount + rejectedCount);
 	const reviewPercent = $derived(notes.length ? Math.round((reviewedCount / notes.length) * 100) : 0);
+	const followingProfiles = $derived(
+		data.following.profiles.map((profile) => ({
+			...profile,
+			category: followingOverrides[profile.accountId] ?? profile.category
+		}))
+	);
+	const followingOpenCount = $derived(followingProfiles.filter((profile) => profile.category === null).length);
+	const visibleFollowing = $derived(
+		followingProfiles.filter((profile) =>
+			followingFilter === 'open' ? profile.category === null : profile.category === followingFilter
+		)
+	);
+	const selectedFollowing = $derived(
+		visibleFollowing.find((profile) => profile.accountId === followingSelectedId) ?? visibleFollowing[0] ?? null
+	);
 	const visibleNotes = $derived(
 		notes.filter((note) => {
 			if (domain !== 'all' && !note.domains.includes(domain)) return false;
@@ -53,6 +74,7 @@
 	function chooseView(next: View) {
 		view = next;
 		selectedId = null;
+		sourceMode = 'overview';
 		clearFeedback();
 	}
 
@@ -92,6 +114,37 @@
 			);
 		} catch {
 			showFeedback('Die Entscheidung wurde nicht gespeichert. Der Eingang blieb unverändert.', true);
+		} finally {
+			saving = false;
+		}
+	}
+
+	async function reviewFollowing(category: SonarFollowingCategory) {
+		if (!selectedFollowing || saving || !data.canReviewFollowing) return;
+		const accountId = selectedFollowing.accountId;
+		saving = true;
+		clearFeedback();
+		try {
+			const response = await fetch('/api/sonar/following-review', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ account_id: accountId, category })
+			});
+			if (!response.ok) throw new Error('following review failed');
+			followingOverrides[accountId] = category;
+			followingOverrides = { ...followingOverrides };
+			followingSelectedId = null;
+			showFeedback(
+				category === 'ai'
+					? 'Für das neue AI-Konto vorgemerkt.'
+					: category === 'politics'
+						? 'Für das politische Konto vorgemerkt.'
+						: category === 'both'
+							? 'Für beide Konten zur späteren Prüfung markiert.'
+							: 'Nicht für den Umzug vorgemerkt.'
+			);
+		} catch {
+			showFeedback('Die Abo-Entscheidung wurde nicht gespeichert.', true);
 		} finally {
 			saving = false;
 		}
@@ -185,6 +238,71 @@
 	{:else if view === 'drafts'}
 		<div class="empty"><Radar size={24} /><strong>Entwürfe folgen im nächsten Schnitt</strong><span>Vorbereiten ja, veröffentlichen weiterhin nur durch dich.</span></div>
 	{:else}
+		{#if sourceMode === 'following'}
+			<section class="following-panel">
+				<header class="following-heading">
+					<button type="button" class="back-button" onclick={() => { sourceMode = 'overview'; followingSelectedId = null; clearFeedback(); }}><ChevronLeft size={16} /> Quellen</button>
+					<div>
+						<p class="archive-eyebrow">Kontoumzug vorbereiten</p>
+						<h2>Abos sortieren</h2>
+						<p>Nur vormerken — Folio folgt und entfolgt keinem Konto.</p>
+					</div>
+					<div class="following-progress">
+						<strong>{followingProfiles.length - followingOpenCount}<span> / {followingProfiles.length}</span></strong>
+						<small>gesichtet</small>
+					</div>
+				</header>
+
+				{#if !data.following.sourceHealthy || data.following.skippedProfiles > 0 || !data.following.ledgerHealthy}
+					<div class="archive-warning" role="status">
+						<ShieldCheck size={18} />
+						<div><strong>Sichtung eingeschränkt</strong><span>{!data.following.sourceHealthy ? 'Der lokale Profil-Cache ist nicht lesbar. ' : ''}{data.following.skippedProfiles > 0 ? `${data.following.skippedProfiles} ungültige Profile ausgelassen. ` : ''}{!data.following.ledgerHealthy ? 'Das Entscheidungsprotokoll ist nicht lesbar; neue Entscheidungen sind gesperrt.' : ''}</span></div>
+					</div>
+				{/if}
+
+				<nav class="following-filters" aria-label="Abo-Kategorien">
+					<button type="button" class:active={followingFilter === 'open'} onclick={() => { followingFilter = 'open'; followingSelectedId = null; }}>Offen <span>{followingOpenCount}</span></button>
+					<button type="button" class:active={followingFilter === 'ai'} onclick={() => { followingFilter = 'ai'; followingSelectedId = null; }}>AI <span>{followingProfiles.filter((profile) => profile.category === 'ai').length}</span></button>
+					<button type="button" class:active={followingFilter === 'politics'} onclick={() => { followingFilter = 'politics'; followingSelectedId = null; }}>Politik <span>{followingProfiles.filter((profile) => profile.category === 'politics').length}</span></button>
+					<button type="button" class:active={followingFilter === 'both'} onclick={() => { followingFilter = 'both'; followingSelectedId = null; }}>Beide <span>{followingProfiles.filter((profile) => profile.category === 'both').length}</span></button>
+					<button type="button" class:active={followingFilter === 'drop'} onclick={() => { followingFilter = 'drop'; followingSelectedId = null; }}>Nicht übernehmen <span>{followingProfiles.filter((profile) => profile.category === 'drop').length}</span></button>
+				</nav>
+
+				{#if visibleFollowing.length > 0}
+					<div class="following-workspace">
+						<div class="following-list" aria-label="X-Abos">
+							{#each visibleFollowing as profile (profile.accountId)}
+								<button type="button" class:selected={selectedFollowing?.accountId === profile.accountId} onclick={() => (followingSelectedId = profile.accountId)}>
+									<span class="profile-avatar">{profile.name.slice(0, 1).toUpperCase()}</span>
+									<span><strong>{profile.name}</strong><small>@{profile.username}</small></span>
+								</button>
+							{/each}
+						</div>
+
+						{#if selectedFollowing}
+							<article class="following-detail">
+								<div class="profile-title">
+									<span class="profile-avatar large">{selectedFollowing.name.slice(0, 1).toUpperCase()}</span>
+									<div><h3>{selectedFollowing.name}</h3><span>@{selectedFollowing.username}{selectedFollowing.verified ? ' · verifiziert' : ''}</span></div>
+									<a href={`https://x.com/${selectedFollowing.username}`} target="_blank" rel="noreferrer" aria-label="Profil auf X öffnen"><ExternalLink size={16} /></a>
+								</div>
+								<p class="profile-description">{selectedFollowing.description || 'Keine Bio vorhanden.'}</p>
+								<div class="destination-question"><strong>Wo gehört dieses Konto hin?</strong><span>Die Entscheidung erzeugt nur eine lokale Umzugsliste.</span></div>
+								<div class="destination-actions">
+									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('ai')}><UserRound size={17} /><span><b>AI-Konto</b><small>zu @aion_lumen</small></span></button>
+									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('politics')}><Landmark size={17} /><span><b>Politik-Konto</b><small>beim bisherigen Konto</small></span></button>
+									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('both')}><Users size={17} /><span><b>Beide prüfen</b><small>bewusst später entscheiden</small></span></button>
+									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('drop')}><Trash2 size={17} /><span><b>Nicht übernehmen</b><small>in keiner Umzugsliste</small></span></button>
+								</div>
+							</article>
+						{/if}
+					</div>
+				{:else}
+					<div class="following-empty"><strong>{followingFilter === 'open' ? 'Alle Abos sind gesichtet' : 'Diese Kategorie ist leer'}</strong><span>Du kannst jederzeit eine andere Kategorie öffnen und Entscheidungen ändern.</span></div>
+				{/if}
+				<footer class="archive-foot"><LockKeyhole size={15} /><span>Profile wurden am {formatDate(data.following.retrievedOn)} lokal zwischengespeichert. Diese Ansicht stellt keine Verbindung zu X her.</span></footer>
+			</section>
+		{:else}
 		<section class="sources-panel">
 			<header class="archive-heading">
 				<span class="archive-icon"><Archive size={21} /></span>
@@ -238,6 +356,7 @@
 						<div class="sorting-preview" aria-label="Vorgesehene Sortierung in AI, Politik und Unklar">
 							<span>AI</span><span>Politik</span><span>Unklar</span>
 						</div>
+						<button class="source-cta" type="button" disabled={data.following.profiles.length === 0} onclick={() => { sourceMode = 'following'; followingFilter = 'open'; followingSelectedId = null; clearFeedback(); }}>Abos sortieren <ArrowRight size={15} /></button>
 					</article>
 
 					<article class="recent-wave">
@@ -260,6 +379,7 @@
 				</div>
 			{/if}
 		</section>
+		{/if}
 	{/if}
 
 	{#if feedback}<p class="feedback" class:error={feedbackError} role={feedbackError ? 'alert' : 'status'}>{feedback}</p>{/if}
@@ -357,6 +477,8 @@
 	.sorting-preview span { padding: 7px; color: var(--color-muted-foreground); background: var(--color-card); font-size: 10px; text-align: center; }
 	.sorting-preview span:first-child { border-radius: 7px 0 0 7px; box-shadow: inset 0 -2px var(--sonar); }
 	.sorting-preview span:last-child { border-radius: 0 7px 7px 0; }
+	.source-cta { display: flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-top: 13px; padding: 9px 12px; border: 1px solid var(--sonar); border-radius: 7px; color: white; background: var(--sonar); cursor: pointer; font: inherit; font-size: 12px; }
+	.source-cta:disabled { opacity: .45; cursor: not-allowed; }
 	.review-ring { display: grid; place-items: center; width: 96px; height: 96px; margin: 14px auto 10px; border-radius: 50%; background: conic-gradient(var(--sonar) var(--reviewed), var(--color-border) 0); }
 	.review-ring::before { content: ''; grid-area: 1 / 1; width: 72px; height: 72px; border-radius: 50%; background: var(--color-background); }
 	.review-ring div { z-index: 1; grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; }
@@ -364,6 +486,51 @@
 	.review-ring span { color: var(--color-muted-foreground); font-size: 10px; }
 	.recent-wave p { text-align: center; }
 	.archive-foot { display: flex; align-items: center; gap: 7px; margin-top: 15px; color: var(--color-muted-foreground); font-size: 10px; }
+	.following-panel { margin-top: 18px; padding: 22px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-card); }
+	.following-heading { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 16px; }
+	.back-button { display: flex; align-items: center; gap: 3px; padding: 7px 9px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-muted-foreground); background: var(--color-card); cursor: pointer; font: inherit; font-size: 12px; }
+	.following-heading h2 { margin: 0; font-size: 21px; font-weight: 500; }
+	.following-heading > div > p:last-child { margin: 4px 0 0; color: var(--color-muted-foreground); font-size: 12px; }
+	.following-progress { justify-self: end; text-align: right; }
+	.following-progress strong { display: block; font-size: 20px; font-weight: 500; }
+	.following-progress strong span { color: var(--color-muted-foreground); font-size: 12px; }
+	.following-progress small { color: var(--color-muted-foreground); font-size: 10px; }
+	.following-filters { display: flex; gap: 7px; margin: 22px 0 12px; overflow-x: auto; }
+	.following-filters button { padding: 7px 9px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-muted-foreground); background: var(--color-card); white-space: nowrap; cursor: pointer; font: inherit; font-size: 11px; }
+	.following-filters button.active { border-color: var(--sonar); color: var(--color-foreground); background: color-mix(in srgb, var(--sonar) 7%, var(--color-card)); }
+	.following-filters span { margin-left: 3px; color: var(--color-muted-foreground); }
+	.following-workspace { display: grid; grid-template-columns: minmax(240px, .75fr) minmax(0, 1.35fr); min-height: 430px; max-height: calc(100vh - 300px); border: 1px solid var(--color-border); border-radius: 10px; overflow: hidden; }
+	.following-list { overflow-y: auto; border-right: 1px solid var(--color-border); background: var(--color-background); }
+	.following-list button { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 10px; width: 100%; padding: 11px 13px; border: 0; border-bottom: 1px solid var(--color-border); color: var(--color-foreground); background: transparent; text-align: left; cursor: pointer; }
+	.following-list button:hover { background: var(--color-muted); }
+	.following-list button.selected { background: var(--color-card); box-shadow: inset 3px 0 var(--sonar); }
+	.profile-avatar { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; color: var(--sonar); background: color-mix(in srgb, var(--sonar) 11%, var(--color-card)); font-size: 12px; font-weight: 600; }
+	.profile-avatar.large { width: 48px; height: 48px; font-size: 16px; }
+	.following-list button > span:last-child { min-width: 0; }
+	.following-list strong, .following-list small { display: block; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+	.following-list strong { font-size: 12px; font-weight: 500; }
+	.following-list small { margin-top: 2px; color: var(--color-muted-foreground); font-size: 10px; }
+	.following-detail { min-width: 0; overflow-y: auto; padding: 24px; }
+	.profile-title { display: flex; align-items: center; gap: 11px; }
+	.profile-title > div { min-width: 0; }
+	.profile-title h3 { margin: 0; font-size: 18px; font-weight: 500; }
+	.profile-title div span { color: var(--color-muted-foreground); font-size: 11px; }
+	.profile-title a { margin-left: auto; padding: 7px; border-radius: 7px; color: var(--color-muted-foreground); }
+	.profile-title a:hover { color: var(--color-foreground); background: var(--color-muted); }
+	.profile-description { min-height: 72px; margin: 23px 0; padding: 15px; border-left: 2px solid var(--color-border); color: var(--color-foreground); background: var(--color-background); font-size: 14px; line-height: 1.5; }
+	.destination-question { display: flex; flex-direction: column; gap: 3px; margin-bottom: 11px; }
+	.destination-question strong { font-size: 13px; font-weight: 500; }
+	.destination-question span { color: var(--color-muted-foreground); font-size: 10px; }
+	.destination-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+	.destination-actions button { display: flex; align-items: center; gap: 9px; padding: 11px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-foreground); background: var(--color-card); text-align: left; cursor: pointer; }
+	.destination-actions button:first-child { border-color: color-mix(in srgb, var(--sonar) 55%, var(--color-border)); background: color-mix(in srgb, var(--sonar) 7%, var(--color-card)); }
+	.destination-actions button:disabled { opacity: .45; cursor: not-allowed; }
+	.destination-actions button > span { display: flex; flex-direction: column; }
+	.destination-actions b { font-size: 11px; font-weight: 500; }
+	.destination-actions small { margin-top: 2px; color: var(--color-muted-foreground); font-size: 9px; }
+	.following-empty { display: grid; place-content: center; justify-items: center; min-height: 320px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-muted-foreground); text-align: center; }
+	.following-empty strong { color: var(--color-foreground); font-weight: 500; }
+	.following-empty span { margin-top: 4px; font-size: 11px; }
 	.feedback { margin: 12px 0 0; padding: 9px 11px; border-radius: 7px; background: color-mix(in srgb, var(--sonar) 10%, var(--color-card)); color: var(--sonar); font-size: 13px; }
 	.feedback.error { background: hsl(0 80% 96%); color: hsl(0 65% 36%); }
 	@media (max-width: 700px) {
@@ -384,5 +551,12 @@
 		.archive-flow { grid-template-columns: 1fr; }
 		.archive-flow > :global(svg) { transform: rotate(90deg); justify-self: center; }
 		.archive-metrics, .source-next-grid { grid-template-columns: 1fr; }
+		.following-panel { padding: 16px; }
+		.following-heading { grid-template-columns: auto 1fr; }
+		.following-progress { grid-column: 2; justify-self: start; text-align: left; }
+		.following-workspace { grid-template-columns: 1fr; max-height: none; }
+		.following-list { max-height: 230px; border-right: 0; border-bottom: 1px solid var(--color-border); }
+		.following-detail { padding: 20px 15px; }
+		.destination-actions { grid-template-columns: 1fr; }
 	}
 </style>

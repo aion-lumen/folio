@@ -1,0 +1,10 @@
+{
+  "schema": "aion-lumen/sonar-following-profile-cache/v1",
+  "retrieved_on": "2026-08-08",
+  "count": 6,
+  "privacy": {
+    "credentials_in_output": false,
+    "network_access_during_ui": false,
+    "public_metrics_stored": false
+  }
+}
