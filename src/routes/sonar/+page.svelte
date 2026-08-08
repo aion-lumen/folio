@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
-	import { ExternalLink, Radar, ShieldCheck } from 'lucide-svelte';
+	import { Archive, ArrowRight, Bookmark, ExternalLink, Heart, LockKeyhole, Radar, ShieldCheck, Users } from 'lucide-svelte';
 	import type { SonarDomain, SonarReviewStatus } from '$lib/server/modules/sonar/store.js';
 
 	let { data } = $props();
@@ -22,6 +22,8 @@
 	const pendingCount = $derived(notes.filter((note) => note.status === 'pending' || note.status === 'deferred').length);
 	const knowledgeCount = $derived(notes.filter((note) => note.status === 'accepted').length);
 	const rejectedCount = $derived(notes.filter((note) => note.status === 'rejected').length);
+	const reviewedCount = $derived(knowledgeCount + rejectedCount);
+	const reviewPercent = $derived(notes.length ? Math.round((reviewedCount / notes.length) * 100) : 0);
 	const visibleNotes = $derived(
 		notes.filter((note) => {
 			if (domain !== 'all' && !note.domains.includes(domain)) return false;
@@ -60,6 +62,10 @@
 		return Number.isNaN(date.valueOf())
 			? value
 			: new Intl.DateTimeFormat('de-CH', { day: '2-digit', month: 'short', year: 'numeric' }).format(date);
+	}
+
+	function formatCount(value: number): string {
+		return new Intl.NumberFormat('de-CH').format(value);
 	}
 
 	async function review(status: 'accepted' | 'deferred' | 'rejected') {
@@ -180,12 +186,79 @@
 		<div class="empty"><Radar size={24} /><strong>Entwürfe folgen im nächsten Schnitt</strong><span>Vorbereiten ja, veröffentlichen weiterhin nur durch dich.</span></div>
 	{:else}
 		<section class="sources-panel">
-			<div><span class="source-dot"></span><strong>X-Archiv</strong><small>Read-only · Bookmarks und Likes aus dem Altbestand</small></div>
-			<dl>
-				<div><dt>Lokale Notizen</dt><dd>{notes.length}</dd></div>
-				<div><dt>Verworfen</dt><dd>{rejectedCount}</dd></div>
-				<div><dt>Externe Auto-Aktion</dt><dd>aus</dd></div>
-			</dl>
+			<header class="archive-heading">
+				<span class="archive-icon"><Archive size={21} /></span>
+				<div>
+					<p class="archive-eyebrow">Lokale Quelle</p>
+					<h2>X-Archiv</h2>
+					<p>Der historische Bestand ist gesichert. Sonar nimmt daraus später kleine, prüfbare Wellen.</p>
+				</div>
+				<span class="readonly-badge"><span class="source-dot"></span>{data.archiveDemo ? 'Demo · ' : ''}nur lesen</span>
+			</header>
+
+			{#if !data.archive.healthy}
+				<div class="archive-warning" role="status">
+					<ShieldCheck size={18} />
+					<div><strong>Archiv nicht lesbar</strong><span>Die jüngsten Sonar-Notizen bleiben verfügbar; der Altbestand wird nicht verwendet.</span></div>
+				</div>
+			{:else if data.archive.summary}
+				<div class="archive-flow" aria-label="Weg vom lokalen Archiv zum bestätigten Wissen">
+					<div class="flow-step current"><span><Archive size={18} /></span><b>Archiv</b><small>lokal bereit</small></div>
+					<ArrowRight size={17} />
+					<div class="flow-step"><span>2</span><b>Kleine Wellen</b><small>bewusst begrenzt</small></div>
+					<ArrowRight size={17} />
+					<div class="flow-step"><span>3</span><b>Dein Review</b><small>behalten oder verwerfen</small></div>
+					<ArrowRight size={17} />
+					<div class="flow-step"><span>4</span><b>Wissen</b><small>erst nach Bestätigung</small></div>
+				</div>
+
+				<div class="archive-metrics">
+					<article>
+						<span class="metric-icon likes"><Heart size={19} /></span>
+						<div><strong>{formatCount(data.archive.summary.likes)}</strong><span>Likes</span></div>
+						<small>Wissenssignale, noch unsortiert</small>
+					</article>
+					<article>
+						<span class="metric-icon follows"><Users size={19} /></span>
+						<div><strong>{formatCount(data.archive.summary.following)}</strong><span>Abos</span></div>
+						<small>Basis für die AI-/Politik-Trennung</small>
+					</article>
+					<article class:missing={data.archive.summary.bookmarks === 0}>
+						<span class="metric-icon bookmarks"><Bookmark size={19} /></span>
+						<div><strong>{formatCount(data.archive.summary.bookmarks)}</strong><span>Bookmarks</span></div>
+						<small>{data.archive.summary.bookmarks === 0 ? 'Vom X-Archiv nicht geliefert' : 'Lokal für spätere Wellen bereit'}</small>
+					</article>
+				</div>
+
+				<div class="source-next-grid">
+					<article class="next-wave">
+						<div class="card-label"><span>Nächster sinnvoller Schritt</span><b>noch nicht gestartet</b></div>
+						<h3>Abos zuerst sortieren</h3>
+						<p>{formatCount(data.archive.summary.following)} Konten sind endlich und direkt für den Umzug relevant. AI, Politik und Unklar lassen sich als erste überschaubare Welle prüfen.</p>
+						<div class="sorting-preview" aria-label="Vorgesehene Sortierung in AI, Politik und Unklar">
+							<span>AI</span><span>Politik</span><span>Unklar</span>
+						</div>
+					</article>
+
+					<article class="recent-wave">
+						<div class="card-label"><span>Jüngste Sonar-Welle</span><b>{reviewPercent}% geprüft</b></div>
+						<div class="review-ring" style={`--reviewed: ${reviewPercent * 3.6}deg`} aria-label={`${reviewedCount} von ${notes.length} lokalen Notizen geprüft`}>
+							<div><strong>{reviewedCount}</strong><span>von {notes.length}</span></div>
+						</div>
+						<p>{pendingCount} offen · {knowledgeCount} als Wissen behalten · {rejectedCount} verworfen</p>
+					</article>
+				</div>
+
+				<footer class="archive-foot">
+					<LockKeyhole size={15} />
+					<span>Importiert am {formatDate(data.archive.summary.importedOn)} · Folio liest hier nur Summen, keine Posttexte. Keine Auto-Follows, Likes oder Veröffentlichungen.</span>
+				</footer>
+			{:else}
+				<div class="archive-empty">
+					<Archive size={25} />
+					<div><strong>Noch kein normalisiertes X-Archiv</strong><span>Jüngste API-Signale und deine lokalen Sonar-Notizen funktionieren unabhängig davon weiter.</span></div>
+				</div>
+			{/if}
 		</section>
 	{/if}
 
@@ -245,12 +318,52 @@
 	.empty { min-height: 340px; display: grid; place-content: center; justify-items: center; gap: 8px; margin-top: 18px; border: 1px solid var(--color-border); border-radius: 11px; color: var(--color-muted-foreground); background: var(--color-card); text-align: center; }
 	.empty strong { color: var(--color-foreground); font-weight: 500; }
 	.sources-panel { margin-top: 18px; padding: 22px; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-card); }
-	.sources-panel > div { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 9px; }
-	.sources-panel small { grid-column: 2; color: var(--color-muted-foreground); }
-	.sources-panel dl { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0 0; }
-	.sources-panel dl div { padding: 14px; border-radius: 8px; background: var(--color-background); }
-	.sources-panel dt { color: var(--color-muted-foreground); font-size: 12px; }
-	.sources-panel dd { margin: 5px 0 0; font-size: 18px; }
+	.archive-heading { display: flex; align-items: flex-start; gap: 13px; }
+	.archive-icon { display: grid; place-items: center; flex: 0 0 auto; width: 42px; height: 42px; border-radius: 10px; color: var(--sonar); background: color-mix(in srgb, var(--sonar) 11%, var(--color-card)); }
+	.archive-heading > div { min-width: 0; }
+	.archive-eyebrow { margin: 0 0 2px; color: var(--sonar); font-size: 10px; letter-spacing: .09em; text-transform: uppercase; }
+	.archive-heading h2 { margin: 0; font-size: 20px; font-weight: 500; }
+	.archive-heading p:last-child { margin: 5px 0 0; color: var(--color-muted-foreground); font-size: 13px; }
+	.readonly-badge { display: flex; align-items: center; gap: 6px; margin-left: auto; padding: 5px 8px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-muted-foreground); white-space: nowrap; font-size: 11px; }
+	.archive-warning, .archive-empty { display: flex; align-items: center; gap: 12px; margin-top: 22px; padding: 18px; border-radius: 9px; background: var(--color-background); color: var(--color-muted-foreground); }
+	.archive-warning { color: hsl(2 58% 40%); background: hsl(0 75% 96%); }
+	.archive-warning div, .archive-empty div { display: flex; flex-direction: column; gap: 3px; }
+	.archive-warning strong, .archive-empty strong { color: var(--color-foreground); font-weight: 500; }
+	.archive-warning span, .archive-empty span { font-size: 12px; }
+	.archive-flow { display: grid; grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr; align-items: center; gap: 10px; margin: 26px 0; padding: 17px 18px; border-radius: 10px; background: var(--color-background); color: var(--color-muted-foreground); }
+	.flow-step { display: grid; grid-template-columns: 30px 1fr; align-items: center; column-gap: 9px; min-width: 0; }
+	.flow-step > span { grid-row: 1 / 3; display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid var(--color-border); border-radius: 50%; font-size: 11px; }
+	.flow-step b { color: var(--color-foreground); font-size: 12px; font-weight: 500; }
+	.flow-step small { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 10px; }
+	.flow-step.current > span { border-color: var(--sonar); color: white; background: var(--sonar); }
+	.archive-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+	.archive-metrics article { display: grid; grid-template-columns: 40px 1fr; align-items: center; gap: 10px; padding: 16px; border: 1px solid var(--color-border); border-radius: 10px; }
+	.metric-icon { grid-row: 1 / 3; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; }
+	.metric-icon.likes { color: hsl(347 58% 48%); background: hsl(347 70% 95%); }
+	.metric-icon.follows { color: hsl(206 62% 43%); background: hsl(206 75% 95%); }
+	.metric-icon.bookmarks { color: hsl(37 67% 42%); background: hsl(40 78% 94%); }
+	.archive-metrics article > div { display: flex; align-items: baseline; gap: 6px; }
+	.archive-metrics strong { font-size: 22px; font-weight: 500; letter-spacing: -.03em; }
+	.archive-metrics article > div span { color: var(--color-muted-foreground); font-size: 12px; }
+	.archive-metrics small { grid-column: 2; color: var(--color-muted-foreground); font-size: 10px; }
+	.archive-metrics article.missing { opacity: .72; }
+	.source-next-grid { display: grid; grid-template-columns: 1.4fr .8fr; gap: 12px; margin-top: 12px; }
+	.source-next-grid article { padding: 17px; border-radius: 10px; background: var(--color-background); }
+	.card-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--color-muted-foreground); font-size: 10px; letter-spacing: .04em; text-transform: uppercase; }
+	.card-label b { padding: 3px 6px; border-radius: 5px; color: var(--sonar); background: color-mix(in srgb, var(--sonar) 10%, var(--color-card)); font-weight: 500; letter-spacing: 0; text-transform: none; }
+	.next-wave h3 { margin: 16px 0 6px; font-size: 18px; font-weight: 500; }
+	.next-wave p, .recent-wave p { margin: 0; color: var(--color-muted-foreground); font-size: 12px; line-height: 1.5; }
+	.sorting-preview { display: grid; grid-template-columns: 1.2fr 1fr .7fr; gap: 3px; margin-top: 17px; }
+	.sorting-preview span { padding: 7px; color: var(--color-muted-foreground); background: var(--color-card); font-size: 10px; text-align: center; }
+	.sorting-preview span:first-child { border-radius: 7px 0 0 7px; box-shadow: inset 0 -2px var(--sonar); }
+	.sorting-preview span:last-child { border-radius: 0 7px 7px 0; }
+	.review-ring { display: grid; place-items: center; width: 96px; height: 96px; margin: 14px auto 10px; border-radius: 50%; background: conic-gradient(var(--sonar) var(--reviewed), var(--color-border) 0); }
+	.review-ring::before { content: ''; grid-area: 1 / 1; width: 72px; height: 72px; border-radius: 50%; background: var(--color-background); }
+	.review-ring div { z-index: 1; grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; }
+	.review-ring strong { font-size: 20px; font-weight: 500; }
+	.review-ring span { color: var(--color-muted-foreground); font-size: 10px; }
+	.recent-wave p { text-align: center; }
+	.archive-foot { display: flex; align-items: center; gap: 7px; margin-top: 15px; color: var(--color-muted-foreground); font-size: 10px; }
 	.feedback { margin: 12px 0 0; padding: 9px 11px; border-radius: 7px; background: color-mix(in srgb, var(--sonar) 10%, var(--color-card)); color: var(--sonar); font-size: 13px; }
 	.feedback.error { background: hsl(0 80% 96%); color: hsl(0 65% 36%); }
 	@media (max-width: 700px) {
@@ -266,6 +379,10 @@
 		.detail { padding: 20px 16px; }
 		.actions button.draft { margin-left: 0; }
 		.human-gate { text-align: left; }
-		.sources-panel dl { grid-template-columns: 1fr; }
+		.archive-heading { flex-wrap: wrap; }
+		.readonly-badge { margin-left: 55px; }
+		.archive-flow { grid-template-columns: 1fr; }
+		.archive-flow > :global(svg) { transform: rotate(90deg); justify-self: center; }
+		.archive-metrics, .source-next-grid { grid-template-columns: 1fr; }
 	}
 </style>

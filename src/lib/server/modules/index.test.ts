@@ -48,6 +48,7 @@ describe('built-in module registry', () => {
 		);
 		expect(getModuleDatabasePath('sonar', 'vault-notes', 'notes.read')).toBe(join(home, 'vault', 'internal', 'sonar'));
 		expect(getModuleDatabasePath('sonar', 'review-state', 'reviews.read')).toBe(join(home, 'vault', 'internal', 'sonar'));
+		expect(getModuleDatabasePath('sonar', 'archive-cache', 'archive.read')).toBe(join(home, '.folio', 'sonar'));
 		expect(hasModuleCapability('council', 'records.read')).toBe(true);
 		expect(getModuleDatabasePath('council', 'primary', 'records.read')).toContain('council.db');
 	});
@@ -70,6 +71,9 @@ describe('built-in module registry', () => {
 		);
 		expect(getModuleDatabasePath('sonar', 'review-state', 'reviews.read')).toBe(
 			join(home, '.folio', 'sonar-demo')
+		);
+		expect(getModuleDatabasePath('sonar', 'archive-cache', 'archive.read')).toBe(
+			join(home, 'demo-vault', 'internal', 'sonar', 'archive-cache')
 		);
 	});
 

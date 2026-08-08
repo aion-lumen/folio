@@ -61,7 +61,10 @@ Sonar is the first non-mail reference module built on the boundary. It reads
 schema-guarded, external-derived notes from the active vault and renders their
 content as text, never as trusted HTML. Explicit human decisions are appended to
 a private `reviews.ndjson` audit ledger; the imported source notes remain
-unchanged. Demo runs keep that mutable ledger in demo-scoped Folio state rather
+unchanged. Its Sources view reads only aggregate counts from the newest local,
+normalized X-archive manifest; it does not open post, following, or account
+records. Demo runs keep mutable review state separate and use a clearly labelled
+synthetic archive summary from the bundled fixture rather
 than writing into the bundled fixture tree. No capability in this slice can
 publish, follow, like, or reply on an external service.
 
