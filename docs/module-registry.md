@@ -66,7 +66,11 @@ normalized X-archive manifest; it does not open post, following, or account
 records. A separate, locally prepared profile cache may expose the user's current
 following list for an explicit AI/politics/both/drop review. Folio does not call X
 from this view, and these decisions only build a local migration list: they never
-follow or unfollow accounts. Demo runs keep mutable review state separate and use a clearly labelled
+follow or unfollow accounts. `npm run sonar:classify-following` may add resumable
+suggestions through the loopback-only LM Studio endpoint. Each suggestion records
+the local model and generation time, remains separate from the human review
+ledger, and never becomes a decision automatically. Demo runs keep mutable review
+state separate and use a clearly labelled
 synthetic archive summary from the bundled fixture rather
 than writing into the bundled fixture tree. No capability in this slice can
 publish, follow, like, or reply on an external service.

@@ -17,7 +17,8 @@
 		"audit:dependencies": "npm audit --audit-level=moderate",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"eval:triage": "tsx evals/triage/run.ts"
+		"eval:triage": "tsx evals/triage/run.ts",
+		"sonar:classify-following": "tsx scripts/sonar-classify-following.ts"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.60.0",

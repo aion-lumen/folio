@@ -78,6 +78,33 @@ describe('Sonar following review', () => {
 		expect(state.profiles).toEqual([]);
 	});
 
+	it('loads optional model suggestions without turning them into decisions', () => {
+		writeFileSync(
+			join(root, 'following-profile-cache-2026-08-08', 'suggestions.ndjson'),
+			JSON.stringify({
+				schema: 'aion-lumen/sonar-following-suggestion/v1',
+				account_id: '10',
+				category: 'ai',
+				confidence: 0.96,
+				reason: 'Lokale Modelle und Agenten.',
+				model: 'test-local-model',
+				generated_at: '2026-08-08T12:00:00.000Z'
+			}) + '\n'
+		);
+		const state = readSonarFollowingState(root);
+		expect(state.suggestionsHealthy).toBe(true);
+		expect(state.profiles[0]).toEqual(expect.objectContaining({
+			category: null,
+			suggestion: {
+				category: 'ai',
+				confidence: 0.96,
+				reason: 'Lokale Modelle und Agenten.',
+				model: 'test-local-model',
+				generatedAt: '2026-08-08T12:00:00.000Z'
+			}
+		}));
+	});
+
 	it('appends decisions, keeps changed decisions auditable, and overlays the latest', () => {
 		appendSonarFollowingReview('10', 'politics', root);
 		appendSonarFollowingReview('10', 'ai', root);

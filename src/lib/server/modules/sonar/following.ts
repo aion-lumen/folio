@@ -19,12 +19,22 @@ import { getModuleDatabasePath } from '../index.js';
 const CACHE_SCHEMA = 'aion-lumen/sonar-following-profile-cache/v1';
 const PROFILE_SCHEMA = 'aion-lumen/sonar-following-profile/v1';
 const REVIEW_SCHEMA = 'aion-lumen/sonar-following-review/v1';
+const SUGGESTION_SCHEMA = 'aion-lumen/sonar-following-suggestion/v1';
 const CACHE_DIRECTORY = /^following-profile-cache-(\d{4}-\d{2}-\d{2})$/;
 const MAX_PROFILE_BYTES = 2 * 1024 * 1024;
 const MAX_MANIFEST_BYTES = 64 * 1024;
 const MAX_LEDGER_BYTES = 1024 * 1024;
 
 export type SonarFollowingCategory = 'ai' | 'politics' | 'both' | 'drop';
+export type SonarFollowingSuggestionCategory = SonarFollowingCategory | 'unclear';
+
+export interface SonarFollowingSuggestion {
+	category: SonarFollowingSuggestionCategory;
+	confidence: number;
+	reason: string;
+	model: string;
+	generatedAt: string;
+}
 
 export interface SonarFollowingProfile {
 	accountId: string;
@@ -34,6 +44,7 @@ export interface SonarFollowingProfile {
 	verified: boolean;
 	category: SonarFollowingCategory | null;
 	reviewedAt: string | null;
+	suggestion: SonarFollowingSuggestion | null;
 }
 
 export interface SonarFollowingState {
@@ -41,6 +52,7 @@ export interface SonarFollowingState {
 	retrievedOn: string | null;
 	skippedProfiles: number;
 	sourceHealthy: boolean;
+	suggestionsHealthy: boolean;
 	ledgerHealthy: boolean;
 }
 
@@ -100,9 +112,55 @@ function safeFile(path: string, maxBytes: number): string {
 	return readFileSync(path, 'utf8');
 }
 
-function readProfiles(root: string): { profiles: SonarFollowingProfile[]; retrievedOn: string | null; skipped: number } {
+function readSuggestions(
+	directory: string,
+	accountIds: ReadonlySet<string>
+): { values: Map<string, SonarFollowingSuggestion>; healthy: boolean } {
+	const path = join(directory, 'suggestions.ndjson');
+	if (!existsSync(path)) return { values: new Map(), healthy: true };
+	try {
+		const values = new Map<string, SonarFollowingSuggestion>();
+		for (const line of safeFile(path, MAX_LEDGER_BYTES).split('\n')) {
+			if (!line.trim()) continue;
+			const value = JSON.parse(line) as Record<string, unknown>;
+			if (
+				value.schema !== SUGGESTION_SCHEMA ||
+				typeof value.account_id !== 'string' ||
+				!accountIds.has(value.account_id) ||
+				values.has(value.account_id) ||
+				!['ai', 'politics', 'both', 'drop', 'unclear'].includes(String(value.category)) ||
+				typeof value.confidence !== 'number' ||
+				!Number.isFinite(value.confidence) ||
+				value.confidence < 0 ||
+				value.confidence > 1 ||
+				typeof value.reason !== 'string' ||
+				value.reason.length === 0 ||
+				value.reason.length > 240 ||
+				typeof value.model !== 'string' ||
+				value.model.length === 0 ||
+				value.model.length > 200 ||
+				typeof value.generated_at !== 'string' ||
+				Number.isNaN(Date.parse(value.generated_at))
+			) {
+				throw new Error('Invalid suggestion');
+			}
+			values.set(value.account_id, {
+				category: value.category as SonarFollowingSuggestionCategory,
+				confidence: value.confidence,
+				reason: value.reason,
+				model: value.model,
+				generatedAt: value.generated_at
+			});
+		}
+		return { values, healthy: true };
+	} catch {
+		return { values: new Map(), healthy: false };
+	}
+}
+
+function readProfiles(root: string): { profiles: SonarFollowingProfile[]; retrievedOn: string | null; skipped: number; suggestionsHealthy: boolean } {
 	const cache = latestCache(root);
-	if (!cache) return { profiles: [], retrievedOn: null, skipped: 0 };
+	if (!cache) return { profiles: [], retrievedOn: null, skipped: 0, suggestionsHealthy: true };
 	const manifest = JSON.parse(safeFile(join(cache.directory, 'manifest.json'), MAX_MANIFEST_BYTES)) as Record<string, unknown>;
 	const privacy = manifest.privacy as Record<string, unknown> | undefined;
 	if (
@@ -148,7 +206,8 @@ function readProfiles(root: string): { profiles: SonarFollowingProfile[]; retrie
 				description: value.description,
 				verified: value.verified,
 				category: null,
-				reviewedAt: null
+				reviewedAt: null,
+				suggestion: null
 			});
 		} catch {
 			skipped += 1;
@@ -157,7 +216,14 @@ function readProfiles(root: string): { profiles: SonarFollowingProfile[]; retrie
 	if (profiles.length + skipped !== Number(manifest.count)) {
 		throw new SonarFollowingError('Profile-cache count does not match manifest');
 	}
-	return { profiles, retrievedOn: cache.retrievedOn, skipped };
+	const suggestions = readSuggestions(cache.directory, new Set(profiles.map((profile) => profile.accountId)));
+	for (const profile of profiles) profile.suggestion = suggestions.values.get(profile.accountId) ?? null;
+	return {
+		profiles,
+		retrievedOn: cache.retrievedOn,
+		skipped,
+		suggestionsHealthy: suggestions.healthy
+	};
 }
 
 function readReviews(root: string): Map<string, FollowingReviewRecord> {
@@ -201,6 +267,7 @@ export function readSonarFollowingState(
 			retrievedOn: null,
 			skippedProfiles: 0,
 			sourceHealthy: false,
+			suggestionsHealthy: true,
 			ledgerHealthy: true
 		};
 	}
@@ -228,6 +295,7 @@ export function readSonarFollowingState(
 		retrievedOn: source.retrievedOn,
 		skippedProfiles: source.skipped,
 		sourceHealthy: true,
+		suggestionsHealthy: source.suggestionsHealthy,
 		ledgerHealthy
 	};
 }

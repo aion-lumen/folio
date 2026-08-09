@@ -90,6 +90,18 @@
 		return new Intl.NumberFormat('de-CH').format(value);
 	}
 
+	function suggestionLabel(category: string): string {
+		return category === 'ai'
+			? 'AI-Konto'
+			: category === 'politics'
+				? 'Politik-Konto'
+				: category === 'both'
+					? 'Beide prüfen'
+					: category === 'drop'
+						? 'Nicht übernehmen'
+						: 'Unklar';
+	}
+
 	async function review(status: 'accepted' | 'deferred' | 'rejected') {
 		if (!selected || saving || !data.canReview) return;
 		const reviewedPostId = selected.postId;
@@ -253,10 +265,10 @@
 					</div>
 				</header>
 
-				{#if !data.following.sourceHealthy || data.following.skippedProfiles > 0 || !data.following.ledgerHealthy}
+				{#if !data.following.sourceHealthy || !data.following.suggestionsHealthy || data.following.skippedProfiles > 0 || !data.following.ledgerHealthy}
 					<div class="archive-warning" role="status">
 						<ShieldCheck size={18} />
-						<div><strong>Sichtung eingeschränkt</strong><span>{!data.following.sourceHealthy ? 'Der lokale Profil-Cache ist nicht lesbar. ' : ''}{data.following.skippedProfiles > 0 ? `${data.following.skippedProfiles} ungültige Profile ausgelassen. ` : ''}{!data.following.ledgerHealthy ? 'Das Entscheidungsprotokoll ist nicht lesbar; neue Entscheidungen sind gesperrt.' : ''}</span></div>
+						<div><strong>Sichtung eingeschränkt</strong><span>{!data.following.sourceHealthy ? 'Der lokale Profil-Cache ist nicht lesbar. ' : ''}{!data.following.suggestionsHealthy ? 'Lokale Modellvorschläge wurden wegen eines ungültigen Ergebnisses ausgeblendet. ' : ''}{data.following.skippedProfiles > 0 ? `${data.following.skippedProfiles} ungültige Profile ausgelassen. ` : ''}{!data.following.ledgerHealthy ? 'Das Entscheidungsprotokoll ist nicht lesbar; neue Entscheidungen sind gesperrt.' : ''}</span></div>
 					</div>
 				{/if}
 
@@ -287,12 +299,19 @@
 									<a href={`https://x.com/${selectedFollowing.username}`} target="_blank" rel="noreferrer" aria-label="Profil auf X öffnen"><ExternalLink size={16} /></a>
 								</div>
 								<p class="profile-description">{selectedFollowing.description || 'Keine Bio vorhanden.'}</p>
+								{#if selectedFollowing.suggestion}
+									<div class="model-suggestion" class:unclear={selectedFollowing.suggestion.category === 'unclear'}>
+										<span>Lokaler Vorschlag</span>
+										<strong>{suggestionLabel(selectedFollowing.suggestion.category)}</strong>
+										<small>{selectedFollowing.suggestion.reason} · {Math.round(selectedFollowing.suggestion.confidence * 100)}% · {selectedFollowing.suggestion.model}</small>
+									</div>
+								{/if}
 								<div class="destination-question"><strong>Wo gehört dieses Konto hin?</strong><span>Die Entscheidung erzeugt nur eine lokale Umzugsliste.</span></div>
 								<div class="destination-actions">
-									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('ai')}><UserRound size={17} /><span><b>AI-Konto</b><small>zu @aion_lumen</small></span></button>
-									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('politics')}><Landmark size={17} /><span><b>Politik-Konto</b><small>beim bisherigen Konto</small></span></button>
-									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('both')}><Users size={17} /><span><b>Beide prüfen</b><small>bewusst später entscheiden</small></span></button>
-									<button type="button" disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('drop')}><Trash2 size={17} /><span><b>Nicht übernehmen</b><small>in keiner Umzugsliste</small></span></button>
+									<button type="button" class:suggested={selectedFollowing.suggestion?.category === 'ai'} disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('ai')}><UserRound size={17} /><span><b>AI-Konto</b><small>zu @aion_lumen</small></span></button>
+									<button type="button" class:suggested={selectedFollowing.suggestion?.category === 'politics'} disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('politics')}><Landmark size={17} /><span><b>Politik-Konto</b><small>beim bisherigen Konto</small></span></button>
+									<button type="button" class:suggested={selectedFollowing.suggestion?.category === 'both'} disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('both')}><Users size={17} /><span><b>Beide prüfen</b><small>bewusst später entscheiden</small></span></button>
+									<button type="button" class:suggested={selectedFollowing.suggestion?.category === 'drop'} disabled={saving || !data.canReviewFollowing} onclick={() => reviewFollowing('drop')}><Trash2 size={17} /><span><b>Nicht übernehmen</b><small>in keiner Umzugsliste</small></span></button>
 								</div>
 							</article>
 						{/if}
@@ -518,12 +537,18 @@
 	.profile-title a { margin-left: auto; padding: 7px; border-radius: 7px; color: var(--color-muted-foreground); }
 	.profile-title a:hover { color: var(--color-foreground); background: var(--color-muted); }
 	.profile-description { min-height: 72px; margin: 23px 0; padding: 15px; border-left: 2px solid var(--color-border); color: var(--color-foreground); background: var(--color-background); font-size: 14px; line-height: 1.5; }
+	.model-suggestion { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; margin: -10px 0 18px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--sonar) 40%, var(--color-border)); border-radius: 8px; background: color-mix(in srgb, var(--sonar) 6%, var(--color-card)); }
+	.model-suggestion > span { color: var(--sonar); font-size: 9px; letter-spacing: .07em; text-transform: uppercase; }
+	.model-suggestion strong { justify-self: end; font-size: 11px; font-weight: 500; }
+	.model-suggestion small { grid-column: 1 / 3; color: var(--color-muted-foreground); font-size: 10px; }
+	.model-suggestion.unclear { border-color: var(--color-border); background: var(--color-background); }
+	.model-suggestion.unclear > span { color: var(--color-muted-foreground); }
 	.destination-question { display: flex; flex-direction: column; gap: 3px; margin-bottom: 11px; }
 	.destination-question strong { font-size: 13px; font-weight: 500; }
 	.destination-question span { color: var(--color-muted-foreground); font-size: 10px; }
 	.destination-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 	.destination-actions button { display: flex; align-items: center; gap: 9px; padding: 11px; border: 1px solid var(--color-border); border-radius: 8px; color: var(--color-foreground); background: var(--color-card); text-align: left; cursor: pointer; }
-	.destination-actions button:first-child { border-color: color-mix(in srgb, var(--sonar) 55%, var(--color-border)); background: color-mix(in srgb, var(--sonar) 7%, var(--color-card)); }
+	.destination-actions button.suggested { border-color: var(--sonar); background: color-mix(in srgb, var(--sonar) 7%, var(--color-card)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sonar) 25%, transparent); }
 	.destination-actions button:disabled { opacity: .45; cursor: not-allowed; }
 	.destination-actions button > span { display: flex; flex-direction: column; }
 	.destination-actions b { font-size: 11px; font-weight: 500; }
