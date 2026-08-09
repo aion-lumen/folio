@@ -41,6 +41,12 @@ Folio validates these declarations before a case can be staged. Target adapters 
 
 The response envelope supports reply drafts, requests for more context and proposed Objectives. Folio rejects unknown fields, mismatched request versions and changed responses. An external session never receives direct write access to mail or campaign state: its result becomes effective only after a human action in Folio. Accepted reply drafts remain available as Folio mail templates; accepted Objective proposals use Folio's existing Objective writer.
 
+## Career mail pilot
+
+An actionable mail classified as `job` or `job-lead` exposes **Prepare handoff** in Mail Queue. The action stages the already local sparse Worker extraction, mail metadata and a policy-filtered memory bundle for the first eligible `career` target. It never shares immediately: cloud content still waits in Relay for the case-bound human approval.
+
+The current mail pipeline retains a sparse extraction rather than the complete RFC message. Relay labels that completeness is not established inside the reviewed payload instead of implying that the full message is present. Repeating the action for the same account, IMAP UID and target returns the existing case. Mail Queue links back to that case and surfaces when a response draft is ready.
+
 Before staging, the Context Compiler may retrieve confirmed facts from Folio's SQLite/FTS baseline. Retrieval is filtered by the case domain and the target's declared sensitivity ceiling. The resulting facts and their provenance are bound to the reviewed request hash; source excerpts are not copied into model context. Folio displays the exact selected facts next to the source material before a cloud handoff is approved.
 
 The generated `request.md` contains the exact response path, request hash and schema name. A minimal reply looks like this:

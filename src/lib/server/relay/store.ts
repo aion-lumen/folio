@@ -503,3 +503,23 @@ export function listRelayCases(): RelayCaseView[] {
 	requireRelayCapability('cases.read');
 	return (getFolioDb().prepare('SELECT * FROM relay_cases ORDER BY updated_at DESC').all() as RelayCaseRow[]).map(rowView);
 }
+
+export function findRelayCaseBySource(
+	sourceKind: string,
+	sourceRef: string,
+	targetId?: string
+): RelayCaseView | null {
+	requireRelayCapability('cases.read');
+	const row = targetId
+		? getFolioDb().prepare(
+			`SELECT * FROM relay_cases
+			 WHERE source_kind = ? AND source_ref = ? AND target_id = ?
+			 ORDER BY created_at DESC LIMIT 1`
+		).get(sourceKind, sourceRef, targetId)
+		: getFolioDb().prepare(
+			`SELECT * FROM relay_cases
+			 WHERE source_kind = ? AND source_ref = ?
+			 ORDER BY created_at DESC LIMIT 1`
+		).get(sourceKind, sourceRef);
+	return row ? rowView(row as RelayCaseRow) : null;
+}

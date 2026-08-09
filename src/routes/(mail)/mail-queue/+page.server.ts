@@ -16,6 +16,8 @@ import { loadRegelwerk } from '$lib/server/regelwerk/loader.js';
 import { computeActiveRules } from '$lib/server/regelwerk/active-rules.js';
 import { getHomePlz } from '$lib/server/env.js';
 import { hasModuleCapability } from '$lib/server/modules/index.js';
+import { mailRelaySourceRef } from '$lib/server/relay/mail.js';
+import { listRelayCases } from '$lib/server/relay/store.js';
 import { buildVotesForFeedback, stripeState } from '$lib/server/lenses/voices.js';
 // F.8 BUG-F1 Fix: Mock-Hydration aus normalem Lade-Pfad entfernt.
 // getStressRows bleibt für ?stress=N (Performance-Smoke). getMockRows nicht
@@ -72,8 +74,17 @@ export const load: PageServerLoad = async ({ url }) => {
 		// 2026-05-28 Bug 1: Home-Coords einmalig für Distanz-Berechnung pro Row.
 		const homePlz = getHomePlz();
 		const homeCoords = homePlz ? { lat: homePlz.lat, lng: homePlz.lng } : null;
+		const relayBySource = new Map<string, ReturnType<typeof listRelayCases>[number]>();
+		if (hasModuleCapability('relay', 'cases.read')) {
+			for (const relayCase of listRelayCases()) {
+				if (relayCase.source_kind === 'mail' && !relayBySource.has(relayCase.source_ref)) {
+					relayBySource.set(relayCase.source_ref, relayCase);
+				}
+			}
+		}
 		const yahooRows: UnifiedMailRow[] = yahooRowsRaw.map((r) => {
 			const unified = unifyFeedbackRow(r);
+			const relayCase = relayBySource.get(mailRelaySourceRef(r.account_id, r.imap_uid));
 			// 2026-06-08 Bauteil 2.7 (Aufgabe 3): latest-wins zwischen Override
 			// und Correction. Vorher: fixe Prioritaet override → correction →
 			// time-decay. Bug: User „→ Übernommen" (override, t1), danach „A"
@@ -141,6 +152,8 @@ export const load: PageServerLoad = async ({ url }) => {
 			);
 			return {
 				...unified,
+				relay_case_id: relayCase?.case_id ?? null,
+				relay_status: relayCase?.status ?? null,
 				correction: correctionMap.get(r.id) ?? null,
 				reviewed: reviewedIds.has(r.id),
 				validator_opinion: validatorMap.get(r.id) ?? null,

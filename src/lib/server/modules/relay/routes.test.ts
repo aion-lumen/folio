@@ -16,4 +16,10 @@ describe('Session Relay route guards', () => {
 			expect(source).toContain(`requireModuleCapability('relay', '${capability}')`);
 		}
 	});
+
+	it('guards mail staging at the HTTP boundary', () => {
+		const source = readFileSync(join(process.cwd(), 'src/routes/api/relay/mail/+server.ts'), 'utf8');
+		expect(source).toContain(`requireModuleCapability('relay', 'cases.read')`);
+		expect(source).toContain(`requireModuleCapability('relay', 'cases.stage')`);
+	});
 });

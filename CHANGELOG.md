@@ -10,7 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Provider-neutral Session Relay with case-bound cloud approvals, filesystem handoff, validated
-  response intake, and human application of reply drafts or Objective proposals.
+  response intake, human application of reply drafts or Objective proposals, and an actionable
+  career-mail handoff from Mail Queue with explicit sparse-extraction labelling.
 - Folio-owned memory baseline with candidate/confirmed facts, provenance, temporal supersession,
   tombstones, rebuildable FTS search, and a Context Compiler constrained by domain and the target's
   declared sensitivity ceiling.

@@ -80,6 +80,10 @@ export interface UnifiedMailRow {
 	// Review-Followup D.10 2026-05-27: server-side pre-compute per row,
 	// gespeist aus regelwerk + user_context. DetailPanel-Info-Icon zeigt sie.
 	active_rules?: import('$lib/server/regelwerk/active-rules.js').ActiveRules;
+	// Session Relay link for an already staged mail. The response body remains in
+	// Relay's runtime exchange; Mail Queue only shows workflow state and a link.
+	relay_case_id?: string | null;
+	relay_status?: import('$lib/server/relay/types.js').RelayCaseStatus | null;
 }
 
 // F.9 BUG-K2 (2026-05-22) — Filterleiste konsolidiert: Sort-Menü zeigt separate

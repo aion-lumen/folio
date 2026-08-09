@@ -8,6 +8,7 @@
 <script lang="ts">
 	import { onDestroy, onMount } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { ArrowRight, Check, LoaderCircle } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
@@ -144,6 +145,69 @@
 	// Apply-Correction Callback for VerdictStage (markers as array, joined CSV server-side)
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
+	let relayLoading = $state(false);
+	let relayError = $state<string | null>(null);
+	let stagedRelay = $state<{
+		caseId: string;
+		status: string;
+		targetLabel: string;
+		bodyTruncated: boolean;
+	} | null>(null);
+
+	const correctedDomain = $derived(
+		(row?.correction?.corrected_domain as string | undefined) ?? row?.domain ?? null
+	);
+	const careerRelayEligible = $derived(
+		canReclassifyRow &&
+		(correctedDomain === 'job' || correctedDomain === 'job-lead') &&
+		(row?.effective_actionability ?? row?.actionability) === 'actionable'
+	);
+	const relayCaseId = $derived(stagedRelay?.caseId ?? row?.relay_case_id ?? null);
+	const relayStatus = $derived(stagedRelay?.status ?? row?.relay_status ?? null);
+
+	$effect(() => {
+		row?.uid;
+		stagedRelay = null;
+		relayError = null;
+	});
+
+	async function prepareCareerRelay(): Promise<void> {
+		if (!row || !canReclassifyRow || relayLoading) return;
+		const feedbackId = Number(row.uid);
+		if (!Number.isInteger(feedbackId)) return;
+		relayLoading = true;
+		relayError = null;
+		try {
+			const response = await fetch('/api/relay/mail', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ feedback_id: feedbackId })
+			});
+			if (!response.ok) throw new Error((await response.text()).slice(0, 240));
+			const result = await response.json() as {
+				case_id: string; status: string; target_label: string; body_truncated: boolean;
+			};
+			stagedRelay = {
+				caseId: result.case_id,
+				status: result.status,
+				targetLabel: result.target_label,
+				bodyTruncated: result.body_truncated
+			};
+			toastStore.show('Übergabe zur Prüfung vorbereitet', 2500);
+		} catch (cause) {
+			relayError = cause instanceof Error ? cause.message : 'Übergabe konnte nicht vorbereitet werden.';
+		} finally {
+			relayLoading = false;
+		}
+	}
+
+	function relayStatusLabel(status: string | null): string {
+		if (status === 'answered') return 'Antwortentwurf bereit';
+		if (status === 'applied') return 'Mailvorlage übernommen';
+		if (status === 'shared' || status === 'claimed') return 'Session arbeitet daran';
+		if (status === 'rejected') return 'Vorschlag verworfen';
+		return 'Zur Freigabe bereit';
+	}
 
 	async function applyCorrection(
 		dom: DomainKey,
@@ -392,6 +456,31 @@
 		</section>
 
 		<PanelBody body={body?.bodyText ?? null} />
+
+		{#if careerRelayEligible}
+			<section class="relay-handoff">
+				<div class="relay-copy">
+					<span class="relay-eyebrow">Session Relay</span>
+					{#if relayCaseId}
+						<strong><Check size={15} /> {relayStatusLabel(relayStatus)}</strong>
+						<p>{stagedRelay ? `Für ${stagedRelay.targetLabel} vorbereitet. ` : ''}Antwort und Freigabe bleiben in Übergaben sichtbar.</p>
+					{:else}
+						<strong>Mit der Karriere-Session bearbeiten</strong>
+						<p>Folio bereitet Mailauszug und passenden bestätigten Kontext zur Prüfung vor.</p>
+					{/if}
+					{#if stagedRelay?.bodyTruncated}<small>Die Vollständigkeit des lokalen Worker-Auszugs ist nicht belegt; Folio kennzeichnet das im Fall.</small>{/if}
+					{#if relayError}<small class="relay-error">{relayError}</small>{/if}
+				</div>
+				{#if relayCaseId}
+					<a class="relay-link" href="/relay">Übergaben öffnen <ArrowRight size={14} /></a>
+				{:else}
+					<button class="relay-button" type="button" disabled={relayLoading} onclick={prepareCareerRelay}>
+						{#if relayLoading}<LoaderCircle class="spin" size={14} />{:else}<ArrowRight size={14} />{/if}
+						Übergabe vorbereiten
+					</button>
+				{/if}
+			</section>
+		{/if}
 	</aside>
 {/if}
 
@@ -513,5 +602,46 @@
 		height: 14px;
 		border-radius: 3px;
 		background: hsl(217 60% 85%);
+	}
+	.relay-handoff {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 18px;
+		margin: 14px 16px 16px;
+		padding: 14px;
+		border: 1px solid hsl(205 42% 84%);
+		border-radius: 11px;
+		background: hsl(205 48% 97%);
+	}
+	.relay-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+	.relay-eyebrow { color: hsl(205 52% 34%); font-family: var(--font-mono); font-size: 9.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+	.relay-copy strong { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+	.relay-copy p, .relay-copy small { margin: 0; color: var(--color-muted-foreground); font-size: 10.5px; line-height: 1.45; }
+	.relay-copy small { color: hsl(28 66% 38%); }
+	.relay-copy small.relay-error { color: hsl(0 56% 38%); }
+	.relay-button, .relay-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		flex: 0 0 auto;
+		border: 0;
+		border-radius: 8px;
+		padding: 9px 11px;
+		background: hsl(205 52% 34%);
+		color: white;
+		font: inherit;
+		font-size: 10.5px;
+		font-weight: 650;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.relay-button:disabled { cursor: not-allowed; opacity: .45; }
+	.spin { animation: spin 1s linear infinite; }
+	@keyframes spin { to { transform: rotate(360deg); } }
+	@media (max-width: 900px) {
+		.relay-handoff { align-items: stretch; flex-direction: column; }
+		.relay-button, .relay-link { width: 100%; }
 	}
 </style>
