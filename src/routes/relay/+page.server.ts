@@ -3,6 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { isDemoVaultActive } from '$lib/server/env.js';
+import { compileMemoryContext } from '$lib/server/memory/compiler.js';
+import {
+	confirmMemoryFactByHuman,
+	findMemoryFactBySource,
+	proposeMemoryFact
+} from '$lib/server/memory/store.js';
 import { requireModuleCapability } from '$lib/server/modules/http.js';
 import {
 	applyRelayResponse,
@@ -23,15 +29,40 @@ import type { Actions, PageServerLoad } from './$types.js';
 
 function ensureDemoCase(): void {
 	if (!isDemoVaultActive()) return;
-	if (listRelayCases().some((item) => item.source_ref === 'demo:career-interview')) return;
+	const sourceRef = 'demo:career-interview-context-v1';
+	if (listRelayCases().some((item) => item.source_ref === sourceRef)) return;
+	let availability = findMemoryFactBySource('career', 'demo:career-availability');
+	if (!availability) {
+		availability = proposeMemoryFact({
+			domain: 'career',
+			data_class: 'availability',
+			sensitivity: 'private',
+			subject: 'Alex',
+			predicate: 'available_for_interview',
+			value: 'Tuesday at 10:00',
+			source_kind: 'owner',
+			source_ref: 'demo:career-availability',
+			actor_kind: 'human',
+			actor_id: 'demo-owner'
+		});
+		availability = confirmMemoryFactByHuman(availability.fact_id, 'demo-owner');
+	}
+	const subject = 'Einladung zum zweiten Gespräch';
+	const body = `Guten Tag Alex\n\nwir möchten Sie gerne zu einem zweiten Gespräch einladen. Wären Dienstag um 10:00 Uhr oder Mittwoch um 14:00 Uhr für Sie möglich?\n\nFreundliche Grüsse\nMara Keller`;
+	const memoryContext = compileMemoryContext({
+		domain: 'career',
+		query: `${subject}\n${body}`,
+		max_sensitivity: DEMO_CAREER_TARGET.memory_max_sensitivity ?? 'public'
+	});
 	stageRelayCase({
 		domain: 'career',
 		source_kind: 'mail',
-		source_ref: 'demo:career-interview',
-		subject: 'Einladung zum zweiten Gespräch',
-		body: `Guten Tag Alex\n\nwir möchten Sie gerne zu einem zweiten Gespräch einladen. Wären Dienstag um 10:00 Uhr oder Mittwoch um 14:00 Uhr für Sie möglich?\n\nFreundliche Grüsse\nMara Keller`,
+		source_ref: sourceRef,
+		subject,
+		body,
 		capability: 'reply_draft',
 		data_classes: ['mail_metadata', 'mail_body', 'memory_context'],
+		memory_context: memoryContext,
 		target: DEMO_CAREER_TARGET
 	});
 }
@@ -44,21 +75,25 @@ export const load: PageServerLoad = async () => {
 	const targets = loadSessionTargets();
 	const responseErrors = ingestAvailableRelayResponses(targets);
 	const labels = Object.fromEntries(targets.map((target) => [target.id, target.label]));
-	const cases = listRelayCases().map((item) => ({
-		...item,
-		target_label: labels[item.target_id] ?? item.target_id,
-		preview: getRelayPayloadForReview(item.case_id).body,
-		response: (() => {
-			if (!['answered', 'needs_context', 'applied', 'rejected'].includes(item.status)) return null;
-			const target = targets.find((candidate) => candidate.id === item.target_id);
-			if (!target) return null;
-			try {
-				return getRelayResponseForReview(item.case_id, target).result;
-			} catch {
-				return null;
-			}
-		})()
-	}));
+	const cases = listRelayCases().map((item) => {
+		const payload = getRelayPayloadForReview(item.case_id);
+		return {
+			...item,
+			target_label: labels[item.target_id] ?? item.target_id,
+			preview: payload.body,
+			memory_context: payload.memory_context ?? null,
+			response: (() => {
+				if (!['answered', 'needs_context', 'applied', 'rejected'].includes(item.status)) return null;
+				const target = targets.find((candidate) => candidate.id === item.target_id);
+				if (!target) return null;
+				try {
+					return getRelayResponseForReview(item.case_id, target).result;
+				} catch {
+					return null;
+				}
+			})()
+		};
+	});
 	return { cases, targetsConfigured: targets.length > 0, responseErrors, demo: isDemoVaultActive() };
 };
 

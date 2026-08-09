@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Provider-neutral Session Relay with case-bound cloud approvals, filesystem handoff, validated
+  response intake, and human application of reply drafts or Objective proposals.
+- Folio-owned memory baseline with candidate/confirmed facts, provenance, temporal supersession,
+  tombstones, rebuildable FTS search, and a Context Compiler constrained by domain and the target's
+  declared sensitivity ceiling.
+- Sonar X-archive and following review surfaces with append-only human decisions and optional local
+  classification suggestions.
+
 ### Security
 
 - Updated the dependency lockfile to remove all known high- and moderate-severity npm advisories

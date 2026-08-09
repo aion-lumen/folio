@@ -3,12 +3,14 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import YAML from 'yaml';
 import { isDemoVaultActive } from '../env.js';
+import type { MemorySensitivity } from '../memory/types.js';
 import type { RelayAdapter, RelayCapability, RelayLocality, SessionTarget } from './types.js';
 
 const ID = /^[a-z][a-z0-9_-]{0,63}$/;
 const CAPABILITIES = new Set<RelayCapability>(['analyze', 'reply_draft', 'objective_proposal', 'needs_context']);
 const ADAPTERS = new Set<RelayAdapter>(['cowork-filesystem', 'hermes-local']);
 const LOCALITIES = new Set<RelayLocality>(['local', 'cloud']);
+const MEMORY_SENSITIVITIES = new Set<MemorySensitivity>(['public', 'private', 'sensitive']);
 
 export const DEMO_CAREER_TARGET: SessionTarget = {
 	id: 'career-cowork',
@@ -18,6 +20,7 @@ export const DEMO_CAREER_TARGET: SessionTarget = {
 	locality: 'cloud',
 	capabilities: ['analyze', 'reply_draft', 'objective_proposal', 'needs_context'],
 	allowed_data_classes: ['mail_body', 'mail_metadata', 'memory_context'],
+	memory_max_sensitivity: 'private',
 	retention_days: 14
 };
 
@@ -48,6 +51,14 @@ export function loadSessionTargets(path = join(homedir(), '.folio', 'session-tar
 		if (capabilities.some((item) => !CAPABILITIES.has(item))) throw new Error(`unknown target capability ${value.id}`);
 		const retention = Number(value.retention_days);
 		if (!Number.isInteger(retention) || retention < 1 || retention > 365) throw new Error(`invalid target retention ${value.id}`);
+		const allowedDataClasses = ids(value.allowed_data_classes, `target data classes ${value.id}`);
+		const memoryMaxSensitivity = value.memory_max_sensitivity;
+		if (allowedDataClasses.includes('memory_context') && !MEMORY_SENSITIVITIES.has(memoryMaxSensitivity as MemorySensitivity)) {
+			throw new Error(`target ${value.id} must declare memory_max_sensitivity`);
+		}
+		if (memoryMaxSensitivity !== undefined && !MEMORY_SENSITIVITIES.has(memoryMaxSensitivity as MemorySensitivity)) {
+			throw new Error(`invalid target memory sensitivity ${value.id}`);
+		}
 		return {
 			id: value.id,
 			label: value.label.trim(),
@@ -55,7 +66,8 @@ export function loadSessionTargets(path = join(homedir(), '.folio', 'session-tar
 			adapter: value.adapter as RelayAdapter,
 			locality: value.locality as RelayLocality,
 			capabilities,
-			allowed_data_classes: ids(value.allowed_data_classes, `target data classes ${value.id}`),
+			allowed_data_classes: allowedDataClasses,
+			memory_max_sensitivity: memoryMaxSensitivity as MemorySensitivity | undefined,
 			retention_days: retention
 		};
 	});

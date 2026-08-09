@@ -12,6 +12,7 @@ const cloudTarget: SessionTarget = {
 	locality: 'cloud',
 	capabilities: ['analyze', 'reply_draft', 'needs_context'],
 	allowed_data_classes: ['mail_body', 'mail_metadata', 'memory_context'],
+	memory_max_sensitivity: 'private',
 	retention_days: 14
 };
 
@@ -80,6 +81,45 @@ describe('Session Relay core egress gate', () => {
 		expect(() => relay.stageRelayCase({ ...base, domain: 'finance' })).toThrow(/domain/);
 		expect(() => relay.stageRelayCase({ ...base, data_classes: ['medical_record'] })).toThrow(/policy denies/);
 		expect(() => relay.stageRelayCase({ ...base, capability: 'objective_proposal' })).toThrow(/lacks capability/);
+	});
+
+	it('binds policy-filtered memory context to the staged request', async () => {
+		const { relay } = await store();
+		const context = {
+			schema: 'folio/memory-context/v1' as const,
+			domain: 'career',
+			max_sensitivity: 'private' as const,
+			query_terms: ['interview'],
+			facts: [{
+				fact_id: randomUUID(), domain: 'career', data_class: 'availability',
+				sensitivity: 'private' as const, subject: 'Afschin', predicate: 'available',
+				value: 'Tuesday at 10:00', source_kind: 'owner', source_ref: 'profile:1',
+				valid_from: null, valid_to: null
+			}],
+			compiled_at: new Date().toISOString()
+		};
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:memory', subject: 'Interview',
+			body: 'Can we meet?', capability: 'reply_draft',
+			data_classes: ['mail_body', 'memory_context'], memory_context: context, target: cloudTarget
+		});
+		expect(relay.getRelayPayloadForReview(staged.case_id).memory_context?.facts).toHaveLength(1);
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const request = readFileSync(join(dir, 'exchange', 'career', 'inbox', staged.case_id, 'request.md'), 'utf8');
+		expect(request).toContain('Known context');
+		expect(request).toContain('Tuesday at 10:00');
+
+		expect(() => relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:wrong-domain', subject: 'Interview',
+			body: 'Can we meet?', capability: 'reply_draft', data_classes: ['mail_body', 'memory_context'],
+			memory_context: { ...context, domain: 'finance' }, target: cloudTarget
+		})).toThrow(/case domain/);
+		expect(() => relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:too-sensitive', subject: 'Interview',
+			body: 'Can we meet?', capability: 'reply_draft', data_classes: ['mail_body', 'memory_context'],
+			memory_context: { ...context, max_sensitivity: 'sensitive' }, target: cloudTarget
+		})).toThrow(/sensitivity policy/);
 	});
 
 	it('shares local targets without creating an egress approval', async () => {

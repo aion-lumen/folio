@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowLeft, Check, Cloud, Laptop, Send, ShieldCheck } from 'lucide-svelte';
+	import { ArrowLeft, Brain, Check, Cloud, Laptop, Send, ShieldCheck } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 
 	let { data, form } = $props();
@@ -46,6 +46,7 @@
 		<div class="case-list">
 			{#each data.cases as item (item.case_id)}
 				{@const response = item.response}
+				{@const memoryFacts = item.memory_context?.facts ?? []}
 				<article class="case" class:done={item.status === 'shared'}>
 					<header>
 						<div class="target-icon" class:cloud={item.target_locality === 'cloud'}>
@@ -59,7 +60,20 @@
 						<span>{item.domain === 'career' ? 'Karriere' : item.domain}</span>
 						<span>{item.capability === 'reply_draft' ? 'Antwortentwurf' : item.capability}</span>
 						{#each item.data_classes as cls}<span>{cls.replaceAll('_', ' ')}</span>{/each}
+						{#if memoryFacts.length}<span>{memoryFacts.length} Erinnerungen</span>{/if}
 					</div>
+
+					{#if memoryFacts.length}
+						<section class="memory-preview">
+							<div class="memory-heading"><Brain size={15} /><span>Passender Kontext aus Folio</span></div>
+							<ul>
+								{#each memoryFacts as fact}
+									<li><strong>{fact.subject}</strong><span>{fact.predicate.replaceAll('_', ' ')}: {fact.value}</span></li>
+								{/each}
+							</ul>
+							<small>Nur bestätigte Fakten dieser Domäne innerhalb der Ziel-Policy.</small>
+						</section>
+					{/if}
 
 					<div class="preview"><span class="preview-label">Freigegebener Inhalt</span><p>{item.preview}</p></div>
 
@@ -146,6 +160,13 @@
 	.meta span { border: 1px solid var(--color-border); border-radius: 6px; padding: 3px 7px; color: var(--color-muted-foreground); font-size: 10px; }
 	.preview { margin: 0 20px 18px 74px; border-radius: 11px; background: var(--color-muted); padding: 13px 14px; }
 	.preview p { margin-top: 7px; white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+	.memory-preview { margin: 0 20px 12px 74px; border: 1px solid hsl(205 42% 84%); border-radius: 11px; background: hsl(205 48% 97%); padding: 12px 14px; }
+	.memory-heading { display: flex; align-items: center; gap: 7px; color: hsl(205 52% 34%); font-size: 11px; font-weight: 700; }
+	.memory-preview ul { display: flex; flex-direction: column; gap: 5px; margin: 9px 0 7px; padding: 0; list-style: none; }
+	.memory-preview li { display: flex; align-items: baseline; gap: 7px; font-size: 12px; }
+	.memory-preview li strong { flex: 0 0 auto; }
+	.memory-preview li span { color: var(--color-muted-foreground); }
+	.memory-preview small { color: var(--color-muted-foreground); font-size: 10px; }
 	.response { margin: -4px 20px 18px 74px; border: 1px solid hsl(158 34% 75%); border-radius: 11px; background: hsl(158 42% 96%); padding: 13px 14px; }
 	.response.question { border-color: hsl(36 66% 75%); background: hsl(36 78% 96%); }
 	.response-label { display: block; margin-bottom: 7px; color: hsl(158 52% 30%); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
@@ -165,5 +186,5 @@
 	.notice.error { color: hsl(0 56% 38%); background: hsl(0 65% 94%); }
 	.empty { border: 1px dashed var(--color-border); border-radius: 15px; padding: 34px; text-align: center; }
 	.empty p { margin-top: 6px; color: var(--color-muted-foreground); font-size: 13px; }
-	@media (max-width: 620px) { .page { padding: 28px 16px 56px; } .case > header { grid-template-columns: 38px 1fr; } .status { grid-column: 2; justify-self: start; } .meta, .preview, .response { margin-left: 16px; } .meta { padding-left: 0; } .preview { padding: 13px 14px; } .case footer { align-items: stretch; flex-direction: column; } .share { width: 100%; justify-content: center; } .review-actions { align-items: stretch; flex-direction: column-reverse; } .review-actions form, .review-actions button { width: 100%; } }
+	@media (max-width: 620px) { .page { padding: 28px 16px 56px; } .case > header { grid-template-columns: 38px 1fr; } .status { grid-column: 2; justify-self: start; } .meta, .memory-preview, .preview, .response { margin-left: 16px; } .meta { padding-left: 0; } .preview { padding: 13px 14px; } .memory-preview li { align-items: flex-start; flex-direction: column; gap: 1px; } .case footer { align-items: stretch; flex-direction: column; } .share { width: 100%; justify-content: center; } .review-actions { align-items: stretch; flex-direction: column-reverse; } .review-actions form, .review-actions button { width: 100%; } }
 </style>

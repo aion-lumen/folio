@@ -21,6 +21,7 @@ Targets are declared in `session-targets.yaml`; see [`config/session-targets.exa
 - its domain and adapter;
 - whether it is local or cloud-hosted;
 - allowed capabilities and data classes;
+- the highest memory sensitivity it may receive when `memory_context` is enabled;
 - its payload retention period.
 
 Folio validates these declarations before a case can be staged. Target adapters do not decide policy themselves.
@@ -39,6 +40,8 @@ Folio validates these declarations before a case can be staged. Target adapters 
 ## Current scope
 
 The response envelope supports reply drafts, requests for more context and proposed Objectives. Folio rejects unknown fields, mismatched request versions and changed responses. An external session never receives direct write access to mail or campaign state: its result becomes effective only after a human action in Folio. Accepted reply drafts remain available as Folio mail templates; accepted Objective proposals use Folio's existing Objective writer.
+
+Before staging, the Context Compiler may retrieve confirmed facts from Folio's SQLite/FTS baseline. Retrieval is filtered by the case domain and the target's declared sensitivity ceiling. The resulting facts and their provenance are bound to the reviewed request hash; source excerpts are not copied into model context. Folio displays the exact selected facts next to the source material before a cloud handoff is approved.
 
 The generated `request.md` contains the exact response path, request hash and schema name. A minimal reply looks like this:
 

@@ -191,6 +191,17 @@ export function getMemoryFact(factId: string): MemoryFactRow {
 	return row;
 }
 
+export function findMemoryFactBySource(domain: string, sourceRef: string): MemoryFactRow | null {
+	const row = getFolioDb()
+		.prepare(
+			`SELECT * FROM memory_facts
+			 WHERE domain = ? AND source_ref = ? AND status != 'tombstoned'
+			 ORDER BY recorded_at DESC LIMIT 1`
+		)
+		.get(assertId(domain, 'domain'), required(sourceRef, 'source_ref')) as MemoryFactRow | undefined;
+	return row ?? null;
+}
+
 export function searchMemoryFacts(query: string, policy: MemorySearchPolicy): MemoryFactRow[] {
 	assertId(policy.domain, 'domain');
 	const limit = Math.max(1, Math.min(50, policy.limit ?? 10));

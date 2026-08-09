@@ -1,3 +1,6 @@
+import type { MemoryContextBundle } from '../memory/compiler.js';
+import type { MemorySensitivity } from '../memory/types.js';
+
 export type RelayLocality = 'local' | 'cloud';
 export type RelayAdapter = 'cowork-filesystem' | 'hermes-local';
 export type RelayCapability = 'analyze' | 'reply_draft' | 'objective_proposal' | 'needs_context';
@@ -23,6 +26,7 @@ export interface SessionTarget {
 	locality: RelayLocality;
 	capabilities: RelayCapability[];
 	allowed_data_classes: string[];
+	memory_max_sensitivity?: MemorySensitivity;
 	retention_days: number;
 }
 
@@ -34,6 +38,7 @@ export interface StageRelayCaseInput {
 	body: string;
 	capability: RelayCapability;
 	data_classes: string[];
+	memory_context?: MemoryContextBundle;
 	target: SessionTarget;
 }
 
@@ -70,6 +75,7 @@ export interface RelayRequestPayload {
 	subject: string;
 	capability: RelayCapability;
 	data_classes: string[];
+	memory_context?: MemoryContextBundle;
 	body: string;
 	created_at: string;
 }

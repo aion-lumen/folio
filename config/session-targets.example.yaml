@@ -10,4 +10,5 @@ targets:
     locality: local
     capabilities: [analyze, reply_draft, needs_context]
     allowed_data_classes: [mail_metadata, mail_body, memory_context]
+    memory_max_sensitivity: sensitive
     retention_days: 14
