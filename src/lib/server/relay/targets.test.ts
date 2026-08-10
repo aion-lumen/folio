@@ -2,7 +2,12 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createDefaultCareerFilesystemTarget, loadSessionTargets } from './targets.js';
+import {
+	DEMO_CAREER_TARGET,
+	createDefaultCareerFilesystemTarget,
+	getSessionTargetsPath,
+	loadSessionTargets
+} from './targets.js';
 
 describe('Session target manifest', () => {
 	let root = '';
@@ -60,5 +65,39 @@ targets:
 		}));
 		expect(loadSessionTargets(path)).toHaveLength(1);
 		expect(() => createDefaultCareerFilesystemTarget(path)).toThrow(/already exists/);
+	});
+
+	it('keeps the demo target manifest separate from the real target manifest', () => {
+		const previousHome = process.env.HOME;
+		const previousVaultOverride = process.env.FOLIO_VAULT_OVERRIDE;
+		const previousTargetsPath = process.env.FOLIO_SESSION_TARGETS_PATH;
+		root = join(tmpdir(), `folio-targets-${Date.now()}`);
+		mkdirSync(join(root, '.folio'), { recursive: true });
+		writeFileSync(join(root, '.folio', 'session-targets.yaml'), `schema: folio/session-targets/v1
+targets:
+  - id: real-only
+    label: Real target
+    domain: career
+    adapter: filesystem
+    locality: cloud
+    capabilities: [reply_draft]
+    allowed_data_classes: [mail_body]
+    retention_days: 14
+`);
+
+		try {
+			process.env.HOME = root;
+			process.env.FOLIO_VAULT_OVERRIDE = '/repo/folio/templates/demo-vault';
+			delete process.env.FOLIO_SESSION_TARGETS_PATH;
+			expect(getSessionTargetsPath()).toBe(join(root, '.folio', 'session-targets-demo.yaml'));
+			expect(loadSessionTargets()).toEqual([DEMO_CAREER_TARGET]);
+		} finally {
+			if (previousHome === undefined) delete process.env.HOME;
+			else process.env.HOME = previousHome;
+			if (previousVaultOverride === undefined) delete process.env.FOLIO_VAULT_OVERRIDE;
+			else process.env.FOLIO_VAULT_OVERRIDE = previousVaultOverride;
+			if (previousTargetsPath === undefined) delete process.env.FOLIO_SESSION_TARGETS_PATH;
+			else process.env.FOLIO_SESSION_TARGETS_PATH = previousTargetsPath;
+		}
 	});
 });

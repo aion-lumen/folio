@@ -389,7 +389,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_facts_fts USING fts5(
 );
 
 -- v0.5.0 Session Relay: metadata and the approval ledger live in Folio.
--- Request/response bodies remain runtime files under ~/.folio/session-exchange.
+-- Unapproved request bodies remain under ~/.folio/session-exchange. Only approved
+-- handoff artifacts and bound responses enter the configured session bridge.
 CREATE TABLE IF NOT EXISTS relay_cases (
     case_id            TEXT PRIMARY KEY,
     domain             TEXT NOT NULL,

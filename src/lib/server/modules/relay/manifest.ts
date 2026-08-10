@@ -1,4 +1,4 @@
-import { getFolioDbPath, getSessionExchangePath } from '../../env.js';
+import { getFolioDbPath, getSessionBridgePath, getSessionExchangePath } from '../../env.js';
 import type { ModuleRegistration } from '../types.js';
 
 export const RELAY_MODULE: ModuleRegistration = {
@@ -31,10 +31,15 @@ export const RELAY_MODULE: ModuleRegistration = {
 		}],
 		databases: [
 			{ id: 'folio-state', engine: 'sqlite', access: 'read-write', data_classes: ['egress-decision'] },
-			{ id: 'exchange', engine: 'filesystem', access: 'read-write', data_classes: ['case-content'] }
+			{ id: 'exchange', engine: 'filesystem', access: 'read-write', data_classes: ['case-content'] },
+			{ id: 'bridge', engine: 'filesystem', access: 'read-write', data_classes: ['case-content'] }
 		],
 		kill_switch: { global_env: 'FOLIO_MODULES_DISABLED', module_env: 'FOLIO_DISABLED_MODULES' }
 	},
 	enabled: () => true,
-	database_paths: { 'folio-state': getFolioDbPath, exchange: getSessionExchangePath }
+	database_paths: {
+		'folio-state': getFolioDbPath,
+		exchange: getSessionExchangePath,
+		bridge: getSessionBridgePath
+	}
 };

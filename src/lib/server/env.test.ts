@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { getAionLumenPath, getRegelwerkPath, getFolioDbPath, getHomePlz } from './env.js';
+import {
+	getAionLumenPath,
+	getFolioDbPath,
+	getHomePlz,
+	getRegelwerkPath,
+	getSessionBridgePath,
+	getSessionExchangePath
+} from './env.js';
 
 describe('env path getters', () => {
 	afterEach(() => {
@@ -19,6 +26,12 @@ describe('env path getters', () => {
 
 	it('getFolioDbPath defaults outside project tree', () => {
 		expect(getFolioDbPath()).toContain('.folio');
+	});
+
+	it('keeps private relay staging outside the connected session bridge', () => {
+		expect(getSessionExchangePath()).toContain('/.folio/session-exchange');
+		expect(getSessionBridgePath()).toContain('/Projects/folio-session-bridge');
+		expect(getSessionBridgePath()).not.toBe(getSessionExchangePath());
 	});
 
 	it('reads demo home coordinates exported by the launcher process', () => {

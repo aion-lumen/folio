@@ -32,6 +32,7 @@ describe('mail to Session Relay', () => {
 		mkdirSync(dir, { recursive: true });
 		vi.stubEnv('FOLIO_DB_PATH', join(dir, 'folio.db'));
 		vi.stubEnv('FOLIO_SESSION_EXCHANGE_PATH', join(dir, 'exchange'));
+		vi.stubEnv('FOLIO_SESSION_BRIDGE_PATH', join(dir, 'bridge'));
 		vi.resetModules();
 		const init = await import('../folio-db/init.js');
 		init.resetFolioDbForTests();

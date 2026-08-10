@@ -46,9 +46,9 @@
 	{#if form?.configured}<div class="notice success" role="status"><Check size={16} /> Karriere-Session ist verbunden.</div>
 	{:else if form?.demoResponse}<div class="notice success" role="status"><Check size={16} /> Antwort ist eingetroffen.</div>
 	{:else if form?.applied}<div class="notice success" role="status"><Check size={16} /> In Folio übernommen.</div>
+	{:else if form?.invalidDiscarded}<div class="notice" role="status">Ungültige Antwort verworfen. Der Fall bleibt offen.</div>
 	{:else if form?.rejected}<div class="notice" role="status">Vorschlag verworfen.</div>
 	{:else if form?.success}<div class="notice success" role="status"><Check size={16} /> Übergabe bereitgestellt.</div>{/if}
-	{#if data.responseErrors.length}<div class="notice error" role="alert">Eine Antwort konnte nicht sicher gelesen werden. Der Fall blieb unverändert.</div>{/if}
 
 	{#if !data.targetsConfigured}
 		<section class="setup-card">
@@ -109,6 +109,20 @@
 					{/if}
 
 					<div class="preview"><span class="preview-label">Freigegebener Inhalt</span><p>{item.preview}</p></div>
+
+					{#if item.response_error}
+						<section class="invalid-response" role="alert">
+							<div>
+								<strong>Antwort nicht übernommen</strong>
+								<p>Das Format passt nicht zum vereinbarten Schema. Der Fall blieb offen.</p>
+								<small>{item.response_error}</small>
+							</div>
+							<form method="POST" action="?/discardInvalid">
+								<input type="hidden" name="case_id" value={item.case_id} />
+								<button class="reject" type="submit">Ungültige Antwort verwerfen</button>
+							</form>
+						</section>
+					{/if}
 
 					{#if response}
 						<section class="response" class:question={response.kind === 'needs_context'}>
@@ -220,6 +234,11 @@
 	.response strong { display: block; margin-bottom: 5px; font-size: 12px; }
 	.response p { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
 	.response small { display: block; margin-top: 7px; color: var(--color-muted-foreground); }
+	.invalid-response { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin: -4px 20px 18px 74px; border: 1px solid hsl(0 48% 82%); border-radius: 11px; background: hsl(0 65% 96%); padding: 13px 14px; color: hsl(0 56% 34%); }
+	.invalid-response strong { display: block; font-size: 12px; }
+	.invalid-response p { margin-top: 3px; font-size: 11px; }
+	.invalid-response small { display: block; margin-top: 5px; color: hsl(0 38% 43%); font-family: var(--font-mono); font-size: 9px; }
+	.invalid-response form { flex: 0 0 auto; }
 	.case footer { display: flex; justify-content: space-between; align-items: center; gap: 18px; border-top: 1px solid var(--color-border); padding: 14px 20px; }
 	.trust { display: flex; align-items: center; gap: 8px; max-width: 560px; color: var(--color-muted-foreground); font-size: 11px; line-height: 1.4; }
 	.trust :global(svg) { flex: 0 0 auto; }
@@ -232,5 +251,5 @@
 	.notice.error { color: hsl(0 56% 38%); background: hsl(0 65% 94%); }
 	.empty { border: 1px dashed var(--color-border); border-radius: 15px; padding: 34px; text-align: center; }
 	.empty p { margin-top: 6px; color: var(--color-muted-foreground); font-size: 13px; }
-	@media (max-width: 620px) { .page { padding: 28px 16px 56px; } .setup-card { grid-template-columns: 1fr; align-items: stretch; } .setup-card form { grid-column: 1; } .setup-card .share { width: 100%; justify-content: center; } .setup-copy ul { flex-direction: column; gap: 4px; } .connection-card, .connection-path { align-items: stretch; flex-direction: column; } .connection-path code { max-width: 100%; } .connection-path button { justify-content: center; } .case > header { grid-template-columns: 38px 1fr; } .status { grid-column: 2; justify-self: start; } .meta, .memory-preview, .preview, .response { margin-left: 16px; } .meta { padding-left: 0; } .preview { padding: 13px 14px; } .memory-preview li { align-items: flex-start; flex-direction: column; gap: 1px; } .case footer { align-items: stretch; flex-direction: column; } .share { width: 100%; justify-content: center; } .review-actions { align-items: stretch; flex-direction: column-reverse; } .review-actions form, .review-actions button { width: 100%; } }
+	@media (max-width: 620px) { .page { padding: 28px 16px 56px; } .setup-card { grid-template-columns: 1fr; align-items: stretch; } .setup-card form { grid-column: 1; } .setup-card .share { width: 100%; justify-content: center; } .setup-copy ul { flex-direction: column; gap: 4px; } .connection-card, .connection-path { align-items: stretch; flex-direction: column; } .connection-path code { max-width: 100%; } .connection-path button { justify-content: center; } .case > header { grid-template-columns: 38px 1fr; } .status { grid-column: 2; justify-self: start; } .meta, .memory-preview, .preview, .response, .invalid-response { margin-left: 16px; } .meta { padding-left: 0; } .preview { padding: 13px 14px; } .memory-preview li { align-items: flex-start; flex-direction: column; gap: 1px; } .invalid-response { align-items: stretch; flex-direction: column; } .invalid-response form, .invalid-response button { width: 100%; } .case footer { align-items: stretch; flex-direction: column; } .share { width: 100%; justify-content: center; } .review-actions { align-items: stretch; flex-direction: column-reverse; } .review-actions form, .review-actions button { width: 100%; } }
 </style>

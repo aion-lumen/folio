@@ -13,6 +13,7 @@ import {
 import { requireModuleCapability } from '$lib/server/modules/http.js';
 import {
 	applyRelayResponse,
+	archiveInvalidRelayResponse,
 	approveRelayEgress,
 	getRelayInboxPath,
 	getRelayPayloadForReview,
@@ -40,7 +41,7 @@ function homeRelative(path: string): string {
 
 function ensureDemoCase(): void {
 	if (!isDemoVaultActive()) return;
-	const sourceRef = 'demo:career-interview-context-v1';
+	const sourceRef = 'demo:career-interview-context-v3';
 	if (listRelayCases().some((item) => item.source_ref === sourceRef)) return;
 	let availability = findMemoryFactBySource('career', 'demo:career-availability');
 	if (!availability) {
@@ -86,6 +87,7 @@ export const load: PageServerLoad = async () => {
 	const targets = loadSessionTargets();
 	const filesystemTarget = targets.find((target) => target.adapter === 'filesystem' || target.adapter === 'cowork-filesystem');
 	const responseErrors = ingestAvailableRelayResponses(targets);
+	const responseErrorByCase = new Map(responseErrors.map((item) => [item.case_id, item.error]));
 	const labels = Object.fromEntries(targets.map((target) => [target.id, target.label]));
 	const cases = listRelayCases().map((item) => {
 		const payload = getRelayPayloadForReview(item.case_id);
@@ -94,6 +96,7 @@ export const load: PageServerLoad = async () => {
 			target_label: labels[item.target_id] ?? item.target_id,
 			preview: payload.body,
 			memory_context: payload.memory_context ?? null,
+			response_error: responseErrorByCase.get(item.case_id) ?? null,
 			response: (() => {
 				if (!['answered', 'needs_context', 'applied', 'rejected'].includes(item.status)) return null;
 				const target = targets.find((candidate) => candidate.id === item.target_id);
@@ -224,6 +227,23 @@ export const actions: Actions = {
 			return { success: true, caseId, rejected: true };
 		} catch (error) {
 			return fail(409, { message: error instanceof Error ? error.message : 'Verwerfen fehlgeschlagen.' });
+		}
+	},
+	discardInvalid: async ({ request }) => {
+		requireModuleCapability('relay', 'cases.read');
+		requireModuleCapability('relay', 'responses.read');
+		requireModuleCapability('relay', 'responses.apply');
+		const data = await request.formData();
+		const caseId = String(data.get('case_id') ?? '');
+		try {
+			const relayCase = listRelayCases().find((item) => item.case_id === caseId);
+			if (!relayCase) return fail(404, { message: 'Übergabe nicht gefunden.' });
+			const target = loadSessionTargets().find((item) => item.id === relayCase.target_id);
+			if (!target) return fail(409, { message: 'Ziel ist nicht mehr konfiguriert.' });
+			archiveInvalidRelayResponse(caseId, 'owner', target);
+			return { success: true, caseId, invalidDiscarded: true };
+		} catch (error) {
+			return fail(409, { message: error instanceof Error ? error.message : 'Ungültige Antwort konnte nicht verworfen werden.' });
 		}
 	}
 };

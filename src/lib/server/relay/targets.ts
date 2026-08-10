@@ -37,7 +37,9 @@ export const DEFAULT_CAREER_FILESYSTEM_TARGET: SessionTarget = {
 };
 
 export function getSessionTargetsPath(): string {
-	return process.env.FOLIO_SESSION_TARGETS_PATH?.trim() || join(homedir(), '.folio', 'session-targets.yaml');
+	const configured = process.env.FOLIO_SESSION_TARGETS_PATH?.trim();
+	if (configured) return configured;
+	return join(homedir(), '.folio', isDemoVaultActive() ? 'session-targets-demo.yaml' : 'session-targets.yaml');
 }
 
 export function createDefaultCareerFilesystemTarget(

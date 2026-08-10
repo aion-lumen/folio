@@ -9,8 +9,14 @@ Session Relay is Folio's provider-neutral handoff boundary between an incoming c
 - Cloud targets require one explicit human action for the exact request hash, target and set of data classes.
 - Changing staged content invalidates that approval.
 - Source material is marked as untrusted data, never as instructions.
-- Runtime payloads live outside the repository and vault under `~/.folio/session-exchange`.
-- Demo mode uses `~/.folio/session-exchange-demo` and a synthetic career case.
+- Unapproved staging payloads live outside the repository, vault and connected session workspace
+  under `~/.folio/session-exchange`.
+- Only an approved `request.md` and its case-bound response enter the connected filesystem bridge
+  under `~/Projects/folio-session-bridge`.
+- Demo mode uses `~/.folio/session-exchange-demo`, `~/Projects/folio-session-bridge-demo` and a
+  synthetic career case. Its target manifest is isolated in
+  `~/.folio/session-targets-demo.yaml`; when that file is absent, only the synthetic
+  `career-cowork` target is available.
 
 The UI deliberately combines approval and delivery into one button. The database still records the approval and sharing as separate append-only events.
 
@@ -29,19 +35,26 @@ Folio validates these declarations before a case can be staged. Target adapters 
 For the first owner-operated career workflow, an empty real installation offers **Connect career
 session** in the Relay UI. The action creates one generic `filesystem` target in the local manifest;
 it stores no provider account or credential. The UI then provides a one-time instruction for any
-online session with local filesystem access. The older `cowork-filesystem` adapter name remains
-accepted for existing manifests, but new setup is provider-neutral.
+online session with access to the connected `~/Projects` workspace. The older
+`cowork-filesystem` adapter name remains accepted for existing manifests, but new setup is
+provider-neutral.
 
 ## Runtime layout
 
 ```text
 ~/.folio/session-exchange/
-├── staging/<case-id>/payload.json
-├── <domain>/inbox/<case-id>/request.md
-└── <domain>/outbox/<case-id>/response.json
+└── staging/<case-id>/payload.json          # private until approval
+
+~/Projects/folio-session-bridge/
+├── <domain>/inbox/<case-id>/request.md     # approved handoff only
+└── <domain>/outbox/<case-id>/response.json # case-bound response
 ```
 
-`payload.json` is the exact human-reviewed version. `request.md` is the provider-neutral handoff artifact consumed by a Cowork filesystem integration or a local Hermes adapter. `response.json` uses `folio/session-relay-response/v1` and is bound to the case ID, request hash and target ID.
+`payload.json` is the exact human-reviewed version and never enters the connected bridge before
+approval. `request.md` is the provider-neutral handoff artifact consumed by a Cowork filesystem
+integration or a local Hermes adapter. `response.json` uses
+`folio/session-relay-response/v1` and is bound to the case ID, request hash and target ID. Override
+the bridge with `FOLIO_SESSION_BRIDGE_PATH` when the connected workspace has a different root.
 
 ## Current scope
 
@@ -59,7 +72,10 @@ one online model provider to another does not change the request or response con
 
 Before staging, the Context Compiler may retrieve confirmed facts from Folio's SQLite/FTS baseline. Retrieval is filtered by the case domain and the target's declared sensitivity ceiling. The resulting facts and their provenance are bound to the reviewed request hash; source excerpts are not copied into model context. Folio displays the exact selected facts next to the source material before a cloud handoff is approved.
 
-The generated `request.md` contains the exact response path, request hash and schema name. A minimal reply looks like this:
+The generated `request.md` contains the exact response path, request hash and schema name. It also
+embeds an exact, case-bound JSON envelope and tells the receiving session not to add fields; the
+parser rejects renamed timestamps and explanatory metadata outside the declared result shape. A
+minimal reply looks like this:
 
 ```json
 {

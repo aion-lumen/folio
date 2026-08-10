@@ -84,6 +84,8 @@ DEMO_VAULT_PATH="$(canonical_demo_vault_path "$DEMO_VAULT_PATH")"
 export FOLIO_VAULT_OVERRIDE="$DEMO_VAULT_PATH"
 export VAULT_PATH="$FOLIO_VAULT_OVERRIDE"
 export FOLIO_INBOX_PATH="${HOME}/.folio/demo-inbox"
+export FOLIO_SESSION_BRIDGE_PATH="${HOME}/Projects/folio-session-bridge-demo"
+export FOLIO_SESSION_TARGETS_PATH="${HOME}/.folio/session-targets-demo.yaml"
 export FOLIO_AGENT_AUTO=0
 
 PORT="${PORT:-5174}"
@@ -112,6 +114,8 @@ cat <<EOF
   FEEDBACK_DB_PATH: ${FEEDBACK_DB_PATH:-(not set)}
   AION_LUMEN_PATH:  $AION_LUMEN_PATH
   VAULT_OVERRIDE:   $FOLIO_VAULT_OVERRIDE
+  SESSION_BRIDGE:   $FOLIO_SESSION_BRIDGE_PATH
+  SESSION_TARGETS:  $FOLIO_SESSION_TARGETS_PATH
   FOLIO_HOME_PLZ:   $FOLIO_HOME_PLZ
   Port:             $PORT
 ═══════════════════════════════════════════════════════════════
