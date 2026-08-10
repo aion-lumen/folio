@@ -2,7 +2,7 @@ import type { MemoryContextBundle } from '../memory/compiler.js';
 import type { MemorySensitivity } from '../memory/types.js';
 
 export type RelayLocality = 'local' | 'cloud';
-export type RelayAdapter = 'cowork-filesystem' | 'hermes-local';
+export type RelayAdapter = 'filesystem' | 'cowork-filesystem' | 'hermes-local';
 export type RelayCapability = 'analyze' | 'reply_draft' | 'objective_proposal' | 'needs_context';
 export type RelayCaseStatus =
 	| 'detected'

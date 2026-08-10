@@ -7,6 +7,7 @@ describe('Session Relay route guards', () => {
 		const source = readFileSync(join(process.cwd(), 'src/routes/relay/+page.server.ts'), 'utf8');
 		for (const capability of [
 			'panel.render',
+			'targets.configure',
 			'cases.read',
 			'egress.approve',
 			'cases.share',

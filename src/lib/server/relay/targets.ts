@@ -1,6 +1,6 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import YAML from 'yaml';
 import { isDemoVaultActive } from '../env.js';
 import type { MemorySensitivity } from '../memory/types.js';
@@ -8,7 +8,7 @@ import type { RelayAdapter, RelayCapability, RelayLocality, SessionTarget } from
 
 const ID = /^[a-z][a-z0-9_-]{0,63}$/;
 const CAPABILITIES = new Set<RelayCapability>(['analyze', 'reply_draft', 'objective_proposal', 'needs_context']);
-const ADAPTERS = new Set<RelayAdapter>(['cowork-filesystem', 'hermes-local']);
+const ADAPTERS = new Set<RelayAdapter>(['filesystem', 'cowork-filesystem', 'hermes-local']);
 const LOCALITIES = new Set<RelayLocality>(['local', 'cloud']);
 const MEMORY_SENSITIVITIES = new Set<MemorySensitivity>(['public', 'private', 'sensitive']);
 
@@ -16,13 +16,41 @@ export const DEMO_CAREER_TARGET: SessionTarget = {
 	id: 'career-cowork',
 	label: 'Karriere-Session',
 	domain: 'career',
-	adapter: 'cowork-filesystem',
+	adapter: 'filesystem',
 	locality: 'cloud',
 	capabilities: ['analyze', 'reply_draft', 'objective_proposal', 'needs_context'],
 	allowed_data_classes: ['mail_body', 'mail_metadata', 'memory_context'],
 	memory_max_sensitivity: 'private',
 	retention_days: 14
 };
+
+export const DEFAULT_CAREER_FILESYSTEM_TARGET: SessionTarget = {
+	id: 'career-session',
+	label: 'Karriere-Session',
+	domain: 'career',
+	adapter: 'filesystem',
+	locality: 'cloud',
+	capabilities: ['analyze', 'reply_draft', 'objective_proposal', 'needs_context'],
+	allowed_data_classes: ['mail_metadata', 'mail_body', 'memory_context'],
+	memory_max_sensitivity: 'private',
+	retention_days: 14
+};
+
+export function getSessionTargetsPath(): string {
+	return process.env.FOLIO_SESSION_TARGETS_PATH?.trim() || join(homedir(), '.folio', 'session-targets.yaml');
+}
+
+export function createDefaultCareerFilesystemTarget(
+	path = getSessionTargetsPath()
+): SessionTarget {
+	if (existsSync(path)) throw new Error('session-targets manifest already exists');
+	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+	writeFileSync(path, YAML.stringify({
+		schema: 'folio/session-targets/v1',
+		targets: [DEFAULT_CAREER_FILESYSTEM_TARGET]
+	}), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+	return loadSessionTargets(path)[0];
+}
 
 function ids(value: unknown, label: string): string[] {
 	if (!Array.isArray(value) || !value.length || value.some((item) => typeof item !== 'string' || !ID.test(item))) {
@@ -31,7 +59,7 @@ function ids(value: unknown, label: string): string[] {
 	return [...new Set(value as string[])];
 }
 
-export function loadSessionTargets(path = join(homedir(), '.folio', 'session-targets.yaml')): SessionTarget[] {
+export function loadSessionTargets(path = getSessionTargetsPath()): SessionTarget[] {
 	if (!existsSync(path)) return isDemoVaultActive() ? [DEMO_CAREER_TARGET] : [];
 	const parsed = YAML.parse(readFileSync(path, 'utf8')) as { schema?: unknown; targets?: unknown };
 	if (parsed?.schema !== 'folio/session-targets/v1' || !Array.isArray(parsed.targets)) {

@@ -9,6 +9,7 @@ export const RELAY_MODULE: ModuleRegistration = {
 		version: '1',
 		capabilities: [
 			{ id: 'panel.render', kind: 'render', description: 'Render the Session Relay review workspace.' },
+			{ id: 'targets.configure', kind: 'write', description: 'Create an explicit local session-target manifest.' },
 			{ id: 'cases.read', kind: 'read', description: 'Read case metadata and staged previews.' },
 			{ id: 'cases.stage', kind: 'write', description: 'Stage a provider-neutral case locally.' },
 			{ id: 'egress.approve', kind: 'write', description: 'Record human approval for one exact cloud-bound request.' },

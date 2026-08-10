@@ -26,6 +26,12 @@ Targets are declared in `session-targets.yaml`; see [`config/session-targets.exa
 
 Folio validates these declarations before a case can be staged. Target adapters do not decide policy themselves.
 
+For the first owner-operated career workflow, an empty real installation offers **Connect career
+session** in the Relay UI. The action creates one generic `filesystem` target in the local manifest;
+it stores no provider account or credential. The UI then provides a one-time instruction for any
+online session with local filesystem access. The older `cowork-filesystem` adapter name remains
+accepted for existing manifests, but new setup is provider-neutral.
+
 ## Runtime layout
 
 ```text
@@ -46,6 +52,10 @@ The response envelope supports reply drafts, requests for more context and propo
 An actionable mail classified as `job` or `job-lead` exposes **Prepare handoff** in Mail Queue. The action stages the already local sparse Worker extraction, mail metadata and a policy-filtered memory bundle for the first eligible `career` target. It never shares immediately: cloud content still waits in Relay for the case-bound human approval.
 
 The current mail pipeline retains a sparse extraction rather than the complete RFC message. Relay labels that completeness is not established inside the reviewed payload instead of implying that the full message is present. Repeating the action for the same account, IMAP UID and target returns the existing case. Mail Queue links back to that case and surfaces when a response draft is ready.
+
+The owner setup is intentionally small: connect the career session once, copy the displayed working
+instruction into that session once, then approve individual mail handoffs in Folio. Changing from
+one online model provider to another does not change the request or response contracts.
 
 Before staging, the Context Compiler may retrieve confirmed facts from Folio's SQLite/FTS baseline. Retrieval is filtered by the case domain and the target's declared sensitivity ceiling. The resulting facts and their provenance are bound to the reviewed request hash; source excerpts are not copied into model context. Folio displays the exact selected facts next to the source material before a cloud handoff is approved.
 

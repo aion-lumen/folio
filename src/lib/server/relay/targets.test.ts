@@ -2,7 +2,7 @@ import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadSessionTargets } from './targets.js';
+import { createDefaultCareerFilesystemTarget, loadSessionTargets } from './targets.js';
 
 describe('Session target manifest', () => {
 	let root = '';
@@ -17,7 +17,7 @@ targets:
   - id: career-session
     label: Career session
     domain: career
-    adapter: cowork-filesystem
+    adapter: filesystem
     locality: cloud
     capabilities: [analyze, reply_draft]
     allowed_data_classes: [mail_body]
@@ -37,7 +37,7 @@ targets:
   - id: career-session
     label: Career session
     domain: career
-    adapter: cowork-filesystem
+    adapter: filesystem
     locality: cloud
     capabilities: [reply_draft]
     allowed_data_classes: [mail_body, memory_context]
@@ -46,5 +46,19 @@ targets:
 		expect(() => loadSessionTargets(path)).toThrow(/must declare memory_max_sensitivity/);
 		writeFileSync(path, readFileSync(path, 'utf8').replace('    retention_days', '    memory_max_sensitivity: private\n    retention_days'));
 		expect(loadSessionTargets(path)[0].memory_max_sensitivity).toBe('private');
+	});
+
+	it('creates one generic filesystem target without overwriting an existing manifest', () => {
+		root = join(tmpdir(), `folio-targets-${Date.now()}`);
+		const path = join(root, 'targets.yaml');
+		const target = createDefaultCareerFilesystemTarget(path);
+		expect(target).toEqual(expect.objectContaining({
+			id: 'career-session',
+			adapter: 'filesystem',
+			locality: 'cloud',
+			memory_max_sensitivity: 'private'
+		}));
+		expect(loadSessionTargets(path)).toHaveLength(1);
+		expect(() => createDefaultCareerFilesystemTarget(path)).toThrow(/already exists/);
 	});
 });

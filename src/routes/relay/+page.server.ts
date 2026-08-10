@@ -1,6 +1,7 @@
 import { fail } from '@sveltejs/kit';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
 import { dirname } from 'node:path';
 import { isDemoVaultActive } from '$lib/server/env.js';
 import { compileMemoryContext } from '$lib/server/memory/compiler.js';
@@ -13,6 +14,7 @@ import { requireModuleCapability } from '$lib/server/modules/http.js';
 import {
 	applyRelayResponse,
 	approveRelayEgress,
+	getRelayInboxPath,
 	getRelayPayloadForReview,
 	getRelayResponseDropPath,
 	getRelayResponseForReview,
@@ -23,9 +25,18 @@ import {
 	shareRelayCase,
 	stageRelayCase
 } from '$lib/server/relay/store.js';
-import { DEMO_CAREER_TARGET, loadSessionTargets } from '$lib/server/relay/targets.js';
+import {
+	createDefaultCareerFilesystemTarget,
+	DEMO_CAREER_TARGET,
+	loadSessionTargets
+} from '$lib/server/relay/targets.js';
 import { createObjective } from '$lib/server/vault/writer.js';
 import type { Actions, PageServerLoad } from './$types.js';
+
+function homeRelative(path: string): string {
+	const home = homedir();
+	return path === home || path.startsWith(`${home}/`) ? `~${path.slice(home.length)}` : path;
+}
 
 function ensureDemoCase(): void {
 	if (!isDemoVaultActive()) return;
@@ -73,6 +84,7 @@ export const load: PageServerLoad = async () => {
 	requireModuleCapability('relay', 'responses.read');
 	ensureDemoCase();
 	const targets = loadSessionTargets();
+	const filesystemTarget = targets.find((target) => target.adapter === 'filesystem' || target.adapter === 'cowork-filesystem');
 	const responseErrors = ingestAvailableRelayResponses(targets);
 	const labels = Object.fromEntries(targets.map((target) => [target.id, target.label]));
 	const cases = listRelayCases().map((item) => {
@@ -94,10 +106,34 @@ export const load: PageServerLoad = async () => {
 			})()
 		};
 	});
-	return { cases, targetsConfigured: targets.length > 0, responseErrors, demo: isDemoVaultActive() };
+	return {
+		cases,
+		targetsConfigured: targets.length > 0,
+		targets: targets.map((target) => ({
+			id: target.id,
+			label: target.label,
+			domain: target.domain,
+			locality: target.locality,
+			adapter: target.adapter
+		})),
+		filesystemInboxPath: filesystemTarget ? homeRelative(getRelayInboxPath(filesystemTarget.domain)) : null,
+		responseErrors,
+		demo: isDemoVaultActive()
+	};
 };
 
 export const actions: Actions = {
+	configureCareer: async () => {
+		requireModuleCapability('relay', 'targets.configure');
+		if (isDemoVaultActive()) return fail(409, { message: 'Das Demo-Ziel ist bereits isoliert eingerichtet.' });
+		try {
+			if (loadSessionTargets().length) return fail(409, { message: 'Es ist bereits ein Session-Ziel eingerichtet.' });
+			createDefaultCareerFilesystemTarget();
+			return { success: true, configured: true };
+		} catch (error) {
+			return fail(409, { message: error instanceof Error ? error.message : 'Ziel konnte nicht eingerichtet werden.' });
+		}
+	},
 	share: async ({ request }) => {
 		requireModuleCapability('relay', 'cases.read');
 		requireModuleCapability('relay', 'egress.approve');

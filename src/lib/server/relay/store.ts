@@ -94,6 +94,10 @@ export function getRelayResponseDropPath(caseId: string, domain: string, root = 
 	return safePath(root, id(domain, 'domain'), 'outbox', caseId, 'response.json');
 }
 
+export function getRelayInboxPath(domain: string, root = exchangeRoot('cases.read')): string {
+	return safePath(root, id(domain, 'domain'), 'inbox');
+}
+
 function readPayload(row: RelayCaseRow): RelayRequestPayload {
 	const root = exchangeRoot('cases.read');
 	const expected = payloadPath(row.case_id, root);
