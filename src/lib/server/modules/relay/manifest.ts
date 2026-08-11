@@ -15,7 +15,8 @@ export const RELAY_MODULE: ModuleRegistration = {
 			{ id: 'egress.approve', kind: 'write', description: 'Record human approval for one exact cloud-bound request.' },
 			{ id: 'cases.share', kind: 'execute', description: 'Share an approved request through its declared adapter.' },
 			{ id: 'responses.read', kind: 'read', description: 'Validate provider-neutral responses from a target outbox.' },
-			{ id: 'responses.apply', kind: 'write', description: 'Apply one human-reviewed response inside Folio.' }
+			{ id: 'responses.apply', kind: 'write', description: 'Apply one human-reviewed response inside Folio.' },
+			{ id: 'retention.enforce', kind: 'execute', description: 'Purge expired runtime case content under the target-declared policy.' }
 		],
 		data_classes: [
 			{ id: 'case-content', sensitivity: 'sensitive', retention: { policy: 'target-declared', enforced: true } },

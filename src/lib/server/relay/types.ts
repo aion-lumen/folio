@@ -57,6 +57,7 @@ export interface RelayCaseRow {
 	request_body_path: string;
 	response_hash: string | null;
 	retention_until: string;
+	content_purged_at: string | null;
 	created_at: string;
 	updated_at: string;
 }

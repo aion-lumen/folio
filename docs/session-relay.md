@@ -31,6 +31,10 @@ Targets are declared in `session-targets.yaml`; see [`config/session-targets.exa
 - its payload retention period.
 
 Folio validates these declarations before a case can be staged. Target adapters do not decide policy themselves.
+On the next Relay access after that period ends, Folio removes the exact case directories from
+staging, target inbox and target outbox. Open cases become `expired`; terminal decisions retain
+their status. The append-only audit and already accepted Folio artifacts remain, but raw request
+and response bodies do not.
 
 For the first owner-operated career workflow, an empty real installation offers **Connect career
 session** in the Relay UI. The action creates one generic `filesystem` target in the local manifest;
@@ -58,7 +62,15 @@ the bridge with `FOLIO_SESSION_BRIDGE_PATH` when the connected workspace has a d
 
 ## Current scope
 
-The response envelope supports reply drafts, requests for more context and proposed Objectives. Folio rejects unknown fields, mismatched request versions and changed responses. An external session never receives direct write access to mail or campaign state: its result becomes effective only after a human action in Folio. When the owner accepts a reply draft, Folio copies its subject and body into its own database. The editable local working copy then appears on the matching Mail Queue item and no longer depends on the bridge response file. Nothing is sent automatically. Accepted Objective proposals use Folio's existing Objective writer.
+The response envelope supports reply drafts, requests for more context, proposed Objectives and an
+explicit `no_action_needed` recommendation. Folio rejects unknown fields, mismatched request
+versions and changed responses. An external session never receives direct write access to mail or
+campaign state: its result becomes effective only after a human action in Folio. When the owner
+accepts a reply draft, Folio copies its subject and body into its own database. The editable local
+working copy then appears on the matching Mail Queue item and no longer depends on the bridge
+response file. Nothing is sent automatically. Accepted Objective proposals use Folio's existing
+Objective writer; accepting `no_action_needed` records the reviewed conclusion without creating a
+mail draft or silently changing the underlying mail state.
 
 ## Career mail pilot
 

@@ -28,6 +28,7 @@ import type {
 const ID = /^[a-z][a-z0-9_-]{0,63}$/;
 const MAX_RESPONSE_BYTES = 512 * 1024;
 const SENSITIVITY_RANK: Record<MemorySensitivity, number> = { public: 0, private: 1, sensitive: 2 };
+const RETENTION_TERMINAL_STATUSES = new Set(['applied', 'closed', 'rejected']);
 
 export class RelayStoreError extends Error {}
 
@@ -97,6 +98,25 @@ function payloadPath(caseId: string, root = exchangeRoot('cases.read')): string 
 	return safePath(root, 'staging', caseId, 'payload.json');
 }
 
+function removeRuntimeTree(root: string, target: string): boolean {
+	if (!existsSync(target)) return false;
+	if (!existsSync(root)) throw new RelayStoreError('relay runtime root disappeared during retention cleanup');
+	const canonicalRoot = realpathSync(root);
+	const canonicalParent = realpathSync(dirname(target));
+	if (canonicalParent !== canonicalRoot && !canonicalParent.startsWith(`${canonicalRoot}${sep}`)) {
+		throw new RelayStoreError('relay retention path escaped its runtime root');
+	}
+	const info = lstatSync(target);
+	if (!info.isSymbolicLink()) {
+		const canonicalTarget = realpathSync(target);
+		if (canonicalTarget !== canonicalRoot && !canonicalTarget.startsWith(`${canonicalRoot}${sep}`)) {
+			throw new RelayStoreError('relay retention path escaped its runtime root');
+		}
+	}
+	rmSync(target, { recursive: info.isDirectory(), force: true });
+	return true;
+}
+
 export function getRelayResponseDropPath(caseId: string, domain: string, root = bridgeRoot('responses.read')): string {
 	return safePath(root, id(domain, 'domain'), 'outbox', caseId, 'response.json');
 }
@@ -106,6 +126,7 @@ export function getRelayInboxPath(domain: string, root = bridgeRoot('cases.read'
 }
 
 function readPayload(row: RelayCaseRow): RelayRequestPayload {
+	if (row.content_purged_at) throw new RelayStoreError('relay case content has expired');
 	const root = exchangeRoot('cases.read');
 	const expected = payloadPath(row.case_id, root);
 	if (resolve(row.request_body_path) !== expected) throw new RelayStoreError('staging path mismatch');
@@ -410,6 +431,7 @@ function readResponse(
 }
 
 function readResponseFile(row: RelayCaseRow): { path: string; raw: string; hash: string } {
+	if (row.content_purged_at) throw new RelayStoreError('relay case content has expired');
 	const root = bridgeRoot('responses.read');
 	const path = getRelayResponseDropPath(row.case_id, row.domain, root);
 	const info = lstatSync(path);
@@ -690,6 +712,51 @@ export function rejectRelayResponse(caseId: string, actorId: string): RelayCaseV
 	return getRelayCase(caseId);
 }
 
+export function enforceRelayRetention(now = new Date()): { purged: number; expired: number } {
+	requireRelayCapability('retention.enforce');
+	if (!Number.isFinite(now.getTime())) throw new RelayStoreError('retention cutoff is invalid');
+	const cutoff = now.toISOString();
+	const db = getFolioDb();
+	const rows = db.prepare(
+		`SELECT * FROM relay_cases
+		 WHERE content_purged_at IS NULL AND retention_until <= ?
+		 ORDER BY retention_until, case_id`
+	).all(cutoff) as RelayCaseRow[];
+	if (!rows.length) return { purged: 0, expired: 0 };
+
+	const exchange = exchangeRoot('retention.enforce');
+	const bridge = bridgeRoot('retention.enforce');
+	let purged = 0;
+	let expired = 0;
+	for (const row of rows) {
+		const removed = {
+			staging: removeRuntimeTree(exchange, safePath(exchange, 'staging', row.case_id)),
+			inbox: removeRuntimeTree(bridge, safePath(bridge, row.domain, 'inbox', row.case_id)),
+			outbox: removeRuntimeTree(bridge, safePath(bridge, row.domain, 'outbox', row.case_id))
+		};
+		const nextStatus = RETENTION_TERMINAL_STATUSES.has(row.status) ? row.status : 'expired';
+		const changed = db.transaction(() => {
+			const result = db.prepare(
+				`UPDATE relay_cases
+				 SET status = ?, response_hash = NULL, content_purged_at = ?, updated_at = ?
+				 WHERE case_id = ? AND content_purged_at IS NULL`
+			).run(nextStatus, cutoff, cutoff, row.case_id);
+			if (!result.changes) return false;
+			appendEvent(row.case_id, 'retention-enforced', 'system', 'folio-core', {
+				status_before: row.status,
+				status_after: nextStatus,
+				removed
+			});
+			return true;
+		})();
+		if (changed) {
+			purged += 1;
+			if (nextStatus === 'expired' && row.status !== 'expired') expired += 1;
+		}
+	}
+	return { purged, expired };
+}
+
 function getRelayCaseRow(caseId: string): RelayCaseRow {
 	const row = getFolioDb().prepare('SELECT * FROM relay_cases WHERE case_id = ?').get(caseId) as RelayCaseRow | undefined;
 	if (!row) throw new RelayStoreError(`unknown relay case: ${caseId}`);
@@ -709,6 +776,7 @@ export function getRelayPayloadForReview(caseId: string): RelayRequestPayload {
 
 export function listRelayCases(): RelayCaseView[] {
 	requireRelayCapability('cases.read');
+	enforceRelayRetention();
 	return (getFolioDb().prepare('SELECT * FROM relay_cases ORDER BY updated_at DESC').all() as RelayCaseRow[]).map(rowView);
 }
 
@@ -718,6 +786,7 @@ export function findRelayCaseBySource(
 	targetId?: string
 ): RelayCaseView | null {
 	requireRelayCapability('cases.read');
+	enforceRelayRetention();
 	const row = targetId
 		? getFolioDb().prepare(
 			`SELECT * FROM relay_cases

@@ -39,7 +39,7 @@
 			<div><span class="eyebrow">Session Relay</span><h1>Übergaben</h1></div>
 			<span class="count">{data.cases.length} {data.cases.length === 1 ? 'Fall' : 'Fälle'}</span>
 		</div>
-		<p>Folio bringt einen Fall zur zuständigen Session und holt Antwort, Rückfrage oder Objective-Vorschlag hierher zurück.</p>
+		<p>Folio bringt einen Fall zur zuständigen Session und holt Antwort, Rückfrage oder Empfehlung hierher zurück.</p>
 	</header>
 
 	{#if form?.message}<div class="notice error" role="alert">{form.message}</div>{/if}
@@ -112,7 +112,11 @@
 						</section>
 					{/if}
 
-					<div class="preview"><span class="preview-label">Freigegebener Inhalt</span><p>{item.preview}</p></div>
+					{#if item.content_purged_at}
+						<div class="preview retained"><span class="preview-label">Laufzeitinhalt entfernt</span><p>Die Aufbewahrungsfrist endete am {item.retention_until.slice(0, 10)}. Audit und übernommene Folio-Ergebnisse bleiben erhalten.</p></div>
+					{:else}
+						<div class="preview"><span class="preview-label">Freigegebener Inhalt</span><p>{item.preview}</p></div>
+					{/if}
 
 					{#if followUps.length}
 						<section class="follow-ups">
@@ -160,7 +164,9 @@
 					<footer class:context-footer={item.status === 'needs_context'}>
 						<div class="trust">
 							<ShieldCheck size={17} />
-							{#if item.status === 'answered' || item.status === 'needs_context'}
+							{#if item.content_purged_at}
+								<span>Staging-, Übergabe- und Antwortdateien dieses Falls wurden fristgerecht entfernt.</span>
+							{:else if item.status === 'answered' || item.status === 'needs_context'}
 								<span>Vorschlag der Session. Erst dein Klick macht ihn zu einem Folio-Ergebnis.</span>
 							{:else if item.target_locality === 'cloud'}
 								<span>Diese Übergabe geht an eine Online-Session. Die Freigabe gilt nur für genau diesen Stand.</span>
@@ -252,6 +258,7 @@
 	.meta { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 20px 14px 74px; }
 	.meta span { border: 1px solid var(--color-border); border-radius: 6px; padding: 3px 7px; color: var(--color-muted-foreground); font-size: 10px; }
 	.preview { margin: 0 20px 18px 74px; border-radius: 11px; background: var(--color-muted); padding: 13px 14px; }
+	.preview.retained { border: 1px dashed var(--color-border); background: transparent; color: var(--color-muted-foreground); }
 	.preview p { margin-top: 7px; white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
 	.follow-ups { margin: -6px 20px 18px 74px; border: 1px solid hsl(205 42% 84%); border-radius: 11px; background: hsl(205 48% 97%); padding: 13px 14px; }
 	.follow-ups > div { margin-top: 8px; }

@@ -406,6 +406,7 @@ CREATE TABLE IF NOT EXISTS relay_cases (
     request_body_path  TEXT NOT NULL,
     response_hash      TEXT,
     retention_until    TEXT NOT NULL,
+    content_purged_at  TEXT,
     created_at         TEXT NOT NULL,
     updated_at         TEXT NOT NULL
 );
@@ -548,6 +549,12 @@ export function getFolioDb(): Database.Database {
 			  ON relay_applications(case_id, applied_at DESC);
 			COMMIT;
 		`);
+	}
+	const relayCaseColumns = _conn
+		.prepare('PRAGMA table_info(relay_cases)')
+		.all() as Array<{ name: string }>;
+	if (!relayCaseColumns.some((column) => column.name === 'content_purged_at')) {
+		_conn.exec('ALTER TABLE relay_cases ADD COLUMN content_purged_at TEXT NULL');
 	}
 	// 2026-06-05: object_status_override.reason — Spalten-Migration fuer
 	// existierende DBs (CREATE TABLE IF NOT EXISTS triggert sonst nicht).

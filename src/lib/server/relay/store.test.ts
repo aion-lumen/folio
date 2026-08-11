@@ -396,6 +396,69 @@ describe('Session Relay core egress gate', () => {
 		expect(() => relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget)).toThrow(/changed after intake/);
 	});
 
+	it('expires an open case and purges its staged content exactly once', async () => {
+		const { db, relay } = await store();
+		const expired = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:expired-open', subject: 'Old request',
+			body: 'This content must expire.', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		const future = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:future-open', subject: 'Future request',
+			body: 'This content remains.', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		db.prepare('UPDATE relay_cases SET retention_until = ? WHERE case_id = ?')
+			.run('2026-01-01T00:00:00.000Z', expired.case_id);
+		db.prepare('UPDATE relay_cases SET retention_until = ? WHERE case_id = ?')
+			.run('2026-03-01T00:00:00.000Z', future.case_id);
+
+		expect(relay.enforceRelayRetention(new Date('2026-02-01T00:00:00.000Z'))).toEqual({ purged: 1, expired: 1 });
+		expect(relay.getRelayCase(expired.case_id)).toEqual(expect.objectContaining({
+			status: 'expired', content_purged_at: '2026-02-01T00:00:00.000Z', response_hash: null
+		}));
+		expect(existsSync(dirname(expired.request_body_path))).toBe(false);
+		expect(() => relay.getRelayPayloadForReview(expired.case_id)).toThrow(/content has expired/);
+		expect(existsSync(future.request_body_path)).toBe(true);
+		expect(relay.getRelayCase(future.case_id).content_purged_at).toBeNull();
+		expect(relay.enforceRelayRetention(new Date('2026-02-01T00:00:00.000Z'))).toEqual({ purged: 0, expired: 0 });
+		expect(db.prepare("SELECT COUNT(*) AS n FROM relay_events WHERE case_id = ? AND event_type = 'retention-enforced'")
+			.get(expired.case_id)).toEqual({ n: 1 });
+	});
+
+	it('purges an applied bridge exchange while preserving the accepted Folio draft', async () => {
+		const { db, relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:expired-applied', subject: 'Old reply',
+			body: 'Please draft a reply.', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const inboxCase = join(relay.getRelayInboxPath('career'), staged.case_id);
+		const responsePath = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(responsePath), { recursive: true });
+		writeFileSync(responsePath, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'reply_draft', body: 'Accepted local working copy.' },
+			created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+		relay.ingestRelayResponse(staged.case_id, cloudTarget);
+		relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget);
+		const draft = relay.getRelayMailDraft(staged.case_id);
+		db.prepare('UPDATE relay_cases SET retention_until = ? WHERE case_id = ?')
+			.run('2026-01-01T00:00:00.000Z', staged.case_id);
+
+		expect(relay.enforceRelayRetention(new Date('2026-02-01T00:00:00.000Z'))).toEqual({ purged: 1, expired: 0 });
+		expect(relay.getRelayCase(staged.case_id)).toEqual(expect.objectContaining({
+			status: 'applied', content_purged_at: '2026-02-01T00:00:00.000Z'
+		}));
+		expect(existsSync(dirname(staged.request_body_path))).toBe(false);
+		expect(existsSync(inboxCase)).toBe(false);
+		expect(existsSync(dirname(responsePath))).toBe(false);
+		expect(relay.getRelayMailDraft(staged.case_id)).toEqual(draft);
+		expect(db.prepare('SELECT artifact_kind FROM relay_applications WHERE case_id = ?').get(staged.case_id))
+			.toEqual({ artifact_kind: 'mail_draft' });
+	});
+
 	it('honours the module kill-switch in the store and exchange resolver', async () => {
 		const { relay } = await store();
 		vi.stubEnv('FOLIO_DISABLED_MODULES', 'relay');

@@ -113,15 +113,16 @@ export const load: PageServerLoad = async () => {
 	const responseErrorByCase = new Map(responseErrors.map((item) => [item.case_id, item.error]));
 	const labels = Object.fromEntries(targets.map((target) => [target.id, target.label]));
 	const cases = listRelayCases().map((item) => {
-		const payload = getRelayPayloadForReview(item.case_id);
+		const payload = item.content_purged_at ? null : getRelayPayloadForReview(item.case_id);
 		return {
 			...item,
 			target_label: labels[item.target_id] ?? item.target_id,
-			preview: payload.body,
-			follow_ups: payload.follow_ups ?? [],
-			memory_context: payload.memory_context ?? null,
+			preview: payload?.body ?? null,
+			follow_ups: payload?.follow_ups ?? [],
+			memory_context: payload?.memory_context ?? null,
 			response_error: responseErrorByCase.get(item.case_id) ?? null,
 			response: (() => {
+				if (item.content_purged_at) return null;
 				if (!['answered', 'needs_context', 'applied', 'rejected'].includes(item.status)) return null;
 				const target = targets.find((candidate) => candidate.id === item.target_id);
 				if (!target) return null;
