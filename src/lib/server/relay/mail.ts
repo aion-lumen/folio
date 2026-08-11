@@ -80,7 +80,9 @@ export function stageCareerMailRelay(
 	enforceRelayRetention();
 	const sourceRef = mailRelaySourceRef(input.account_id, input.imap_uid);
 	const existing = findRelayCaseBySource('mail', sourceRef, target.id);
-	if (existing) return { case: existing, target, created: false, body_truncated: input.body_truncated };
+	if (existing && existing.status !== 'expired') {
+		return { case: existing, target, created: false, body_truncated: input.body_truncated };
+	}
 
 	const body = reviewedMailBody(input);
 	const dataClasses = ['mail_metadata', 'mail_body'];

@@ -8,7 +8,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowRight, Check, Copy, LoaderCircle, Save } from 'lucide-svelte';
+	import { ArrowRight, Check, CircleAlert, Copy, LoaderCircle, Save } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
@@ -218,11 +218,30 @@
 	}
 
 	function relayStatusLabel(status: string | null): string {
+		if (status === 'detected') return 'Mail erkannt';
+		if (status === 'staged') return 'Zur Freigabe bereit';
+		if (status === 'approved') return 'Freigabe erteilt';
 		if (status === 'answered') return 'Antwortentwurf bereit';
 		if (status === 'applied') return relayDraft ? 'Antwortentwurf bereit' : 'Keine weitere Aktion nötig';
 		if (status === 'shared' || status === 'claimed') return 'Session arbeitet daran';
+		if (status === 'needs_context') return 'Rückfrage der Session';
+		if (status === 'reviewed') return 'Antwort geprüft';
+		if (status === 'closed') return 'Übergabe abgeschlossen';
 		if (status === 'rejected') return 'Vorschlag verworfen';
+		if (status === 'expired') return 'Übergabe abgelaufen';
 		return 'Zur Freigabe bereit';
+	}
+
+	function relayStatusDescription(status: string | null): string {
+		if (status === 'expired') {
+			return 'Der frühere Laufzeitinhalt wurde entfernt. Bei Bedarf kannst du die Übergabe neu vorbereiten.';
+		}
+		if (status === 'needs_context') return 'Die Rückfrage wartet in Übergaben auf deine Antwort.';
+		if (status === 'rejected') return 'Der verworfene Vorschlag und die Entscheidung bleiben in Übergaben sichtbar.';
+		if (relayDraft) return 'Der angenommene Entwurf liegt jetzt lokal bei dieser Mail.';
+		if (status === 'applied') return 'Die Empfehlung der Session wurde ohne Mailentwurf übernommen.';
+		if (stagedRelay) return `Für ${stagedRelay.targetLabel} vorbereitet.`;
+		return 'Antwort und Freigabe bleiben in Übergaben sichtbar.';
 	}
 
 	async function saveRelayDraft(): Promise<void> {
@@ -512,8 +531,11 @@
 				<div class="relay-copy">
 					<span class="relay-eyebrow">Session Relay</span>
 					{#if relayCaseId}
-						<strong><Check size={15} /> {relayStatusLabel(relayStatus)}</strong>
-						<p>{stagedRelay ? `Für ${stagedRelay.targetLabel} vorbereitet. ` : ''}{relayDraft ? 'Der angenommene Entwurf liegt jetzt lokal bei dieser Mail.' : relayStatus === 'applied' ? 'Die Empfehlung der Session wurde ohne Mailentwurf übernommen.' : 'Antwort und Freigabe bleiben in Übergaben sichtbar.'}</p>
+						<strong>
+							{#if relayStatus === 'expired'}<CircleAlert size={15} />{:else}<Check size={15} />{/if}
+							{relayStatusLabel(relayStatus)}
+						</strong>
+						<p>{relayStatusDescription(relayStatus)}</p>
 					{:else}
 						<strong>Mit der Karriere-Session bearbeiten</strong>
 						<p>Folio bereitet Mailauszug und passenden bestätigten Kontext zur Prüfung vor.</p>
@@ -521,12 +543,12 @@
 					{#if stagedRelay?.bodyTruncated}<small>Die Vollständigkeit des lokalen Worker-Auszugs ist nicht belegt; Folio kennzeichnet das im Fall.</small>{/if}
 					{#if relayError}<small class="relay-error">{relayError}</small>{/if}
 				</div>
-				{#if relayCaseId}
+				{#if relayCaseId && relayStatus !== 'expired'}
 					<a class="relay-link" href="/relay">Übergaben öffnen <ArrowRight size={14} /></a>
-				{:else}
+				{:else if careerRelayEligible}
 					<button class="relay-button" type="button" disabled={relayLoading} onclick={prepareCareerRelay}>
 						{#if relayLoading}<LoaderCircle class="spin" size={14} />{:else}<ArrowRight size={14} />{/if}
-						Übergabe vorbereiten
+						{relayStatus === 'expired' ? 'Neu vorbereiten' : 'Übergabe vorbereiten'}
 					</button>
 				{/if}
 				{#if relayDraft}

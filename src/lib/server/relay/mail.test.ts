@@ -71,6 +71,32 @@ describe('mail to Session Relay', () => {
 		expect(second.case.case_id).toBe(first.case.case_id);
 	});
 
+	it('starts a new case when the previous handoff expired', async () => {
+		const { mail, relay } = await setup();
+		const input = {
+			feedback_id: 19,
+			account_id: 'mirhamed',
+			imap_uid: 4219,
+			sender: 'Recruiting <jobs@example.org>',
+			to_addr: 'candidate@example.net',
+			subject: 'Erneute Prüfung',
+			received_at: '2026-08-10T08:00:00Z',
+			domain: 'job',
+			body: 'Bitte prüfen Sie diese Nachricht erneut.',
+			body_truncated: false
+		};
+		const first = mail.stageCareerMailRelay(input, [target]);
+		const init = await import('../folio-db/init.js');
+		init.getFolioDb().prepare('UPDATE relay_cases SET retention_until = ? WHERE case_id = ?')
+			.run('2000-01-01T00:00:00.000Z', first.case.case_id);
+
+		const second = mail.stageCareerMailRelay(input, [target]);
+		expect(second.created).toBe(true);
+		expect(second.case.case_id).not.toBe(first.case.case_id);
+		expect(second.case.status).toBe('staged');
+		expect(relay.getRelayCase(first.case.case_id).status).toBe('expired');
+	});
+
 	it('rejects non-career mail and targets without mail policy', async () => {
 		const { mail } = await setup();
 		const base = {
