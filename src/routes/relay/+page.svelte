@@ -45,6 +45,8 @@
 	{#if form?.message}<div class="notice error" role="alert">{form.message}</div>{/if}
 	{#if form?.configured}<div class="notice success" role="status"><Check size={16} /> Karriere-Session ist verbunden.</div>
 	{:else if form?.demoResponse}<div class="notice success" role="status"><Check size={16} /> Antwort ist eingetroffen.</div>
+	{:else if form?.demoContextQuestion}<div class="notice success" role="status"><Check size={16} /> Rückfrage ist eingetroffen.</div>
+	{:else if form?.contextAnswered}<div class="notice success" role="status"><Check size={16} /> Antwort ergänzt. Prüfe den neuen Stand und gib ihn erneut frei.</div>
 	{:else if form?.applied}<div class="notice success" role="status"><Check size={16} /> In Folio übernommen.</div>
 	{:else if form?.invalidDiscarded}<div class="notice" role="status">Ungültige Antwort verworfen. Der Fall bleibt offen.</div>
 	{:else if form?.rejected}<div class="notice" role="status">Vorschlag verworfen.</div>
@@ -80,6 +82,7 @@
 			{#each data.cases as item (item.case_id)}
 				{@const response = item.response}
 				{@const memoryFacts = item.memory_context?.facts ?? []}
+				{@const followUps = item.follow_ups ?? []}
 				<article class="case" class:done={item.status === 'shared'}>
 					<header>
 						<div class="target-icon" class:cloud={item.target_locality === 'cloud'}>
@@ -109,6 +112,15 @@
 					{/if}
 
 					<div class="preview"><span class="preview-label">Freigegebener Inhalt</span><p>{item.preview}</p></div>
+
+					{#if followUps.length}
+						<section class="follow-ups">
+							<span class="preview-label">Deine Ergänzung</span>
+							{#each followUps as followUp}
+								<div><small>{followUp.question}</small><p>{followUp.answer}</p></div>
+							{/each}
+						</section>
+					{/if}
 
 					{#if item.response_error}
 						<section class="invalid-response" role="alert">
@@ -142,7 +154,7 @@
 						</section>
 					{/if}
 
-					<footer>
+					<footer class:context-footer={item.status === 'needs_context'}>
 						<div class="trust">
 							<ShieldCheck size={17} />
 							{#if item.status === 'answered' || item.status === 'needs_context'}
@@ -160,10 +172,16 @@
 							</form>
 						{:else if item.status === 'shared'}
 							{#if data.demo}
-								<form method="POST" action="?/demoResponse">
-									<input type="hidden" name="case_id" value={item.case_id} />
-									<button class="demo" type="submit">Demo-Antwort eintreffen lassen</button>
-								</form>
+								<div class="demo-actions">
+									<form method="POST" action="?/demoContextQuestion">
+										<input type="hidden" name="case_id" value={item.case_id} />
+										<button class="demo" type="submit">Demo-Rückfrage</button>
+									</form>
+									<form method="POST" action="?/demoResponse">
+										<input type="hidden" name="case_id" value={item.case_id} />
+										<button class="demo" type="submit">Demo-Antwort</button>
+									</form>
+								</div>
 							{:else}<span class="shared">Wartet auf die Session …</span>{/if}
 						{:else if item.status === 'answered'}
 							<div class="review-actions">
@@ -171,7 +189,15 @@
 								<form method="POST" action="?/apply"><input type="hidden" name="case_id" value={item.case_id} /><button class="share" type="submit">{response?.kind === 'objective_proposal' ? 'Als Objective übernehmen' : 'Als Mailvorlage übernehmen'}</button></form>
 							</div>
 						{:else if item.status === 'needs_context'}
-							<form method="POST" action="?/reject"><input type="hidden" name="case_id" value={item.case_id} /><button class="reject" type="submit">Rückfrage schliessen</button></form>
+							<div class="context-actions">
+								<form class="context-answer" method="POST" action="?/answerContext">
+									<input type="hidden" name="case_id" value={item.case_id} />
+									<label for={`answer-${item.case_id}`}>Deine Antwort</label>
+									<textarea id={`answer-${item.case_id}`} name="answer" required maxlength="5000" rows="3" placeholder="Fehlenden Kontext kurz ergänzen …"></textarea>
+									<button class="share" type="submit">In Übergabe aufnehmen</button>
+								</form>
+								<form method="POST" action="?/reject"><input type="hidden" name="case_id" value={item.case_id} /><button class="reject" type="submit">Rückfrage schliessen</button></form>
+							</div>
 						{:else if item.status === 'applied'}
 							{#if response?.kind === 'reply_draft'}
 								{@const draftBody = response.body}
@@ -220,6 +246,10 @@
 	.meta span { border: 1px solid var(--color-border); border-radius: 6px; padding: 3px 7px; color: var(--color-muted-foreground); font-size: 10px; }
 	.preview { margin: 0 20px 18px 74px; border-radius: 11px; background: var(--color-muted); padding: 13px 14px; }
 	.preview p { margin-top: 7px; white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+	.follow-ups { margin: -6px 20px 18px 74px; border: 1px solid hsl(205 42% 84%); border-radius: 11px; background: hsl(205 48% 97%); padding: 13px 14px; }
+	.follow-ups > div { margin-top: 8px; }
+	.follow-ups small { display: block; color: hsl(205 42% 36%); font-size: 11px; }
+	.follow-ups p { margin-top: 3px; white-space: pre-wrap; font-size: 13px; line-height: 1.5; }
 	.memory-preview { margin: 0 20px 12px 74px; border: 1px solid hsl(205 42% 84%); border-radius: 11px; background: hsl(205 48% 97%); padding: 12px 14px; }
 	.memory-heading { display: flex; align-items: center; gap: 7px; color: hsl(205 52% 34%); font-size: 11px; font-weight: 700; }
 	.memory-preview ul { display: flex; flex-direction: column; gap: 5px; margin: 9px 0 7px; padding: 0; list-style: none; }
@@ -245,11 +275,18 @@
 	.share { display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 9px; padding: 10px 14px; background: hsl(158 52% 34%); color: white; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; white-space: nowrap; }
 	.demo, .reject, .copy { border: 1px solid var(--color-border); border-radius: 9px; padding: 9px 12px; background: var(--color-card); color: var(--color-foreground); font: inherit; font-size: 11px; cursor: pointer; }
 	.review-actions { display: flex; align-items: center; gap: 8px; }
+	.demo-actions { display: flex; align-items: center; gap: 8px; }
+	.context-footer { align-items: flex-start !important; flex-direction: column; }
+	.context-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 8px; width: 100%; }
+	.context-answer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 8px; }
+	.context-answer label { grid-column: 1 / -1; color: var(--color-muted-foreground); font-size: 10px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }
+	.context-answer textarea { min-width: 0; resize: vertical; border: 1px solid var(--color-border); border-radius: 9px; padding: 10px 11px; background: var(--color-background); color: var(--color-foreground); font: inherit; font-size: 12px; line-height: 1.45; }
+	.context-answer .share { align-self: end; }
 	.shared, .notice { display: inline-flex; align-items: center; gap: 7px; color: hsl(158 52% 30%); font-size: 12px; font-weight: 600; }
 	.shared.muted { color: var(--color-muted-foreground); }
 	.notice { border-radius: 10px; padding: 11px 13px; background: hsl(158 42% 92%); }
 	.notice.error { color: hsl(0 56% 38%); background: hsl(0 65% 94%); }
 	.empty { border: 1px dashed var(--color-border); border-radius: 15px; padding: 34px; text-align: center; }
 	.empty p { margin-top: 6px; color: var(--color-muted-foreground); font-size: 13px; }
-	@media (max-width: 620px) { .page { padding: 28px 16px 56px; } .setup-card { grid-template-columns: 1fr; align-items: stretch; } .setup-card form { grid-column: 1; } .setup-card .share { width: 100%; justify-content: center; } .setup-copy ul { flex-direction: column; gap: 4px; } .connection-card, .connection-path { align-items: stretch; flex-direction: column; } .connection-path code { max-width: 100%; } .connection-path button { justify-content: center; } .case > header { grid-template-columns: 38px 1fr; } .status { grid-column: 2; justify-self: start; } .meta, .memory-preview, .preview, .response, .invalid-response { margin-left: 16px; } .meta { padding-left: 0; } .preview { padding: 13px 14px; } .memory-preview li { align-items: flex-start; flex-direction: column; gap: 1px; } .invalid-response { align-items: stretch; flex-direction: column; } .invalid-response form, .invalid-response button { width: 100%; } .case footer { align-items: stretch; flex-direction: column; } .share { width: 100%; justify-content: center; } .review-actions { align-items: stretch; flex-direction: column-reverse; } .review-actions form, .review-actions button { width: 100%; } }
+	@media (max-width: 620px) { .page { padding: 28px 16px 56px; } .setup-card { grid-template-columns: 1fr; align-items: stretch; } .setup-card form { grid-column: 1; } .setup-card .share { width: 100%; justify-content: center; } .setup-copy ul { flex-direction: column; gap: 4px; } .connection-card, .connection-path { align-items: stretch; flex-direction: column; } .connection-path code { max-width: 100%; } .connection-path button { justify-content: center; } .case > header { grid-template-columns: 38px 1fr; } .status { grid-column: 2; justify-self: start; } .meta, .memory-preview, .preview, .follow-ups, .response, .invalid-response { margin-left: 16px; } .meta { padding-left: 0; } .preview { padding: 13px 14px; } .memory-preview li { align-items: flex-start; flex-direction: column; gap: 1px; } .invalid-response { align-items: stretch; flex-direction: column; } .invalid-response form, .invalid-response button { width: 100%; } .case footer { align-items: stretch; flex-direction: column; } .share { width: 100%; justify-content: center; } .review-actions { align-items: stretch; flex-direction: column-reverse; } .review-actions form, .review-actions button { width: 100%; } .demo-actions, .context-actions, .context-answer { grid-template-columns: 1fr; align-items: stretch; flex-direction: column; } .demo-actions form, .demo-actions button, .context-actions form, .context-actions button { width: 100%; } .context-answer label { grid-column: 1; } }
 </style>

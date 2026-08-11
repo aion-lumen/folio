@@ -246,7 +246,7 @@ describe('Session Relay core egress gate', () => {
 		expect(relay.ingestAvailableRelayResponses([cloudTarget])).toEqual([]);
 	});
 
-	it('surfaces a context request and lets the human reject it', async () => {
+	it('adds a human context answer to a new request version before sharing again', async () => {
 		const { relay } = await store();
 		const staged = relay.stageRelayCase({
 			domain: 'career', source_kind: 'mail', source_ref: 'mail:25', subject: 'Question',
@@ -263,6 +263,44 @@ describe('Session Relay core egress gate', () => {
 			created_at: new Date().toISOString()
 		}), { mode: 0o600 });
 		expect(relay.ingestRelayResponse(staged.case_id, cloudTarget).status).toBe('needs_context');
+		const answered = relay.answerRelayContext(staged.case_id, 'Tuesday at 10:00 works for me.', 'owner', cloudTarget);
+		expect(answered.status).toBe('staged');
+		expect(answered.request_hash).not.toBe(staged.request_hash);
+		expect(answered.response_hash).toBeNull();
+		expect(relay.getRelayPayloadForReview(staged.case_id).follow_ups).toEqual([
+			expect.objectContaining({
+				question: 'Which appointment do you prefer?',
+				answer: 'Tuesday at 10:00 works for me.'
+			})
+		]);
+		expect(existsSync(path)).toBe(false);
+		expect(readdirSync(dirname(path)).some((name) => name.startsWith('response.context-answered-'))).toBe(true);
+		expect(() => relay.shareRelayCase(staged.case_id, cloudTarget)).toThrow(/approval/);
+
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		expect(relay.shareRelayCase(staged.case_id, cloudTarget).status).toBe('shared');
+		const request = readFileSync(join(relay.getRelayInboxPath('career'), staged.case_id, 'request.md'), 'utf8');
+		expect(request).toContain('## Owner follow-up');
+		expect(request).toContain('Tuesday at 10:00 works for me.');
+	});
+
+	it('lets the human close a context request without answering it', async () => {
+		const { relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:context-reject', subject: 'Question',
+			body: 'Please draft a reply', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'needs_context', question: 'Which appointment do you prefer?' },
+			created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+		relay.ingestRelayResponse(staged.case_id, cloudTarget);
 		expect(relay.rejectRelayResponse(staged.case_id, 'owner').status).toBe('rejected');
 	});
 

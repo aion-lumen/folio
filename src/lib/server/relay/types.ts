@@ -76,7 +76,14 @@ export interface RelayRequestPayload {
 	capability: RelayCapability;
 	data_classes: string[];
 	memory_context?: MemoryContextBundle;
+	follow_ups?: RelayFollowUp[];
 	body: string;
+	created_at: string;
+}
+
+export interface RelayFollowUp {
+	question: string;
+	answer: string;
 	created_at: string;
 }
 
