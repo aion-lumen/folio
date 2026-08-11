@@ -284,6 +284,48 @@ describe('Session Relay core egress gate', () => {
 		expect(request).toContain('Tuesday at 10:00 works for me.');
 	});
 
+	it('restores the context request files when the database update fails', async () => {
+		const { db, relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:context-rollback', subject: 'Question',
+			body: 'Please draft a reply', capability: 'reply_draft', data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const responsePath = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(responsePath), { recursive: true });
+		const responseRaw = JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'needs_context', question: 'Which appointment do you prefer?' },
+			created_at: new Date().toISOString()
+		});
+		writeFileSync(responsePath, responseRaw, { mode: 0o600 });
+		const ingested = relay.ingestRelayResponse(staged.case_id, cloudTarget);
+		const requestRaw = readFileSync(staged.request_body_path, 'utf8');
+
+		writeFileSync(responsePath, JSON.stringify({ changed: true }));
+		expect(() => relay.answerRelayContext(staged.case_id, 'Tuesday at 10:00.', 'owner', cloudTarget))
+			.toThrow(/changed after intake/);
+		writeFileSync(responsePath, responseRaw);
+
+		db.exec(`CREATE TRIGGER relay_context_rollback_test
+			BEFORE UPDATE OF status ON relay_cases
+			WHEN OLD.status = 'needs_context' AND NEW.status = 'staged'
+			BEGIN SELECT RAISE(ABORT, 'forced context rollback'); END`);
+		expect(() => relay.answerRelayContext(staged.case_id, 'Tuesday at 10:00.', 'owner', cloudTarget))
+			.toThrow(/forced context rollback/);
+
+		const restored = relay.getRelayCase(staged.case_id);
+		expect(restored.status).toBe('needs_context');
+		expect(restored.request_hash).toBe(staged.request_hash);
+		expect(restored.response_hash).toBe(ingested.response_hash);
+		expect(readFileSync(staged.request_body_path, 'utf8')).toBe(requestRaw);
+		expect(readFileSync(responsePath, 'utf8')).toBe(responseRaw);
+		expect(readdirSync(dirname(responsePath))).toEqual(['response.json']);
+		expect(readdirSync(dirname(staged.request_body_path))).toEqual(['payload.json']);
+	});
+
 	it('lets the human close a context request without answering it', async () => {
 		const { relay } = await store();
 		const staged = relay.stageRelayCase({
