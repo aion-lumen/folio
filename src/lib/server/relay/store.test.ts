@@ -424,6 +424,28 @@ describe('Session Relay core egress gate', () => {
 			.get(expired.case_id)).toEqual({ n: 1 });
 	});
 
+	it('keeps case reads side-effect free until retention is explicitly enforced', async () => {
+		const { db, relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:expired-read', subject: 'Old request',
+			body: 'Reading metadata must not purge this content.', capability: 'reply_draft',
+			data_classes: ['mail_body'], target: cloudTarget
+		});
+		db.prepare('UPDATE relay_cases SET retention_until = ? WHERE case_id = ?')
+			.run('2026-01-01T00:00:00.000Z', staged.case_id);
+
+		expect(relay.listRelayCases().find((item) => item.case_id === staged.case_id)).toEqual(
+			expect.objectContaining({ status: 'staged', content_purged_at: null })
+		);
+		expect(relay.findRelayCaseBySource('mail', 'mail:expired-read', cloudTarget.id)).toEqual(
+			expect.objectContaining({ status: 'staged', content_purged_at: null })
+		);
+		expect(existsSync(staged.request_body_path)).toBe(true);
+
+		expect(relay.enforceRelayRetention(new Date('2026-02-01T00:00:00.000Z'))).toEqual({ purged: 1, expired: 1 });
+		expect(relay.getRelayCase(staged.case_id).status).toBe('expired');
+	});
+
 	it('purges an applied bridge exchange while preserving the accepted Folio draft', async () => {
 		const { db, relay } = await store();
 		const staged = relay.stageRelayCase({

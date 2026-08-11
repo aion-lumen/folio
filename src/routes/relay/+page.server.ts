@@ -16,6 +16,7 @@ import {
 	applyRelayResponse,
 	archiveInvalidRelayResponse,
 	approveRelayEgress,
+	enforceRelayRetention,
 	getRelayInboxPath,
 	getRelayPayloadForReview,
 	getRelayResponseDropPath,
@@ -106,6 +107,8 @@ export const load: PageServerLoad = async () => {
 	requireModuleCapability('relay', 'panel.render');
 	requireModuleCapability('relay', 'cases.read');
 	requireModuleCapability('relay', 'responses.read');
+	requireModuleCapability('relay', 'retention.enforce');
+	enforceRelayRetention();
 	ensureDemoCase();
 	const targets = loadSessionTargets();
 	const filesystemTarget = targets.find((target) => target.adapter === 'filesystem' || target.adapter === 'cowork-filesystem');

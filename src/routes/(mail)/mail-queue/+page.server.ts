@@ -17,7 +17,7 @@ import { computeActiveRules } from '$lib/server/regelwerk/active-rules.js';
 import { getHomePlz } from '$lib/server/env.js';
 import { hasModuleCapability } from '$lib/server/modules/index.js';
 import { mailRelaySourceRef } from '$lib/server/relay/mail.js';
-import { listRelayCases, listRelayMailDrafts } from '$lib/server/relay/store.js';
+import { enforceRelayRetention, listRelayCases, listRelayMailDrafts } from '$lib/server/relay/store.js';
 import { buildVotesForFeedback, stripeState } from '$lib/server/lenses/voices.js';
 // F.8 BUG-F1 Fix: Mock-Hydration aus normalem Lade-Pfad entfernt.
 // getStressRows bleibt für ?stress=N (Performance-Smoke). getMockRows nicht
@@ -76,6 +76,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		const homeCoords = homePlz ? { lat: homePlz.lat, lng: homePlz.lng } : null;
 		const relayBySource = new Map<string, ReturnType<typeof listRelayCases>[number]>();
 		const relayDraftByCase = new Map<string, ReturnType<typeof listRelayMailDrafts>[number]>();
+		if (hasModuleCapability('relay', 'retention.enforce')) enforceRelayRetention();
 		if (hasModuleCapability('relay', 'cases.read')) {
 			for (const relayCase of listRelayCases()) {
 				if (relayCase.source_kind === 'mail' && !relayBySource.has(relayCase.source_ref)) {

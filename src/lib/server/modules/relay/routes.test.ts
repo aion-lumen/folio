@@ -9,6 +9,7 @@ describe('Session Relay route guards', () => {
 			'panel.render',
 			'targets.configure',
 			'cases.read',
+			'retention.enforce',
 			'egress.approve',
 			'cases.share',
 			'responses.read',

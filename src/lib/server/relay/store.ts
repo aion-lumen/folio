@@ -776,7 +776,6 @@ export function getRelayPayloadForReview(caseId: string): RelayRequestPayload {
 
 export function listRelayCases(): RelayCaseView[] {
 	requireRelayCapability('cases.read');
-	enforceRelayRetention();
 	return (getFolioDb().prepare('SELECT * FROM relay_cases ORDER BY updated_at DESC').all() as RelayCaseRow[]).map(rowView);
 }
 
@@ -786,7 +785,6 @@ export function findRelayCaseBySource(
 	targetId?: string
 ): RelayCaseView | null {
 	requireRelayCapability('cases.read');
-	enforceRelayRetention();
 	const row = targetId
 		? getFolioDb().prepare(
 			`SELECT * FROM relay_cases

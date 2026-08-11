@@ -1,5 +1,5 @@
 import { compileMemoryContext } from '../memory/compiler.js';
-import { findRelayCaseBySource, stageRelayCase } from './store.js';
+import { enforceRelayRetention, findRelayCaseBySource, stageRelayCase } from './store.js';
 import type { RelayCaseView, SessionTarget } from './types.js';
 
 export class MailRelayError extends Error {}
@@ -77,6 +77,7 @@ export function stageCareerMailRelay(
 		throw new MailRelayError('Nur als Job oder Job-Lead bestätigte Mails können an die Karriere-Session gehen.');
 	}
 	const target = chooseTarget(targets, input.target_id);
+	enforceRelayRetention();
 	const sourceRef = mailRelaySourceRef(input.account_id, input.imap_uid);
 	const existing = findRelayCaseBySource('mail', sourceRef, target.id);
 	if (existing) return { case: existing, target, created: false, body_truncated: input.body_truncated };
