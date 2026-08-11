@@ -10,13 +10,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Provider-neutral Session Relay with case-bound cloud approvals, one-click local filesystem-target
-  setup, validated response intake, human application of reply drafts or Objective proposals, and
-  an actionable career-mail handoff from Mail Queue with explicit sparse-extraction labelling.
+  setup, validated response intake, context-question round trips, and human application of reply
+  drafts, Objective proposals or explicit no-action conclusions.
+- End-to-end career-mail pilot from an actionable Mail Queue item through a connected session and
+  back to an editable local reply draft, without automatic sending or provider-specific APIs.
 - Folio-owned memory baseline with candidate/confirmed facts, provenance, temporal supersession,
   tombstones, rebuildable FTS search, and a Context Compiler constrained by domain and the target's
   declared sensitivity ceiling.
 - Sonar X-archive and following review surfaces with append-only human decisions and optional local
   classification suggestions.
+
+### Changed
+
+- Session Relay now enforces each target's declared runtime-content retention at explicit workflow
+  boundaries. Expired request and response directories are removed while accepted Folio artifacts
+  and the append-only decision trail remain.
+- Leuchtfeuer reach reporting now counts only successful GETs to deployed routes from non-bot user
+  agents, keeps exclusion reasons auditable, and presents channel and content resonance visually.
 
 ### Security
 

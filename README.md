@@ -188,19 +188,27 @@ Set `AION_LUMEN_PATH` if the repo is not at `~/Projects/aion-lumen/multi-agent`.
 - Import inbox — validated interchange documents, source-trust policy and local LLM triage
 - Hermes integration — manifest-selected vault context, traceable sessions and execution profiles
 - Module foundation — deny-by-default capabilities, route/database guards and kill switches
-- Sonar preview — local review of imported external notes with append-only human decisions
+- Folio-owned memory — confirmed facts with provenance, temporal history and domain-scoped context
+- Session Relay — provider-neutral handoffs with exact cloud approval and reviewed return paths
+- Career-mail workflow — a Mail Queue case can return as an editable draft, context question,
+  Objective proposal or explicit no-action conclusion; Folio never sends it automatically
+- Sonar preview — local review of X archive and following imports with append-only human decisions
+- Leuchtfeuer — privacy-preserving, visually attributed site and repository resonance from server
+  aggregates, without client tracking
 - Isolated demo — fictional fixtures and separate `*-demo.db` state, without IMAP credentials
 
 ## What is being built next
 
-- **Session Relay** — a provider-neutral, reviewed handoff from Folio to a responsible local or
-  online session, with reply drafts, context requests or Objective proposals returning to Folio
-- **Folio-owned memory** — confirmed facts with provenance and small, domain-scoped context bundles
-- **Career pilot** — one complete real workflow from incoming mail to a human-reviewed result
+- **Operational learning** — use the career Relay in daily work before expanding its adapters or
+  turning the optional Redaction Gate into a default workflow
+- **Memory evaluation** — compare disposable graph/RAG projections against Folio's small canonical
+  facts-and-FTS baseline, using questions produced by real Relay cases
 - **Measured local delegation** — move suitable routines from long-running online sessions to local
   agents only after their quality has been observed against the same contracts
+- **Mobile review** — consider a small approval and correction surface once the desktop workflow
+  and backend contracts have proved stable in use
 
-These items are development direction, not part of the `v0.4.2` public release. See
+These items are post-`v0.5.0` development direction, not promises of the current release. See
 [docs/ROADMAP.md](docs/ROADMAP.md) for gates, sequencing and the full roadmap.
 
 ## Contributing
