@@ -46,6 +46,7 @@
 	{#if form?.configured}<div class="notice success" role="status"><Check size={16} /> Karriere-Session ist verbunden.</div>
 	{:else if form?.demoResponse}<div class="notice success" role="status"><Check size={16} /> Antwort ist eingetroffen.</div>
 	{:else if form?.demoContextQuestion}<div class="notice success" role="status"><Check size={16} /> Rückfrage ist eingetroffen.</div>
+	{:else if form?.demoNoAction}<div class="notice success" role="status"><Check size={16} /> Empfehlung ist eingetroffen.</div>
 	{:else if form?.contextAnswered}<div class="notice success" role="status"><Check size={16} /> Antwort ergänzt. Prüfe den neuen Stand und gib ihn erneut frei.</div>
 	{:else if form?.applied}<div class="notice success" role="status"><Check size={16} /> In Folio übernommen.</div>
 	{:else if form?.invalidDiscarded}<div class="notice" role="status">Ungültige Antwort verworfen. Der Fall bleibt offen.</div>
@@ -137,15 +138,17 @@
 					{/if}
 
 					{#if response}
-						<section class="response" class:question={response.kind === 'needs_context'}>
+						<section class="response" class:question={response.kind === 'needs_context'} class:noaction={response.kind === 'no_action_needed'}>
 							<span class="response-label">
-								{response.kind === 'reply_draft' ? 'Antwortentwurf der Session' : response.kind === 'needs_context' ? 'Rückfrage der Session' : 'Objective-Vorschlag der Session'}
+								{response.kind === 'reply_draft' ? 'Antwortentwurf der Session' : response.kind === 'needs_context' ? 'Rückfrage der Session' : response.kind === 'no_action_needed' ? 'Keine Aktion nötig' : 'Objective-Vorschlag der Session'}
 							</span>
 							{#if response.kind === 'reply_draft'}
 								{#if response.subject}<strong>{response.subject}</strong>{/if}
 								<p>{response.body}</p>
 							{:else if response.kind === 'needs_context'}
 								<p>{response.question}</p>
+							{:else if response.kind === 'no_action_needed'}
+								<p>{response.reason}</p>
 							{:else}
 								<strong>{response.title}</strong>
 								<p>{response.threshold}</p>
@@ -181,12 +184,16 @@
 										<input type="hidden" name="case_id" value={item.case_id} />
 										<button class="demo" type="submit">Demo-Antwort</button>
 									</form>
+									<form method="POST" action="?/demoNoAction">
+										<input type="hidden" name="case_id" value={item.case_id} />
+										<button class="demo" type="submit">Demo: nichts tun</button>
+									</form>
 								</div>
 							{:else}<span class="shared">Wartet auf die Session …</span>{/if}
 						{:else if item.status === 'answered'}
 							<div class="review-actions">
 								<form method="POST" action="?/reject"><input type="hidden" name="case_id" value={item.case_id} /><button class="reject" type="submit">Verwerfen</button></form>
-								<form method="POST" action="?/apply"><input type="hidden" name="case_id" value={item.case_id} /><button class="share" type="submit">{response?.kind === 'objective_proposal' ? 'Als Objective übernehmen' : 'Als Mailvorlage übernehmen'}</button></form>
+								<form method="POST" action="?/apply"><input type="hidden" name="case_id" value={item.case_id} /><button class="share" type="submit">{response?.kind === 'objective_proposal' ? 'Als Objective übernehmen' : response?.kind === 'no_action_needed' ? 'Als erledigt übernehmen' : 'Als Mailvorlage übernehmen'}</button></form>
 							</div>
 						{:else if item.status === 'needs_context'}
 							<div class="context-actions">
@@ -259,8 +266,10 @@
 	.memory-preview small { color: var(--color-muted-foreground); font-size: 10px; }
 	.response { margin: -4px 20px 18px 74px; border: 1px solid hsl(158 34% 75%); border-radius: 11px; background: hsl(158 42% 96%); padding: 13px 14px; }
 	.response.question { border-color: hsl(36 66% 75%); background: hsl(36 78% 96%); }
+	.response.noaction { border-color: hsl(205 36% 78%); background: hsl(205 44% 97%); }
 	.response-label { display: block; margin-bottom: 7px; color: hsl(158 52% 30%); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 	.response.question .response-label { color: hsl(28 72% 38%); }
+	.response.noaction .response-label { color: hsl(205 52% 34%); }
 	.response strong { display: block; margin-bottom: 5px; font-size: 12px; }
 	.response p { white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
 	.response small { display: block; margin-top: 7px; color: var(--color-muted-foreground); }

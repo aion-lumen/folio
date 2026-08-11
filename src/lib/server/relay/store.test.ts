@@ -200,6 +200,36 @@ describe('Session Relay core egress gate', () => {
 			.toEqual(expect.objectContaining({ subject: 'Re: Updated', body: 'Wednesday works.' }));
 	});
 
+	it('records an accepted no-action recommendation without creating a mail draft', async () => {
+		const { db, relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'mail', source_ref: 'mail:no-action', subject: 'Automatic rejection',
+			body: 'This automated message does not accept replies.', capability: 'reply_draft',
+			data_classes: ['mail_body'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const request = readFileSync(join(relay.getRelayInboxPath('career'), staged.case_id, 'request.md'), 'utf8');
+		expect(request).toContain('{"kind":"no_action_needed","reason":"<reason>"}');
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: { kind: 'no_action_needed', reason: 'The sender is automated and no reply is expected.' },
+			created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+
+		expect(relay.ingestRelayResponse(staged.case_id, cloudTarget).status).toBe('answered');
+		expect(relay.getRelayResponseForReview(staged.case_id, cloudTarget).result).toEqual({
+			kind: 'no_action_needed', reason: 'The sender is automated and no reply is expected.'
+		});
+		expect(relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget).status).toBe('applied');
+		expect(db.prepare('SELECT artifact_kind, target_ref FROM relay_applications WHERE case_id = ?').get(staged.case_id))
+			.toEqual({ artifact_kind: 'no_action', target_ref: `relay:${staged.case_id}` });
+		expect(relay.getRelayMailDraft(staged.case_id)).toBeNull();
+	});
+
 	it('rejects a response bound to a different request or target', async () => {
 		const { relay } = await store();
 		const staged = relay.stageRelayCase({

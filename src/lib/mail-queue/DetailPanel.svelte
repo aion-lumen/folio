@@ -219,7 +219,7 @@
 
 	function relayStatusLabel(status: string | null): string {
 		if (status === 'answered') return 'Antwortentwurf bereit';
-		if (status === 'applied') return 'Antwortentwurf bereit';
+		if (status === 'applied') return relayDraft ? 'Antwortentwurf bereit' : 'Keine weitere Aktion nötig';
 		if (status === 'shared' || status === 'claimed') return 'Session arbeitet daran';
 		if (status === 'rejected') return 'Vorschlag verworfen';
 		return 'Zur Freigabe bereit';
@@ -513,7 +513,7 @@
 					<span class="relay-eyebrow">Session Relay</span>
 					{#if relayCaseId}
 						<strong><Check size={15} /> {relayStatusLabel(relayStatus)}</strong>
-						<p>{stagedRelay ? `Für ${stagedRelay.targetLabel} vorbereitet. ` : ''}{relayDraft ? 'Der angenommene Entwurf liegt jetzt lokal bei dieser Mail.' : 'Antwort und Freigabe bleiben in Übergaben sichtbar.'}</p>
+						<p>{stagedRelay ? `Für ${stagedRelay.targetLabel} vorbereitet. ` : ''}{relayDraft ? 'Der angenommene Entwurf liegt jetzt lokal bei dieser Mail.' : relayStatus === 'applied' ? 'Die Empfehlung der Session wurde ohne Mailentwurf übernommen.' : 'Antwort und Freigabe bleiben in Übergaben sichtbar.'}</p>
 					{:else}
 						<strong>Mit der Karriere-Session bearbeiten</strong>
 						<p>Folio bereitet Mailauszug und passenden bestätigten Kontext zur Prüfung vor.</p>

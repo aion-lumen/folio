@@ -452,7 +452,7 @@ CREATE TRIGGER IF NOT EXISTS relay_events_no_delete
 CREATE TABLE IF NOT EXISTS relay_applications (
     application_id  TEXT PRIMARY KEY,
     case_id          TEXT NOT NULL UNIQUE,
-    artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request')),
+    artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','no_action')),
     target_ref       TEXT NOT NULL,
     applied_by       TEXT NOT NULL,
     applied_at       TEXT NOT NULL,
@@ -517,6 +517,35 @@ export function getFolioDb(): Database.Database {
 			ALTER TABLE hermes_turns__new RENAME TO hermes_turns;
 			CREATE INDEX idx_hermes_turns_session
 			  ON hermes_turns(session_id, started_at DESC);
+			COMMIT;
+		`);
+	}
+
+	// Relay gained a first-class "no action needed" result after the first real
+	// mail pilot. Preserve existing applications while widening the CHECK vocabulary.
+	const relayApplicationsSql = _conn
+		.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='relay_applications'")
+		.get() as { sql: string } | undefined;
+	if (relayApplicationsSql && !relayApplicationsSql.sql.includes("'no_action'")) {
+		_conn.exec(`
+			BEGIN;
+			CREATE TABLE relay_applications__new (
+				application_id  TEXT PRIMARY KEY,
+				case_id          TEXT NOT NULL UNIQUE,
+				artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','no_action')),
+				target_ref       TEXT NOT NULL,
+				applied_by       TEXT NOT NULL,
+				applied_at       TEXT NOT NULL,
+				FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+			);
+			INSERT INTO relay_applications__new
+			  (application_id, case_id, artifact_kind, target_ref, applied_by, applied_at)
+			SELECT application_id, case_id, artifact_kind, target_ref, applied_by, applied_at
+			FROM relay_applications;
+			DROP TABLE relay_applications;
+			ALTER TABLE relay_applications__new RENAME TO relay_applications;
+			CREATE INDEX idx_relay_applications_case
+			  ON relay_applications(case_id, applied_at DESC);
 			COMMIT;
 		`);
 	}

@@ -32,6 +32,7 @@ import {
 	DEMO_CAREER_TARGET,
 	loadSessionTargets
 } from '$lib/server/relay/targets.js';
+import type { RelayResponseResult } from '$lib/server/relay/types.js';
 import { createObjective } from '$lib/server/vault/writer.js';
 import type { Actions, PageServerLoad } from './$types.js';
 
@@ -78,6 +79,27 @@ function ensureDemoCase(): void {
 		memory_context: memoryContext,
 		target: DEMO_CAREER_TARGET
 	});
+}
+
+function writeDemoRelayResponse(
+	caseId: string,
+	domain: string,
+	requestHash: string,
+	result: RelayResponseResult
+): void {
+	const path = getRelayResponseDropPath(caseId, domain);
+	mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+	const temp = `${path}.${randomUUID()}.tmp`;
+	writeFileSync(temp, JSON.stringify({
+		schema: 'folio/session-relay-response/v1',
+		case_id: caseId,
+		request_hash: requestHash,
+		target_id: DEMO_CAREER_TARGET.id,
+		result,
+		created_at: new Date().toISOString()
+	}), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
+	renameSync(temp, path);
+	ingestRelayResponse(caseId, DEMO_CAREER_TARGET);
 }
 
 export const load: PageServerLoad = async () => {
@@ -167,23 +189,11 @@ export const actions: Actions = {
 			const relayCase = listRelayCases().find((item) => item.case_id === caseId);
 			if (!relayCase) return fail(404, { message: 'Übergabe nicht gefunden.' });
 			if (relayCase.status !== 'shared') return fail(409, { message: 'Die Demo-Session wartet noch nicht auf diesen Fall.' });
-			const path = getRelayResponseDropPath(caseId, relayCase.domain);
-			mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-			const temp = `${path}.${randomUUID()}.tmp`;
-			writeFileSync(temp, JSON.stringify({
-				schema: 'folio/session-relay-response/v1',
-				case_id: caseId,
-				request_hash: relayCase.request_hash,
-				target_id: DEMO_CAREER_TARGET.id,
-				result: {
-					kind: 'reply_draft',
-					subject: `Re: ${relayCase.subject}`,
-					body: 'Guten Tag Frau Keller\n\nvielen Dank für die Einladung. Dienstag um 10:00 Uhr passt mir sehr gut. Ich freue mich auf das zweite Gespräch.\n\nFreundliche Grüsse\nAlex'
-				},
-				created_at: new Date().toISOString()
-			}), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-			renameSync(temp, path);
-			ingestRelayResponse(caseId, DEMO_CAREER_TARGET);
+			writeDemoRelayResponse(caseId, relayCase.domain, relayCase.request_hash, {
+				kind: 'reply_draft',
+				subject: `Re: ${relayCase.subject}`,
+				body: 'Guten Tag Frau Keller\n\nvielen Dank für die Einladung. Dienstag um 10:00 Uhr passt mir sehr gut. Ich freue mich auf das zweite Gespräch.\n\nFreundliche Grüsse\nAlex'
+			});
 			return { success: true, caseId, demoResponse: true };
 		} catch (error) {
 			return fail(409, { message: error instanceof Error ? error.message : 'Demo-Antwort fehlgeschlagen.' });
@@ -199,25 +209,32 @@ export const actions: Actions = {
 			const relayCase = listRelayCases().find((item) => item.case_id === caseId);
 			if (!relayCase) return fail(404, { message: 'Übergabe nicht gefunden.' });
 			if (relayCase.status !== 'shared') return fail(409, { message: 'Die Demo-Session wartet noch nicht auf diesen Fall.' });
-			const path = getRelayResponseDropPath(caseId, relayCase.domain);
-			mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-			const temp = `${path}.${randomUUID()}.tmp`;
-			writeFileSync(temp, JSON.stringify({
-				schema: 'folio/session-relay-response/v1',
-				case_id: caseId,
-				request_hash: relayCase.request_hash,
-				target_id: DEMO_CAREER_TARGET.id,
-				result: {
-					kind: 'needs_context',
-					question: 'Soll ich Dienstag um 10:00 Uhr verbindlich zusagen?'
-				},
-				created_at: new Date().toISOString()
-			}), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
-			renameSync(temp, path);
-			ingestRelayResponse(caseId, DEMO_CAREER_TARGET);
+			writeDemoRelayResponse(caseId, relayCase.domain, relayCase.request_hash, {
+				kind: 'needs_context',
+				question: 'Soll ich Dienstag um 10:00 Uhr verbindlich zusagen?'
+			});
 			return { success: true, caseId, demoContextQuestion: true };
 		} catch (error) {
 			return fail(409, { message: error instanceof Error ? error.message : 'Demo-Rückfrage fehlgeschlagen.' });
+		}
+	},
+	demoNoAction: async ({ request }) => {
+		requireModuleCapability('relay', 'cases.read');
+		requireModuleCapability('relay', 'responses.read');
+		if (!isDemoVaultActive()) return fail(404, { message: 'Nur im Demo-Vault verfügbar.' });
+		const data = await request.formData();
+		const caseId = String(data.get('case_id') ?? '');
+		try {
+			const relayCase = listRelayCases().find((item) => item.case_id === caseId);
+			if (!relayCase) return fail(404, { message: 'Übergabe nicht gefunden.' });
+			if (relayCase.status !== 'shared') return fail(409, { message: 'Die Demo-Session wartet noch nicht auf diesen Fall.' });
+			writeDemoRelayResponse(caseId, relayCase.domain, relayCase.request_hash, {
+				kind: 'no_action_needed',
+				reason: 'Diese Nachricht ist rein informativ und erwartet keine Antwort.'
+			});
+			return { success: true, caseId, demoNoAction: true };
+		} catch (error) {
+			return fail(409, { message: error instanceof Error ? error.message : 'Demo-Empfehlung fehlgeschlagen.' });
 		}
 	},
 	answerContext: async ({ request }) => {
