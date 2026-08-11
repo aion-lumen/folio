@@ -111,3 +111,13 @@ export interface RelayResponsePayload {
 	result: RelayResponseResult;
 	created_at: string;
 }
+
+export interface RelayMailDraftRow {
+	draft_id: string;
+	case_id: string;
+	source_ref: string;
+	subject: string;
+	body: string;
+	created_at: string;
+	updated_at: string;
+}

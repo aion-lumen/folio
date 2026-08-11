@@ -23,4 +23,14 @@ describe('Session Relay route guards', () => {
 		expect(source).toContain(`requireModuleCapability('relay', 'cases.read')`);
 		expect(source).toContain(`requireModuleCapability('relay', 'cases.stage')`);
 	});
+
+	it('guards accepted mail-draft editing at the HTTP boundary', () => {
+		const source = readFileSync(
+			join(process.cwd(), 'src/routes/api/relay/mail-draft/[caseId]/+server.ts'),
+			'utf8'
+		);
+		expect(source).toContain(`requireModuleCapability('relay', 'cases.read')`);
+		expect(source).toContain(`requireModuleCapability('relay', 'responses.read')`);
+		expect(source).toContain(`requireModuleCapability('relay', 'responses.apply')`);
+	});
 });

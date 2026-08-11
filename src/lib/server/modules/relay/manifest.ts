@@ -19,18 +19,20 @@ export const RELAY_MODULE: ModuleRegistration = {
 		],
 		data_classes: [
 			{ id: 'case-content', sensitivity: 'sensitive', retention: { policy: 'target-declared', enforced: true } },
-			{ id: 'egress-decision', sensitivity: 'sensitive', retention: { policy: 'append-only-audit', enforced: true } }
+			{ id: 'egress-decision', sensitivity: 'sensitive', retention: { policy: 'append-only-audit', enforced: true } },
+			{ id: 'accepted-result', sensitivity: 'sensitive', retention: { policy: 'owner-managed', enforced: false } }
 		],
 		panels: [{
 			id: 'review-workspace', label: 'Übergaben', requires: 'panel.render',
 			fields: [
 				{ id: 'case.preview', label: 'Fall', data_class: 'case-content' },
 				{ id: 'case.approval', label: 'Freigabe', data_class: 'egress-decision' },
-				{ id: 'case.response', label: 'Session-Antwort', data_class: 'case-content' }
+				{ id: 'case.response', label: 'Session-Antwort', data_class: 'case-content' },
+				{ id: 'case.accepted-result', label: 'Übernommenes Ergebnis', data_class: 'accepted-result' }
 			]
 		}],
 		databases: [
-			{ id: 'folio-state', engine: 'sqlite', access: 'read-write', data_classes: ['egress-decision'] },
+			{ id: 'folio-state', engine: 'sqlite', access: 'read-write', data_classes: ['egress-decision', 'accepted-result'] },
 			{ id: 'exchange', engine: 'filesystem', access: 'read-write', data_classes: ['case-content'] },
 			{ id: 'bridge', engine: 'filesystem', access: 'read-write', data_classes: ['case-content'] }
 		],

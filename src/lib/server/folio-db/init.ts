@@ -460,6 +460,19 @@ CREATE TABLE IF NOT EXISTS relay_applications (
 );
 CREATE INDEX IF NOT EXISTS idx_relay_applications_case
     ON relay_applications(case_id, applied_at DESC);
+
+CREATE TABLE IF NOT EXISTS relay_mail_drafts (
+    draft_id      TEXT PRIMARY KEY,
+    case_id       TEXT NOT NULL UNIQUE,
+    source_ref    TEXT NOT NULL,
+    subject       TEXT NOT NULL,
+    body          TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_mail_drafts_source
+    ON relay_mail_drafts(source_ref, updated_at DESC);
 `;
 
 export function getFolioDb(): Database.Database {

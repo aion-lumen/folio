@@ -6,9 +6,9 @@
   bleibt im Outer-Frame erhalten.
 -->
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowRight, Check, LoaderCircle } from 'lucide-svelte';
+	import { ArrowRight, Check, Copy, LoaderCircle, Save } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
@@ -164,11 +164,27 @@
 	);
 	const relayCaseId = $derived(stagedRelay?.caseId ?? row?.relay_case_id ?? null);
 	const relayStatus = $derived(stagedRelay?.status ?? row?.relay_status ?? null);
+	const relayDraft = $derived(row?.relay_draft ?? null);
+	const relayDraftKey = $derived(`${row?.uid ?? ''}:${row?.relay_draft?.draft_id ?? ''}`);
+	let draftSubject = $state('');
+	let draftBody = $state('');
+	let draftSaving = $state(false);
+	let draftError = $state<string | null>(null);
+	let draftSaved = $state(false);
+	let draftCopied = $state(false);
 
 	$effect(() => {
 		row?.uid;
 		stagedRelay = null;
 		relayError = null;
+	});
+
+	$effect(() => {
+		relayDraftKey;
+		const initialDraft = untrack(() => relayDraft);
+		draftSubject = initialDraft?.subject ?? '';
+		draftBody = initialDraft?.body ?? '';
+		draftError = null;
 	});
 
 	async function prepareCareerRelay(): Promise<void> {
@@ -203,10 +219,44 @@
 
 	function relayStatusLabel(status: string | null): string {
 		if (status === 'answered') return 'Antwortentwurf bereit';
-		if (status === 'applied') return 'Mailvorlage übernommen';
+		if (status === 'applied') return 'Antwortentwurf bereit';
 		if (status === 'shared' || status === 'claimed') return 'Session arbeitet daran';
 		if (status === 'rejected') return 'Vorschlag verworfen';
 		return 'Zur Freigabe bereit';
+	}
+
+	async function saveRelayDraft(): Promise<void> {
+		if (!relayCaseId || !relayDraft || draftSaving) return;
+		draftSaving = true;
+		draftError = null;
+		draftSaved = false;
+		try {
+			const response = await fetch(`/api/relay/mail-draft/${encodeURIComponent(relayCaseId)}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ subject: draftSubject, body: draftBody })
+			});
+			if (!response.ok) throw new Error((await response.text()).slice(0, 240));
+			await invalidateAll();
+			draftSaved = true;
+			setTimeout(() => { draftSaved = false; }, 1800);
+			toastStore.show('Antwortentwurf lokal gespeichert', 2200);
+		} catch (cause) {
+			draftError = cause instanceof Error ? cause.message : 'Antwortentwurf konnte nicht gespeichert werden.';
+		} finally {
+			draftSaving = false;
+		}
+	}
+
+	async function copyRelayDraft(): Promise<void> {
+		draftError = null;
+		try {
+			await navigator.clipboard.writeText(draftBody);
+			draftCopied = true;
+			setTimeout(() => { draftCopied = false; }, 1800);
+		} catch {
+			draftError = 'Antworttext konnte nicht kopiert werden.';
+		}
 	}
 
 	async function applyCorrection(
@@ -457,13 +507,13 @@
 
 		<PanelBody body={body?.bodyText ?? null} />
 
-		{#if careerRelayEligible}
+		{#if careerRelayEligible || relayCaseId}
 			<section class="relay-handoff">
 				<div class="relay-copy">
 					<span class="relay-eyebrow">Session Relay</span>
 					{#if relayCaseId}
 						<strong><Check size={15} /> {relayStatusLabel(relayStatus)}</strong>
-						<p>{stagedRelay ? `Für ${stagedRelay.targetLabel} vorbereitet. ` : ''}Antwort und Freigabe bleiben in Übergaben sichtbar.</p>
+						<p>{stagedRelay ? `Für ${stagedRelay.targetLabel} vorbereitet. ` : ''}{relayDraft ? 'Der angenommene Entwurf liegt jetzt lokal bei dieser Mail.' : 'Antwort und Freigabe bleiben in Übergaben sichtbar.'}</p>
 					{:else}
 						<strong>Mit der Karriere-Session bearbeiten</strong>
 						<p>Folio bereitet Mailauszug und passenden bestätigten Kontext zur Prüfung vor.</p>
@@ -478,6 +528,31 @@
 						{#if relayLoading}<LoaderCircle class="spin" size={14} />{:else}<ArrowRight size={14} />{/if}
 						Übergabe vorbereiten
 					</button>
+				{/if}
+				{#if relayDraft}
+					<div class="relay-draft-editor">
+						<label>
+							<span>Betreff</span>
+							<input bind:value={draftSubject} maxlength="500" />
+						</label>
+						<label>
+							<span>Antwortentwurf</span>
+							<textarea bind:value={draftBody} rows="7" maxlength="50000"></textarea>
+						</label>
+						<div class="relay-draft-footer">
+							<small>Lokale Arbeitskopie · nichts wurde versendet.</small>
+							<div class="relay-draft-actions">
+								<button type="button" class="relay-secondary" onclick={copyRelayDraft}>
+									{#if draftCopied}<Check size={14} /> Kopiert{:else}<Copy size={14} /> Text kopieren{/if}
+								</button>
+								<button type="button" class="relay-button" disabled={draftSaving} onclick={saveRelayDraft}>
+									{#if draftSaving}<LoaderCircle class="spin" size={14} />{:else if draftSaved}<Check size={14} />{:else}<Save size={14} />{/if}
+									{draftSaved ? 'Gespeichert' : 'Speichern'}
+								</button>
+							</div>
+						</div>
+						{#if draftError}<small class="relay-error">{draftError}</small>{/if}
+					</div>
 				{/if}
 			</section>
 		{/if}
@@ -604,9 +679,9 @@
 		background: hsl(217 60% 85%);
 	}
 	.relay-handoff {
-		display: flex;
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
 		align-items: center;
-		justify-content: space-between;
 		gap: 18px;
 		margin: 14px 16px 16px;
 		padding: 14px;
@@ -638,10 +713,66 @@
 		cursor: pointer;
 	}
 	.relay-button:disabled { cursor: not-allowed; opacity: .45; }
+	.relay-draft-editor {
+		display: flex;
+		grid-column: 1 / -1;
+		flex-direction: column;
+		gap: 9px;
+		padding-top: 12px;
+		border-top: 1px solid hsl(205 35% 87%);
+	}
+	.relay-draft-editor label { display: flex; flex-direction: column; gap: 4px; }
+	.relay-draft-editor label > span {
+		color: hsl(205 38% 31%);
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		font-weight: 650;
+		letter-spacing: .04em;
+		text-transform: uppercase;
+	}
+	.relay-draft-editor input, .relay-draft-editor textarea {
+		box-sizing: border-box;
+		width: 100%;
+		border: 1px solid hsl(205 30% 80%);
+		border-radius: 7px;
+		background: white;
+		color: var(--color-foreground);
+		font: inherit;
+		font-size: 11.5px;
+		line-height: 1.5;
+		padding: 8px 9px;
+	}
+	.relay-draft-editor textarea { min-height: 116px; resize: vertical; }
+	.relay-draft-editor input:focus, .relay-draft-editor textarea:focus {
+		border-color: hsl(205 52% 45%);
+		outline: 2px solid hsl(205 52% 45% / .13);
+	}
+	.relay-draft-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+	.relay-draft-footer small { color: var(--color-muted-foreground); font-size: 10px; }
+	.relay-draft-actions { display: flex; gap: 7px; }
+	.relay-secondary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		border: 1px solid hsl(205 30% 75%);
+		border-radius: 8px;
+		padding: 8px 10px;
+		background: white;
+		color: hsl(205 45% 31%);
+		font: inherit;
+		font-size: 10.5px;
+		font-weight: 650;
+		cursor: pointer;
+	}
+	.relay-draft-editor small.relay-error { color: hsl(0 56% 38%); }
 	.spin { animation: spin 1s linear infinite; }
 	@keyframes spin { to { transform: rotate(360deg); } }
 	@media (max-width: 900px) {
-		.relay-handoff { align-items: stretch; flex-direction: column; }
+		.relay-handoff { align-items: stretch; grid-template-columns: minmax(0, 1fr); }
 		.relay-button, .relay-link { width: 100%; }
+		.relay-draft-footer { align-items: stretch; flex-direction: column; }
+		.relay-draft-actions { width: 100%; }
+		.relay-draft-actions > button { flex: 1; width: auto; }
 	}
 </style>

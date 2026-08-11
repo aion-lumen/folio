@@ -189,8 +189,15 @@ describe('Session Relay core egress gate', () => {
 			kind: 'reply_draft', body: 'Tuesday works well.'
 		});
 		expect(relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget).status).toBe('applied');
-		expect(db.prepare('SELECT artifact_kind FROM relay_applications WHERE case_id = ?').get(staged.case_id))
-			.toEqual({ artifact_kind: 'mail_draft' });
+		expect(db.prepare('SELECT artifact_kind, target_ref FROM relay_applications WHERE case_id = ?').get(staged.case_id))
+			.toEqual({ artifact_kind: 'mail_draft', target_ref: expect.stringMatching(/^mail-draft:/) });
+		expect(relay.getRelayMailDraft(staged.case_id)).toEqual(expect.objectContaining({
+			source_ref: 'mail:23', subject: 'Re: Reply', body: 'Tuesday works well.'
+		}));
+		writeFileSync(path, JSON.stringify({ changed: true }));
+		expect(relay.getRelayMailDraft(staged.case_id)?.body).toBe('Tuesday works well.');
+		expect(relay.updateRelayMailDraft(staged.case_id, 'Re: Updated', 'Wednesday works.', 'owner'))
+			.toEqual(expect.objectContaining({ subject: 'Re: Updated', body: 'Wednesday works.' }));
 	});
 
 	it('rejects a response bound to a different request or target', async () => {

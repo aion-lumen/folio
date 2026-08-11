@@ -17,6 +17,7 @@ import { getModuleDatabasePath, hasModuleCapability } from '../modules/index.js'
 import type {
 	RelayCaseRow,
 	RelayCaseView,
+	RelayMailDraftRow,
 	RelayRequestPayload,
 	RelayResponsePayload,
 	RelayResponseResult,
@@ -520,8 +521,25 @@ export function applyRelayResponse(caseId: string, actorId: string, target: Sess
 		const { payload } = readResponse(row, target, row.response_hash);
 		if (payload.result.kind === 'needs_context') throw new RelayStoreError('a context request cannot be applied');
 		const artifactKind = payload.result.kind === 'reply_draft' ? 'mail_draft' : 'objective';
-		const ref = targetRef ?? `relay:${caseId}`;
 		const now = new Date().toISOString();
+		let ref = targetRef ?? `relay:${caseId}`;
+		if (payload.result.kind === 'reply_draft') {
+			const draftId = randomUUID();
+			ref = `mail-draft:${draftId}`;
+			db.prepare(
+				`INSERT INTO relay_mail_drafts
+				 (draft_id, case_id, source_ref, subject, body, created_at, updated_at)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)`
+			).run(
+				draftId,
+				caseId,
+				row.source_ref,
+				payload.result.subject ?? `Re: ${row.subject}`,
+				payload.result.body,
+				now,
+				now
+			);
+		}
 		db.prepare(
 			`INSERT INTO relay_applications
 			 (application_id, case_id, artifact_kind, target_ref, applied_by, applied_at)
@@ -533,6 +551,45 @@ export function applyRelayResponse(caseId: string, actorId: string, target: Sess
 	});
 	tx();
 	return getRelayCase(caseId);
+}
+
+export function listRelayMailDrafts(): RelayMailDraftRow[] {
+	requireRelayCapability('responses.read');
+	return getFolioDb().prepare(
+		'SELECT * FROM relay_mail_drafts ORDER BY updated_at DESC'
+	).all() as RelayMailDraftRow[];
+}
+
+export function getRelayMailDraft(caseId: string): RelayMailDraftRow | null {
+	requireRelayCapability('responses.read');
+	const row = getFolioDb().prepare(
+		'SELECT * FROM relay_mail_drafts WHERE case_id = ?'
+	).get(required(caseId, 'case_id')) as RelayMailDraftRow | undefined;
+	return row ?? null;
+}
+
+export function updateRelayMailDraft(
+	caseId: string,
+	subject: string,
+	body: string,
+	actorId: string
+): RelayMailDraftRow {
+	requireRelayCapability('responses.apply');
+	requireRelayCapability('responses.read');
+	const cleanSubject = responseText(subject, 'draft subject', 500);
+	const cleanBody = responseText(body, 'draft body');
+	const db = getFolioDb();
+	db.transaction(() => {
+		const existing = db.prepare('SELECT draft_id FROM relay_mail_drafts WHERE case_id = ?')
+			.get(required(caseId, 'case_id')) as { draft_id: string } | undefined;
+		if (!existing) throw new RelayStoreError('mail draft not found');
+		const now = new Date().toISOString();
+		db.prepare(
+			'UPDATE relay_mail_drafts SET subject = ?, body = ?, updated_at = ? WHERE case_id = ?'
+		).run(cleanSubject, cleanBody, now, caseId);
+		appendEvent(caseId, 'mail-draft-edited', 'human', actorId, { draft_id: existing.draft_id });
+	})();
+	return getRelayMailDraft(caseId)!;
 }
 
 export function rejectRelayResponse(caseId: string, actorId: string): RelayCaseView {
