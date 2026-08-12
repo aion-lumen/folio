@@ -16,19 +16,37 @@
 
 ## Why Folio exists
 
-Cloud AI forgets you at the end of every session. You start over. Every time. Folio is the generator that keeps the heat on: a local markdown vault holds your full context, a locally-running AI agent reads it directly, and nothing leaves your machine. Markdown as source of truth — no lock-in, no subscription. The full story is at [aion-lumen.ch/folio](https://aion-lumen.ch/folio).
+Folio began with a simple need: a second brain that would not disappear at the end of an AI
+session. A local Markdown vault became the durable memory; a campaign gave that memory direction
+through chapters and concrete objectives. From the beginning, the vault separated material into
+`open`, `internal`, and `restricted` layers. That boundary became Folio's first governance rule.
+
+But a memory that is maintained by hand goes stale. Much of the work that changes a life or a
+project arrives through email, so Folio grew a read-only mail connection and a local multi-model
+pipeline that can sort incoming messages, surface uncertainty, and bring relevant work back into
+the campaign. The vault is the memory, the campaign is the structure, and mail is one of the flows
+that keeps both current.
+
+That connection is deliberately local-first. As mail, local models, and session handoffs were
+added, the original boundary had to remain valid across every new interface. Models may assess and
+propose; source trust, capabilities, review gates, and audit determine what is allowed to become
+part of the record. Plain Markdown remains the portable source of truth. The full story is at
+[aion-lumen.ch/folio](https://aion-lumen.ch/folio).
 
 ## Status
 
-**Status:** v0.4.0 public preview  
-**License:** AGPL-3.0  
+**Status:** v0.5.0 public preview<br>
+**License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
+
+Seven public version tags are available from `v0.1.0` through `v0.5.0`; see the
+[public tags](https://github.com/aion-lumen/folio/tags) and [changelog](CHANGELOG.md).
 
 ## Stack
 
 - SvelteKit 2 + Svelte 5 (Runes), Tailwind CSS 4
 - SQLite (local, file-based) via better-sqlite3 — no DB server
-- Local LLMs via Hermes Agent (Nous Research)
+- Local LLMs via Hermes Agent (Nous Research) and LM Studio
 - Cytoscape.js for graph visualisations
 
 ## Leuchtfeuer
@@ -164,20 +182,34 @@ Set `AION_LUMEN_PATH` if the repo is not at `~/Projects/aion-lumen/multi-agent`.
 
 ## What works today
 
-- Strategic view — campaign banner, all five acts, active chapter
-- Tactical view — kanban with drag-and-drop, gantt, objective selection
-- Objective detail panel — status, deadline, progress note, history
-- Hermes chat — agent reads and edits vault files via tool calls
-- Vault format — plain markdown + YAML frontmatter, git-friendly
-- Setup wizard, demo vault, model switcher
+- Portable memory — plain Markdown + YAML frontmatter as the source of truth
+- Campaign workspace — acts, chapters, objectives, Kanban, history and weekly focus
+- Read-only-first mail pipeline — local classification, visible disagreement and review queue
+- Import inbox — validated interchange documents, source-trust policy and local LLM triage
+- Hermes integration — manifest-selected vault context, traceable sessions and execution profiles
+- Module foundation — deny-by-default capabilities, route/database guards and kill switches
+- Folio-owned memory — confirmed facts with provenance, temporal history and domain-scoped context
+- Session Relay — provider-neutral handoffs with exact cloud approval and reviewed return paths
+- Career-mail workflow — a Mail Queue case can return as an editable draft, context question,
+  Objective proposal or explicit no-action conclusion; Folio never sends it automatically
+- Sonar preview — local review of X archive and following imports with append-only human decisions
+- Leuchtfeuer — privacy-preserving, visually attributed site and repository resonance from server
+  aggregates, without client tracking
+- Isolated demo — fictional fixtures and separate `*-demo.db` state, without IMAP credentials
 
-## What's coming
+## What is being built next
 
-- **v0.2** — Voice input (STT), interview-style setup wizard, mobile PWA, approval UI for risky tool calls
-- **v0.3** — Frostpunk view: generator metaphor, resource decay, harder visual atmosphere
-- **v1.0** — Multi-user, NAS deployment, public vault templates
+- **Operational learning** — use the career Relay in daily work before expanding its adapters or
+  turning the optional Redaction Gate into a default workflow
+- **Memory evaluation** — compare disposable graph/RAG projections against Folio's small canonical
+  facts-and-FTS baseline, using questions produced by real Relay cases
+- **Measured local delegation** — move suitable routines from long-running online sessions to local
+  agents only after their quality has been observed against the same contracts
+- **Mobile review** — consider a small approval and correction surface once the desktop workflow
+  and backend contracts have proved stable in use
 
-See [docs/ROADMAP.md](docs/ROADMAP.md) for the full roadmap.
+These items are post-`v0.5.0` development direction, not promises of the current release. See
+[docs/ROADMAP.md](docs/ROADMAP.md) for gates, sequencing and the full roadmap.
 
 ## Contributing
 

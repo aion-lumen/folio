@@ -21,7 +21,8 @@ GitHub API (stars + traffic)          ─┘                         │
 ## Files here
 | File | Runs on | Purpose |
 |---|---|---|
-| `collect_caddy.py` (+test) | VPS | parse a day of Caddy logs → per-site aggregate (visits, uniques, top paths, door /story\:/folio, referrers, bots filtered) |
+| `collect_caddy.py` (+test) | VPS | parse a day of Caddy logs → structurally verified per-site aggregate (GET + 200 + deployed route + UA filter) |
+| `routes/*.txt` | VPS | reviewed page-route manifests for the two server-rendered sites |
 | `collect_github.py` (+test) | VPS | daily stars + traffic (views/clones, unique) snapshot for folio, multi-agent-lab, NobleCause.ai |
 | `run-collectors.sh` | VPS | cron wrapper: sources token env, runs all collectors for yesterday |
 | `cron.d-leuchtfeuer` | VPS | the root system-cron entry (00:20 UTC) |
@@ -29,7 +30,7 @@ GitHub API (stars + traffic)          ─┘                         │
 | `com.folio.leuchtfeuer-pull.plist` | **Mac** | launchd: daily rsync pull VPS → `~/.folio/metrics/` |
 | `privacy-drafts.md` | — | one-sentence privacy text per site (frag-shifu separate, DE-only) |
 
-Local tests: `cd ops/leuchtfeuer && python3 -m unittest -v` (7 tests, stdlib only).
+Local tests: `cd ops/leuchtfeuer && python3 -m unittest -v` (9 tests, stdlib only).
 
 ## Architecture decisions (with reasons)
 - **Python, not GoAccess** — custom schema incl. the door measurement + IP-anon-at-parse + bot filter;
@@ -43,18 +44,32 @@ Local tests: `cd ops/leuchtfeuer && python3 -m unittest -v` (7 tests, stdlib onl
     is the **opposite** direction (VPS → Mac, pull) and deliberately outside the webroot, so the deploy
     whitelist is **not involved** — and must not be, or the aggregates would ship publicly. If you'd
     rather expose an authenticated metrics endpoint instead of an SSH pull, that's a different design;
-    confirm the private-dir + SSH-pull choice.
+  confirm the private-dir + SSH-pull choice.
+- **One eligibility set for every metric** — a request enters visits, uniques, paths, referrers and
+  Story/System together or none of them. Excluded traffic is retained only as reason counts. Static
+  routes come from the deployed HTML tree; the two server-rendered apps use explicit route manifests.
 
 ## Deployment (VPS side — ausgeführte Einrichtung, Referenz; CC hat keinen VPS-Zugang)
 1. **Caddy logging:** merge `caddy-logging.snippet.caddy` into each of the four site blocks, reload Caddy.
    Verify a fresh log line shows a masked IP (e.g. `1.2.3.0`).
-2. **Collectors:** `sudo mkdir -p /opt/leuchtfeuer && sudo cp collect_caddy.py collect_github.py run-collectors.sh /opt/leuchtfeuer/ && sudo chmod +x /opt/leuchtfeuer/*.sh`
+2. **Collectors:** copy `collect_caddy.py`, `collect_github.py`, `run-collectors.sh` and `routes/` to
+   `/opt/leuchtfeuer/`; make the scripts executable. A missing/empty site tree or route manifest fails
+   that site's daily run instead of falling back to the old heuristic.
 3. **Output dir:** `sudo mkdir -p /var/lib/leuchtfeuer/metrics`
 4. **Token env:** already in place — `/etc/leuchtfeuer/env` (root:root 0600) with
    `LEUCHTFEUER_GH_PAT_AION` + `LEUCHTFEUER_GH_PAT_NOBLECAUSE`. ✅
 5. **Cron:** `sudo cp cron.d-leuchtfeuer /etc/cron.d/leuchtfeuer`
 6. **Smoke:** `sudo /opt/leuchtfeuer/run-collectors.sh` then check
    `/var/lib/leuchtfeuer/metrics/*/$(date -u -d yesterday +%F).json` and the github file exist.
+   Site files must carry `"eligibility_rule": "get-200-deployed-route-v1"` and the four exclusion
+   reason counts. Folio does not mix older aggregate files into the verified series.
+
+## Baseline transition
+
+The raw Caddy logs are retained for seven days, so the previous 28 days cannot be reconstructed after
+the fact. The old aggregates remain as provenance but are not shown as reach. The honest baseline is
+therefore the first 28 consecutive hardened daily files after the VPS collector update; until then the
+UI states the number of verified days. No public reach claim should be made from the legacy series.
 
 ## Deployment (Mac side — local pull)
 Prereq: the VPS read-only pull user `leuchtfeuer-pull` exists with an authorized_keys **forced command**

@@ -8,10 +8,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Home, Map, Inbox, Workflow, Users, Radar, Settings } from 'lucide-svelte';
+	import { Home, Map, Inbox, Workflow, Users, Radar, Send, Settings } from 'lucide-svelte';
 	import WorkerPill from './ActivityBar/WorkerPill.svelte';
 
-	type Workspace = 'heute' | 'vault' | 'mail' | 'pipeline' | 'council' | 'sonar' | 'settings' | 'other';
+	type Workspace = 'heute' | 'vault' | 'mail' | 'pipeline' | 'relay' | 'council' | 'sonar' | 'settings' | 'other';
 
 	function detectWorkspace(pathname: string): Workspace {
 		// Post-Block-3 URL-Tree: / ist Heute-Hub, Vault wandert nach /vault.
@@ -19,6 +19,7 @@
 		if (pathname.startsWith('/vault')) return 'vault';
 		if (pathname.startsWith('/mail-queue')) return 'mail';
 		if (pathname.startsWith('/pipeline')) return 'pipeline';
+		if (pathname.startsWith('/relay')) return 'relay';
 		if (pathname.startsWith('/council')) return 'council';
 		if (pathname.startsWith('/sonar')) return 'sonar';
 		if (pathname.startsWith('/settings')) return 'settings';
@@ -41,6 +42,7 @@
 		{ key: 'vault', label: 'Vault', href: '/vault', Icon: Map },
 		{ key: 'mail', label: 'Mail', href: '/mail-queue', Icon: Inbox },
 		{ key: 'pipeline', label: 'Pipeline', href: '/pipeline', Icon: Workflow },
+		{ key: 'relay', label: 'Übergaben', href: '/relay', Icon: Send },
 		{ key: 'council', label: 'Council', href: '/council', Icon: Users },
 		{ key: 'sonar', label: 'Sonar', href: '/sonar', Icon: Radar }
 	];

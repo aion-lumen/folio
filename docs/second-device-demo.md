@@ -57,7 +57,8 @@ The launcher binds to `http://localhost:5174` and forces:
 - the bundled fictional demo vault;
 - `~/.folio/folio-demo.db`;
 - `<multi-agent>/state/feedback-demo.db`;
-- a separate demo inbox, import ledger, and triage log; and
+- a separate demo inbox, import ledger, and triage log;
+- `~/Projects/folio-session-bridge-demo` for approved demo handoffs only; and
 - no automatic LLM triage.
 
 Missing demo databases are initialized only from the checked-in static schemas. This setup path
@@ -79,7 +80,8 @@ after the hardware is known. Folio interprets no executable fields from the mani
 
 ## 4. Acceptance checklist
 
-- The startup banner lists only paths ending in `demo-vault`, `*-demo.db`, or `demo-inbox`.
+- The startup banner lists only paths ending in `demo-vault`, `*-demo.db`, `demo-inbox`, or
+  `folio-session-bridge-demo`.
 - Heute, Vault, Mail, Pipeline, Import-Inbox, and Leuchtfeuer open without real-data errors.
 - No IMAP credentials are requested and no mail worker is started.
 - Restarting the same command returns to the isolated demo.

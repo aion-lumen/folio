@@ -1,6 +1,6 @@
 <!--
   Panel-C Werkstatt §1.4: Mail-Inhalt-Sektion, letzter Block.
-  Sektions-Header (Mono caps: „MAIL-INHALT · ERSTE 1000 Z.") + body.
+  Sektions-Header (Mono caps: „MAIL-INHALT · LOKALER AUSZUG") + body.
   Links bleiben Links, sonst keine Dekoration.
 -->
 <script lang="ts">
@@ -20,7 +20,7 @@
 <section class="panel-body">
 	<header class="body-head">
 		<span class="head-label">Mail-Inhalt</span>
-		<span class="head-tag">erste 1000 Z.</span>
+		<span class="head-tag">lokaler Auszug</span>
 	</header>
 	<div class="body-text">
 		{#if body}

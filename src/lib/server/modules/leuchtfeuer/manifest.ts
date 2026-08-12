@@ -41,6 +41,6 @@ export const LEUCHTFEUER_MODULE: ModuleRegistration = {
 	},
 	enabled: () => true,
 	database_paths: {
-		metrics: () => join(homedir(), '.folio', 'metrics')
+		metrics: () => process.env.FOLIO_LEUCHTFEUER_METRICS_PATH ?? join(homedir(), '.folio', 'metrics')
 	}
 };

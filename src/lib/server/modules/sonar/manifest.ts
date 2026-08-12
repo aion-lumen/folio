@@ -13,6 +13,7 @@ export const SONAR_MODULE: ModuleRegistration = {
 			{ id: 'panel.render', kind: 'render', description: 'Render the Sonar review workspace.' },
 			{ id: 'notes.read', kind: 'read', description: 'Read external-derived Sonar notes from the active vault.' },
 			{ id: 'reviews.read', kind: 'read', description: 'Read recorded human review decisions.' },
+			{ id: 'archive.read', kind: 'read', description: 'Read aggregate metadata from a local normalized X archive.' },
 			{ id: 'review.write', kind: 'write', description: 'Append explicit human review decisions.' }
 		],
 		data_classes: [
@@ -25,6 +26,11 @@ export const SONAR_MODULE: ModuleRegistration = {
 				id: 'review-decision',
 				sensitivity: 'sensitive',
 				retention: { policy: 'append-only-audit', enforced: true }
+			},
+			{
+				id: 'archive-metadata',
+				sensitivity: 'private',
+				retention: { policy: 'local-user-controlled', enforced: false }
 			}
 		],
 		panels: [
@@ -35,7 +41,11 @@ export const SONAR_MODULE: ModuleRegistration = {
 				fields: [
 					{ id: 'note.signal', label: 'Signal', data_class: 'external-note' },
 					{ id: 'note.context', label: 'Context', data_class: 'external-note' },
-					{ id: 'note.review', label: 'Review', data_class: 'review-decision' }
+					{ id: 'note.review', label: 'Review', data_class: 'review-decision' },
+					{ id: 'archive.summary', label: 'Archive summary', data_class: 'archive-metadata' },
+					{ id: 'archive.following', label: 'Following profiles', data_class: 'archive-metadata' },
+					{ id: 'archive.following-suggestion', label: 'Local following suggestion', data_class: 'archive-metadata' },
+					{ id: 'archive.following-review', label: 'Following review', data_class: 'review-decision' }
 				]
 			}
 		],
@@ -51,6 +61,12 @@ export const SONAR_MODULE: ModuleRegistration = {
 				engine: 'filesystem',
 				access: 'read-write',
 				data_classes: ['review-decision']
+			},
+			{
+				id: 'archive-cache',
+				engine: 'filesystem',
+				access: 'read-only',
+				data_classes: ['archive-metadata']
 			}
 		],
 		kill_switch: {
@@ -64,6 +80,10 @@ export const SONAR_MODULE: ModuleRegistration = {
 		'review-state': () =>
 			isDemoVaultActive()
 				? join(homedir(), '.folio', 'sonar-demo')
-				: join(getVaultPath(), 'internal', 'sonar')
+				: join(getVaultPath(), 'internal', 'sonar'),
+		'archive-cache': () =>
+			isDemoVaultActive()
+				? join(getVaultPath(), 'internal', 'sonar', 'archive-cache')
+				: join(homedir(), '.folio', 'sonar')
 	}
 };

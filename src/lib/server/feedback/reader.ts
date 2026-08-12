@@ -70,6 +70,11 @@ export function getFeedbackRows(filter: FeedbackFilter = {}): FeedbackRow[] {
 	return stmt.all(...params, limit, offset) as FeedbackRow[];
 }
 
+export function getFeedbackRowById(id: number): FeedbackRow | null {
+	const row = getConn().prepare('SELECT * FROM feedback WHERE id = ?').get(id) as FeedbackRow | undefined;
+	return row ?? null;
+}
+
 export function getFeedbackCounts(): FeedbackCounts {
 	const db = getConn();
 	const byUserFinalAction: Record<string, number> = {};

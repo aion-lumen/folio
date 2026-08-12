@@ -36,16 +36,19 @@ describe('built-in module registry', () => {
 		rmSync(home, { recursive: true, force: true });
 	});
 
-	it('keeps Council opt-in while Leuchtfeuer and Sonar are registered built-ins', () => {
+	it('keeps Council opt-in while core built-ins are registered', () => {
 		expect(hasModuleCapability('council', 'records.read')).toBe(false);
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(true);
 		expect(hasModuleCapability('sonar', 'notes.read')).toBe(true);
+		expect(hasModuleCapability('relay', 'egress.approve')).toBe(true);
+		expect(hasModuleCapability('relay', 'responses.apply')).toBe(true);
 		writeFileSync(
 			join(home, '.folio', 'active-vault.json'),
 			JSON.stringify({ path: join(home, 'vault'), council: true })
 		);
 		expect(getModuleDatabasePath('sonar', 'vault-notes', 'notes.read')).toBe(join(home, 'vault', 'internal', 'sonar'));
 		expect(getModuleDatabasePath('sonar', 'review-state', 'reviews.read')).toBe(join(home, 'vault', 'internal', 'sonar'));
+		expect(getModuleDatabasePath('sonar', 'archive-cache', 'archive.read')).toBe(join(home, '.folio', 'sonar'));
 		expect(hasModuleCapability('council', 'records.read')).toBe(true);
 		expect(getModuleDatabasePath('council', 'primary', 'records.read')).toContain('council.db');
 	});
@@ -53,6 +56,9 @@ describe('built-in module registry', () => {
 	it('applies global and per-module emergency stops dynamically', () => {
 		process.env.FOLIO_DISABLED_MODULES = 'leuchtfeuer';
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(false);
+		process.env.FOLIO_DISABLED_MODULES = 'relay';
+		expect(hasModuleCapability('relay', 'responses.read')).toBe(false);
+		expect(getModuleDatabasePath('relay', 'exchange', 'responses.read')).toBeNull();
 		process.env.FOLIO_DISABLED_MODULES = '';
 		process.env.FOLIO_MODULES_DISABLED = 'true';
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(false);
@@ -66,11 +72,14 @@ describe('built-in module registry', () => {
 		expect(getModuleDatabasePath('sonar', 'review-state', 'reviews.read')).toBe(
 			join(home, '.folio', 'sonar-demo')
 		);
+		expect(getModuleDatabasePath('sonar', 'archive-cache', 'archive.read')).toBe(
+			join(home, 'demo-vault', 'internal', 'sonar', 'archive-cache')
+		);
 	});
 
 	it('registry snapshot contains both reference consumers and no paths', () => {
 		const snapshot = getModuleRegistrySnapshot();
-		expect(snapshot.map((item) => item.manifest.id)).toEqual(['council', 'leuchtfeuer', 'sonar']);
+		expect(snapshot.map((item) => item.manifest.id)).toEqual(['council', 'leuchtfeuer', 'relay', 'sonar']);
 		expect(JSON.stringify(snapshot)).not.toContain(home);
 	});
 });

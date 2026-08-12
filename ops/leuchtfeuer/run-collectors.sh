@@ -7,7 +7,12 @@ set -uo pipefail
 ENV_FILE=/etc/leuchtfeuer/env         # root:root 0600, holds LEUCHTFEUER_GH_PAT_* (never in this repo)
 APP=/opt/leuchtfeuer                   # where collect_*.py are deployed
 OUT=/var/lib/leuchtfeuer/metrics       # NOT web-exposed (deliberately not under /srv/aion-lumen)
-SITES=(aion-lumen.ch frag-shifu.ch noblecause.ai mirhamed.ch)
+STATIC_SITES=(
+	"aion-lumen.ch:/srv/aion-lumen"
+	"noblecause.ai:/srv/noblecause"
+)
+DYNAMIC_SITES=(frag-shifu.ch mirhamed.ch)
+ROUTES_DIR="$APP/routes"
 
 # shellcheck disable=SC1090
 set -a; [ -r "$ENV_FILE" ] && . "$ENV_FILE"; set +a
@@ -15,8 +20,15 @@ set -a; [ -r "$ENV_FILE" ] && . "$ENV_FILE"; set +a
 YESTERDAY=$(date -u -d 'yesterday' +%Y-%m-%d 2>/dev/null || date -u -v-1d +%Y-%m-%d)
 TODAY=$(date -u +%Y-%m-%d)
 
-for s in "${SITES[@]}"; do
-	python3 "$APP/collect_caddy.py" --site "$s" \
+for entry in "${STATIC_SITES[@]}"; do
+	s=${entry%%:*}
+	root=${entry#*:}
+	python3 "$APP/collect_caddy.py" --site "$s" --site-root "$root" \
+		--log "/var/log/caddy/$s.log" --out "$OUT" --date "$YESTERDAY" || true
+done
+
+for s in "${DYNAMIC_SITES[@]}"; do
+	python3 "$APP/collect_caddy.py" --site "$s" --routes-file "$ROUTES_DIR/$s.txt" \
 		--log "/var/log/caddy/$s.log" --out "$OUT" --date "$YESTERDAY" || true
 done
 

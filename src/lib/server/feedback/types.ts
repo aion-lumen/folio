@@ -25,6 +25,8 @@ export interface FeedbackRow {
 	domain: string | null;                  // F.8/F.8.5: immo|job|shopping|finance|kontakt|werbung|system|unsorted
 	actionability: string | null;           // F.8: actionable|archive|archive-silent (frozen-at-insert)
 	effective_actionability: string | null; // F.8: post time-decay (Worker NULL, Folio computed)
+	body_excerpt?: string | null;           // sparse worker extraction, currently <= 1000 chars in feedback.db
+	to_addr?: string | null;
 }
 
 export interface FeedbackFilter {

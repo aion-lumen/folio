@@ -160,6 +160,31 @@ export function getFolioDbPath(): string {
 		?? join(homedir(), '.folio/folio.db');
 }
 
+/** Runtime-only Session Relay files. Never stored in the repository or vault. */
+export function getSessionExchangePath(): string {
+	if (isDemoVaultActive()) return join(homedir(), '.folio', 'session-exchange-demo');
+	return process.env.FOLIO_SESSION_EXCHANGE_PATH
+		?? kitEnv().FOLIO_SESSION_EXCHANGE_PATH
+		?? join(homedir(), '.folio', 'session-exchange');
+}
+
+/**
+ * Filesystem bridge visible to a connected Cowork/session workspace.
+ *
+ * Only human-approved requests and their bound responses belong here. Unapproved
+ * staging payloads stay in getSessionExchangePath() outside the connected tree.
+ */
+export function getSessionBridgePath(): string {
+	if (isDemoVaultActive()) {
+		return process.env.FOLIO_SESSION_BRIDGE_PATH
+			?? kitEnv().FOLIO_SESSION_BRIDGE_PATH
+			?? join(homedir(), 'Projects', 'folio-session-bridge-demo');
+	}
+	return process.env.FOLIO_SESSION_BRIDGE_PATH
+		?? kitEnv().FOLIO_SESSION_BRIDGE_PATH
+		?? join(homedir(), 'Projects', 'folio-session-bridge');
+}
+
 export function getMoveActionsPath(): string {
 	return kitEnv().MOVE_ACTIONS_PATH
 		?? join(homedir(), 'Projects/folio/config/move_actions.yaml');

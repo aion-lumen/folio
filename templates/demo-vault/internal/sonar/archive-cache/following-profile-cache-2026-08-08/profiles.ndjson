@@ -1,0 +1,6 @@
+{"schema":"aion-lumen/sonar-following-profile/v1","account_id":"910000000000000001","username":"local_agent_lab","name":"Local Agent Lab","description":"Local models, inspectable agents and practical open-source AI.","verified":false}
+{"schema":"aion-lumen/sonar-following-profile/v1","account_id":"910000000000000002","username":"swiss_policy","name":"Swiss Policy Notes","description":"Federal politics, public institutions and Swiss votes.","verified":true}
+{"schema":"aion-lumen/sonar-following-profile/v1","account_id":"910000000000000003","username":"human_systems","name":"Human Systems","description":"Technology, institutions and the people working between them.","verified":false}
+{"schema":"aion-lumen/sonar-following-profile/v1","account_id":"910000000000000004","username":"open_weights","name":"Open Weights","description":"Model releases, inference research and local AI benchmarks.","verified":false}
+{"schema":"aion-lumen/sonar-following-profile/v1","account_id":"910000000000000005","username":"eu_affairs","name":"European Affairs","description":"European politics, democracy and foreign policy.","verified":false}
+{"schema":"aion-lumen/sonar-following-profile/v1","account_id":"910000000000000006","username":"old_misc_feed","name":"Old Misc Feed","description":"An account from an earlier phase that no longer fits either timeline.","verified":false}

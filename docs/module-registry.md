@@ -61,7 +61,17 @@ Sonar is the first non-mail reference module built on the boundary. It reads
 schema-guarded, external-derived notes from the active vault and renders their
 content as text, never as trusted HTML. Explicit human decisions are appended to
 a private `reviews.ndjson` audit ledger; the imported source notes remain
-unchanged. Demo runs keep that mutable ledger in demo-scoped Folio state rather
+unchanged. Its Sources view reads only aggregate counts from the newest local,
+normalized X-archive manifest; it does not open post, following, or account
+records. A separate, locally prepared profile cache may expose the user's current
+following list for an explicit AI/politics/both/drop review. Folio does not call X
+from this view, and these decisions only build a local migration list: they never
+follow or unfollow accounts. `npm run sonar:classify-following` may add resumable
+suggestions through the loopback-only LM Studio endpoint. Each suggestion records
+the local model and generation time, remains separate from the human review
+ledger, and never becomes a decision automatically. Demo runs keep mutable review
+state separate and use a clearly labelled
+synthetic archive summary from the bundled fixture rather
 than writing into the bundled fixture tree. No capability in this slice can
 publish, follow, like, or reply on an external service.
 

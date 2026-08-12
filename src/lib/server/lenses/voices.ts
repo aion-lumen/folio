@@ -51,6 +51,9 @@ export type ConsensusState = 'still' | 'ne' | 'ne-strong';
 /** Map Pipeline-Domain to UI-Domain. Pipeline uses "shopping", Bundle uses "shop". */
 export function toLensDomain(d: PipelineDomain | string | null | undefined): LensDomain {
 	if (d === 'shopping') return 'shop';
+	// Legacy/worker alias used for mails sent to the dedicated job inbox.
+	// It is provenance, not a ninth UI domain: show it consistently as Job.
+	if (d === 'job-lead') return 'job';
 	const known: LensDomain[] = ['immo', 'job', 'werbung', 'kontakt', 'shop', 'finance', 'system', 'unsorted'];
 	return (known as string[]).includes(d as string) ? (d as LensDomain) : 'unsorted';
 }
@@ -99,6 +102,44 @@ export interface VoteInputOpinion {
 /** Heuristik-Voice braucht eigene reasoning-Quelle (feedback.heuristic_reason). */
 export interface VoteInputFeedbackExtras {
 	heuristic_reason?: string | null;
+	heuristic_markers?: string[] | null;
+}
+
+const DOMAIN_LABELS: Record<LensDomain, string> = {
+	immo: 'Immobilien',
+	job: 'Job',
+	werbung: 'Werbung',
+	kontakt: 'Kontakt',
+	shop: 'Shopping',
+	finance: 'Finanzen',
+	system: 'System',
+	unsorted: 'Unsortiert'
+};
+
+/**
+ * The stored heuristic_reason predates the general domain classifier and is
+ * often an Immo-only negative (for example "keine Immo-Indikatoren"). Such a
+ * sentence is useful evidence for an Immo classification, but misleading as
+ * the explanation of a Job/Finance/etc. vote. Prefer the deterministic signal
+ * that actually selected the domain and keep the legacy detail for Immo only.
+ */
+export function deterministicVoiceReason(
+	domain: PipelineDomain | string | null | undefined,
+	legacyReason: string | null | undefined,
+	markers: string[] | null | undefined
+): string | undefined {
+	const normalized = toLensDomain(domain);
+	if (normalized === 'immo') return legacyReason ?? undefined;
+
+	const aliasMarker = (markers ?? []).find((marker) =>
+		marker.startsWith('override:recipient_alias:')
+	);
+	if (aliasMarker) {
+		const aliasDomain = aliasMarker.slice('override:recipient_alias:'.length);
+		return `Empfänger-Alias → ${DOMAIN_LABELS[toLensDomain(aliasDomain)]}`;
+	}
+
+	return `Deterministische Einordnung → ${DOMAIN_LABELS[normalized]}`;
 }
 
 export interface RegelwerkVoiceMeta {
@@ -134,7 +175,11 @@ export function buildVotesForFeedback(
 			kind: 'present',
 			label: 'H',
 			domain: toLensDomain(heurDomainRaw),
-			reasoning: feedback.heuristic_reason ?? undefined,
+			reasoning: deterministicVoiceReason(
+				heurDomainRaw,
+				feedback.heuristic_reason,
+				feedback.heuristic_markers
+			),
 			modelId: null,
 		});
 	} else {

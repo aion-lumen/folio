@@ -3,6 +3,13 @@ import { resolveTriageModel } from './preflight.js';
 
 export type LlmCallFn = (prompt: string, model: string) => Promise<string | null>;
 
+export interface LlmCallOptions {
+	responseFormat?: Record<string, unknown>;
+	reasoningEffort?: 'low' | 'medium' | 'high';
+	maxTokens?: number;
+	acceptReasoningAsContent?: boolean;
+}
+
 const LLM_TIMEOUT_MS = 90_000;
 
 let _override: LlmCallFn | null = null;
@@ -23,7 +30,8 @@ export function stripLlmResponse(text: string): string {
 
 export async function callLmStudio(
 	prompt: string,
-	model?: string
+	model?: string,
+	options?: LlmCallOptions
 ): Promise<string | null> {
 	const mock = process.env.FOLIO_AGENT_MOCK_RESPONSE;
 	if (mock !== undefined) return mock || null;
@@ -40,15 +48,23 @@ export async function callLmStudio(
 			body: JSON.stringify({
 				model: resolved,
 				messages: [{ role: 'user', content: prompt }],
-				temperature: 0
+				temperature: 0,
+				...(options?.responseFormat ? { response_format: options.responseFormat } : {}),
+				...(options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
+				...(options?.maxTokens ? { max_tokens: options.maxTokens } : {})
 			}),
 			signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
 		});
 		if (!res.ok) return null;
 		const data = (await res.json()) as {
-			choices?: Array<{ message?: { content?: string } }>;
+			choices?: Array<{ message?: { content?: string; reasoning_content?: string } }>;
 		};
-		return data.choices?.[0]?.message?.content ?? null;
+		const message = data.choices?.[0]?.message;
+		return message?.content?.trim()
+			? message.content
+			: options?.acceptReasoningAsContent
+				? message?.reasoning_content ?? null
+				: null;
 	} catch {
 		return null;
 	}
@@ -56,9 +72,10 @@ export async function callLmStudio(
 
 export async function callLmStudioJson<T extends Record<string, unknown>>(
 	prompt: string,
-	model?: string
+	model?: string,
+	options?: LlmCallOptions
 ): Promise<T | null> {
-	const raw = await callLmStudio(prompt, model);
+	const raw = await callLmStudio(prompt, model, options);
 	if (!raw) return null;
 	const stripped = stripLlmResponse(raw);
 	try {

@@ -4,7 +4,7 @@
 // Gmail/mirhamed.ch (mock): synthesizes body from mock subject/sender.
 
 import { error, json } from '@sveltejs/kit';
-import { getFeedbackRows } from '$lib/server/feedback/reader.js';
+import { getFeedbackRowById } from '$lib/server/feedback/reader.js';
 import { lookupMailBody } from '$lib/server/hermes/mail-body.js';
 import { getMockRows } from '$lib/util/mail-mock.js';
 import type { RequestHandler } from './$types.js';
@@ -102,23 +102,3 @@ export const GET: RequestHandler = ({ params }) => {
 	};
 	return json(response);
 };
-
-// Direct read of one feedback row by primary key. Used only by this endpoint.
-// (reader.ts doesn't expose this lookup-shape; small inline helper.)
-import Database from 'better-sqlite3';
-import { getFeedbackDbPath } from '$lib/server/env.js';
-import type { FeedbackRow } from '$lib/server/feedback/types.js';
-
-let _conn: Database.Database | null = null;
-function conn(): Database.Database {
-	if (_conn) return _conn;
-	_conn = new Database(getFeedbackDbPath(), { readonly: true, fileMustExist: true });
-	return _conn;
-}
-
-function getFeedbackRowById(id: number): FeedbackRow | null {
-	const r = conn().prepare('SELECT * FROM feedback WHERE id = ?').get(id) as
-		| FeedbackRow
-		| undefined;
-	return r ?? null;
-}

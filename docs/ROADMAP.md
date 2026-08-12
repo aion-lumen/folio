@@ -83,25 +83,32 @@ third-party package loading remains deliberately outside this foundation and is 
 Sonar is the first non-mail consumer: its initial read/review surface keeps imported external notes
 immutable, records human decisions append-only, and has no external publishing capability.
 
-## v0.5.0 — Redaction Gate, T2 first
+## v0.5.0 — Session Relay and career pilot
 
-The first release of the Redaction Gate is deliberately human-carried and has no outbound network
-capability:
-
-- One local redaction core based on Presidio with a local-LLM cross-check.
-- Per data class, choose reversible tokenisation or irreversible masking explicitly.
-- Keep the token map in memory only; never persist it or expose it to a model provider.
-- Add **Prepare for session**: review original and redacted content before copying the approved
-  version into an external model session.
-- Record what was redacted and approved without storing the sensitive reconstruction map.
+- Add a provider-neutral filesystem contract that hands a reviewed case to its responsible session
+  and accepts a reply draft, context request, or Objective proposal in return.
+- Require a case-bound human approval for every cloud handoff; local targets need no egress approval.
+- Keep runtime request and response bodies outside repositories and vaults with target-declared
+  retention.
+- Establish Folio-owned canonical memory with candidate/confirmed facts, provenance, temporal
+  supersession, tombstones, and a rebuildable SQLite FTS projection.
+- Compile small context bundles from confirmed facts only, filtered by domain and the target's
+  explicit sensitivity ceiling, and show the exact bundle before approval.
+- Complete one real career workflow from incoming mail through session response to a reviewed Folio
+  result. Cloud targets remain opt-in and absent from a fresh installation.
+- Keep the existing Redaction Gate as an optional `redact-then-share` step where a case needs it;
+  do not make its more complex T2 workflow the default path.
 - Update the public privacy promise atomically with the release, never afterward.
 
-## After the learning gate — T1 candidate
+## After the career learning gate
 
-An automated provider API is not part of the initial v0.5.0 scope. It may be designed only after at
-least two weeks of real T2 usage have produced evidence about redaction quality and operator needs.
-Ledger is a later consumer of the same gated session interface; real-money execution remains outside
-this roadmap stage.
+- Evaluate Hindsight and OpenViking as disposable shadow projections against questions produced by
+  real Relay usage; Folio's SQLite/FTS baseline remains the control.
+- Consider direct provider adapters only when the filesystem pilot shows that they reduce real work.
+- Hand individual task types from cloud sessions to local Hermes agents only after measured shadow
+  results, while retaining the same Relay and memory contracts.
+- Ledger is a later consumer of the same gated session interface; real-money execution remains
+  outside this roadmap stage.
 
 ## Local routines — exploration
 

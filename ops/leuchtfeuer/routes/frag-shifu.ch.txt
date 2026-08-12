@@ -1,0 +1,11 @@
+# Public page routes of the server-rendered app. Prefix patterns end in /*.
+/
+/agb
+/chat
+/datenschutz
+/dojo
+/graph
+/impressum
+/login
+/wiki
+/wiki/*

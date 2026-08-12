@@ -328,6 +328,152 @@ CREATE TABLE IF NOT EXISTS hermes_turns (
 );
 CREATE INDEX IF NOT EXISTS idx_hermes_turns_session
     ON hermes_turns(session_id, started_at DESC);
+
+-- v0.5.0 baseline: Folio-owned canonical memory. Search is a disposable
+-- projection; facts and their provenance remain in the ordinary SQLite table.
+CREATE TABLE IF NOT EXISTS memory_facts (
+    fact_id                TEXT PRIMARY KEY,
+    domain                 TEXT NOT NULL,
+    data_class             TEXT NOT NULL,
+    sensitivity            TEXT NOT NULL CHECK(sensitivity IN ('public','private','sensitive')),
+    subject                TEXT NOT NULL,
+    predicate              TEXT NOT NULL,
+    value_text             TEXT NOT NULL,
+    status                 TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected','superseded','tombstoned')),
+    source_kind            TEXT NOT NULL,
+    source_ref             TEXT NOT NULL,
+    source_excerpt         TEXT,
+    derived_from_external  INTEGER NOT NULL DEFAULT 0 CHECK(derived_from_external IN (0,1)),
+    valid_from             TEXT,
+    valid_to               TEXT,
+    supersedes_fact_id     TEXT,
+    recorded_at            TEXT NOT NULL,
+    confirmed_at           TEXT,
+    confirmed_by           TEXT,
+    FOREIGN KEY (supersedes_fact_id) REFERENCES memory_facts(fact_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_facts_scope
+    ON memory_facts(domain, sensitivity, status, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_facts_source
+    ON memory_facts(source_kind, source_ref);
+
+CREATE TABLE IF NOT EXISTS memory_events (
+    event_id     TEXT PRIMARY KEY,
+    fact_id      TEXT NOT NULL,
+    event_type   TEXT NOT NULL CHECK(event_type IN ('proposed','confirmed','rejected','superseded','tombstoned')),
+    actor_kind   TEXT NOT NULL CHECK(actor_kind IN ('human','system','import')),
+    actor_id     TEXT NOT NULL,
+    detail_json  TEXT NOT NULL DEFAULT '{}',
+    recorded_at  TEXT NOT NULL,
+    FOREIGN KEY (fact_id) REFERENCES memory_facts(fact_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_events_fact
+    ON memory_events(fact_id, recorded_at);
+CREATE TRIGGER IF NOT EXISTS memory_events_no_update
+    BEFORE UPDATE ON memory_events BEGIN
+        SELECT RAISE(ABORT, 'memory_events is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS memory_events_no_delete
+    BEFORE DELETE ON memory_events BEGIN
+        SELECT RAISE(ABORT, 'memory_events is append-only');
+    END;
+
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_facts_fts USING fts5(
+    fact_id UNINDEXED,
+    domain UNINDEXED,
+    subject,
+    predicate,
+    value_text,
+    source_excerpt,
+    tokenize = 'unicode61'
+);
+
+-- v0.5.0 Session Relay: metadata and the approval ledger live in Folio.
+-- Unapproved request bodies remain under ~/.folio/session-exchange. Only approved
+-- handoff artifacts and bound responses enter the configured session bridge.
+CREATE TABLE IF NOT EXISTS relay_cases (
+    case_id            TEXT PRIMARY KEY,
+    domain             TEXT NOT NULL,
+    source_kind        TEXT NOT NULL,
+    source_ref         TEXT NOT NULL,
+    subject            TEXT NOT NULL,
+    capability         TEXT NOT NULL,
+    target_id          TEXT NOT NULL,
+    target_locality    TEXT NOT NULL CHECK(target_locality IN ('local','cloud')),
+    data_classes_json  TEXT NOT NULL,
+    status             TEXT NOT NULL CHECK(status IN ('detected','staged','approved','shared','claimed','needs_context','answered','reviewed','applied','closed','rejected','expired')),
+    request_hash       TEXT NOT NULL,
+    request_body_path  TEXT NOT NULL,
+    response_hash      TEXT,
+    retention_until    TEXT NOT NULL,
+    content_purged_at  TEXT,
+    created_at         TEXT NOT NULL,
+    updated_at         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_relay_cases_status
+    ON relay_cases(status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_relay_cases_domain
+    ON relay_cases(domain, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS relay_egress_approvals (
+    approval_id        TEXT PRIMARY KEY,
+    case_id            TEXT NOT NULL,
+    request_hash       TEXT NOT NULL,
+    target_id          TEXT NOT NULL,
+    data_classes_json  TEXT NOT NULL,
+    approved_by        TEXT NOT NULL,
+    approved_at        TEXT NOT NULL,
+    revoked_at         TEXT,
+    FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_approvals_case
+    ON relay_egress_approvals(case_id, approved_at DESC);
+
+CREATE TABLE IF NOT EXISTS relay_events (
+    event_id     TEXT PRIMARY KEY,
+    case_id      TEXT NOT NULL,
+    event_type   TEXT NOT NULL,
+    actor_kind   TEXT NOT NULL CHECK(actor_kind IN ('human','system','adapter')),
+    actor_id     TEXT NOT NULL,
+    detail_json  TEXT NOT NULL DEFAULT '{}',
+    recorded_at  TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_events_case
+    ON relay_events(case_id, recorded_at);
+CREATE TRIGGER IF NOT EXISTS relay_events_no_update
+    BEFORE UPDATE ON relay_events BEGIN
+        SELECT RAISE(ABORT, 'relay_events is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS relay_events_no_delete
+    BEFORE DELETE ON relay_events BEGIN
+        SELECT RAISE(ABORT, 'relay_events is append-only');
+    END;
+
+CREATE TABLE IF NOT EXISTS relay_applications (
+    application_id  TEXT PRIMARY KEY,
+    case_id          TEXT NOT NULL UNIQUE,
+    artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','no_action')),
+    target_ref       TEXT NOT NULL,
+    applied_by       TEXT NOT NULL,
+    applied_at       TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_applications_case
+    ON relay_applications(case_id, applied_at DESC);
+
+CREATE TABLE IF NOT EXISTS relay_mail_drafts (
+    draft_id      TEXT PRIMARY KEY,
+    case_id       TEXT NOT NULL UNIQUE,
+    source_ref    TEXT NOT NULL,
+    subject       TEXT NOT NULL,
+    body          TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    updated_at    TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_relay_mail_drafts_source
+    ON relay_mail_drafts(source_ref, updated_at DESC);
 `;
 
 export function getFolioDb(): Database.Database {
@@ -374,6 +520,41 @@ export function getFolioDb(): Database.Database {
 			  ON hermes_turns(session_id, started_at DESC);
 			COMMIT;
 		`);
+	}
+
+	// Relay gained a first-class "no action needed" result after the first real
+	// mail pilot. Preserve existing applications while widening the CHECK vocabulary.
+	const relayApplicationsSql = _conn
+		.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='relay_applications'")
+		.get() as { sql: string } | undefined;
+	if (relayApplicationsSql && !relayApplicationsSql.sql.includes("'no_action'")) {
+		_conn.exec(`
+			BEGIN;
+			CREATE TABLE relay_applications__new (
+				application_id  TEXT PRIMARY KEY,
+				case_id          TEXT NOT NULL UNIQUE,
+				artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','no_action')),
+				target_ref       TEXT NOT NULL,
+				applied_by       TEXT NOT NULL,
+				applied_at       TEXT NOT NULL,
+				FOREIGN KEY (case_id) REFERENCES relay_cases(case_id)
+			);
+			INSERT INTO relay_applications__new
+			  (application_id, case_id, artifact_kind, target_ref, applied_by, applied_at)
+			SELECT application_id, case_id, artifact_kind, target_ref, applied_by, applied_at
+			FROM relay_applications;
+			DROP TABLE relay_applications;
+			ALTER TABLE relay_applications__new RENAME TO relay_applications;
+			CREATE INDEX idx_relay_applications_case
+			  ON relay_applications(case_id, applied_at DESC);
+			COMMIT;
+		`);
+	}
+	const relayCaseColumns = _conn
+		.prepare('PRAGMA table_info(relay_cases)')
+		.all() as Array<{ name: string }>;
+	if (!relayCaseColumns.some((column) => column.name === 'content_purged_at')) {
+		_conn.exec('ALTER TABLE relay_cases ADD COLUMN content_purged_at TEXT NULL');
 	}
 	// 2026-06-05: object_status_override.reason — Spalten-Migration fuer
 	// existierende DBs (CREATE TABLE IF NOT EXISTS triggert sonst nicht).

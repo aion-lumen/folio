@@ -5,7 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-08-12
+
+### Added
+
+- Provider-neutral Session Relay with case-bound cloud approvals, one-click local filesystem-target
+  setup, validated response intake, context-question round trips, and human application of reply
+  drafts, Objective proposals or explicit no-action conclusions.
+- End-to-end career-mail pilot from an actionable Mail Queue item through a connected session and
+  back to an editable local reply draft, without automatic sending or provider-specific APIs.
+- Folio-owned memory baseline with candidate/confirmed facts, provenance, temporal supersession,
+  tombstones, rebuildable FTS search, and a Context Compiler constrained by domain and the target's
+  declared sensitivity ceiling.
+- Sonar X-archive and following review surfaces with append-only human decisions and optional local
+  classification suggestions.
+
+### Changed
+
+- Mail Queue now presents the `job-lead` provenance alias consistently as Job and keeps non-Immo
+  rules and deterministic signals available in initially collapsed decision details. Existing
+  Job-Lead cases therefore correctly show four agreeing voices without a data migration.
+- Session Relay now enforces each target's declared runtime-content retention at explicit workflow
+  boundaries. Expired request and response directories are removed while accepted Folio artifacts
+  and the append-only decision trail remain.
+- Leuchtfeuer reach reporting now counts only successful GETs to deployed routes from non-bot user
+  agents, keeps exclusion reasons auditable, and presents channel and content resonance visually.
 
 ### Security
 

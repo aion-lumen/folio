@@ -18,6 +18,11 @@ export interface ClassificationContext {
 	heuristic_markers?: string[] | null;
 }
 
+function displayDomain(domain: string | null | undefined): string {
+	if (domain === 'job-lead' || domain === 'job') return 'Job';
+	return domain ?? '—';
+}
+
 export function summarizeClassification(ctx: ClassificationContext): string {
 	const action = ctx.effective_actionability ?? ctx.actionability ?? 'actionable';
 	const isArchive = action === 'archive-silent' || action === 'archive';
@@ -53,25 +58,25 @@ export function summarizeClassification(ctx: ClassificationContext): string {
 		}
 		// System-Domain (werbung etc.)
 		const sysDom = markers.find((m) => m.startsWith('system:domain'));
-		if (sysDom) return `${prefix}: ${ctx.domain ?? '—'}`;
+		if (sysDom) return `${prefix}: ${displayDomain(ctx.domain)}`;
 		// Fallback: domain + erster Marker (vor dem Doppelpunkt)
 		const firstMarker = markers[0];
 		if (firstMarker) {
 			const cat = firstMarker.split(':')[0];
-			return `${prefix}: ${ctx.domain ?? '—'} · ${cat}`;
+			return `${prefix}: ${displayDomain(ctx.domain)} · ${cat}`;
 		}
-		return `${prefix}: ${ctx.domain ?? '—'}`;
+		return `${prefix}: ${displayDomain(ctx.domain)}`;
 	}
 
 	// Actionable-Praezisierung: woher?
 	const portalM = markers.find((m) => m.startsWith('tier1:portal_domain'));
 	const whitelistM = markers.find((m) => m.startsWith('tier2:location_whitelist'));
 	const parts: string[] = [];
-	if (ctx.domain) parts.push(ctx.domain);
+	if (ctx.domain) parts.push(displayDomain(ctx.domain));
 	if (portalM) parts.push('Portal-Sender');
 	if (whitelistM) {
 		const loc = whitelistM.split(':').slice(-1)[0];
 		parts.push(`Whitelist (${loc})`);
 	}
-	return parts.length > 0 ? `${prefix}: ${parts.join(' + ')}` : `${prefix}: ${ctx.domain ?? '—'}`;
+	return parts.length > 0 ? `${prefix}: ${parts.join(' + ')}` : `${prefix}: ${displayDomain(ctx.domain)}`;
 }

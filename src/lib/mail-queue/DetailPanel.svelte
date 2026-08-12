@@ -6,8 +6,9 @@
   bleibt im Outer-Frame erhalten.
 -->
 <script lang="ts">
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
+	import { ArrowRight, Check, CircleAlert, Copy, LoaderCircle, Save } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
@@ -144,6 +145,138 @@
 	// Apply-Correction Callback for VerdictStage (markers as array, joined CSV server-side)
 	let saving = $state(false);
 	let saveError = $state<string | null>(null);
+	let relayLoading = $state(false);
+	let relayError = $state<string | null>(null);
+	let stagedRelay = $state<{
+		caseId: string;
+		status: string;
+		targetLabel: string;
+		bodyTruncated: boolean;
+	} | null>(null);
+
+	const correctedDomain = $derived(
+		(row?.correction?.corrected_domain as string | undefined) ?? row?.domain ?? null
+	);
+	const careerRelayEligible = $derived(
+		canReclassifyRow &&
+		(correctedDomain === 'job' || correctedDomain === 'job-lead') &&
+		(row?.effective_actionability ?? row?.actionability) === 'actionable'
+	);
+	const relayCaseId = $derived(stagedRelay?.caseId ?? row?.relay_case_id ?? null);
+	const relayStatus = $derived(stagedRelay?.status ?? row?.relay_status ?? null);
+	const relayDraft = $derived(row?.relay_draft ?? null);
+	const relayDraftKey = $derived(`${row?.uid ?? ''}:${row?.relay_draft?.draft_id ?? ''}`);
+	let draftSubject = $state('');
+	let draftBody = $state('');
+	let draftSaving = $state(false);
+	let draftError = $state<string | null>(null);
+	let draftSaved = $state(false);
+	let draftCopied = $state(false);
+
+	$effect(() => {
+		row?.uid;
+		stagedRelay = null;
+		relayError = null;
+	});
+
+	$effect(() => {
+		relayDraftKey;
+		const initialDraft = untrack(() => relayDraft);
+		draftSubject = initialDraft?.subject ?? '';
+		draftBody = initialDraft?.body ?? '';
+		draftError = null;
+	});
+
+	async function prepareCareerRelay(): Promise<void> {
+		if (!row || !canReclassifyRow || relayLoading) return;
+		const feedbackId = Number(row.uid);
+		if (!Number.isInteger(feedbackId)) return;
+		relayLoading = true;
+		relayError = null;
+		try {
+			const response = await fetch('/api/relay/mail', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ feedback_id: feedbackId })
+			});
+			if (!response.ok) throw new Error((await response.text()).slice(0, 240));
+			const result = await response.json() as {
+				case_id: string; status: string; target_label: string; body_truncated: boolean;
+			};
+			stagedRelay = {
+				caseId: result.case_id,
+				status: result.status,
+				targetLabel: result.target_label,
+				bodyTruncated: result.body_truncated
+			};
+			toastStore.show('Übergabe zur Prüfung vorbereitet', 2500);
+		} catch (cause) {
+			relayError = cause instanceof Error ? cause.message : 'Übergabe konnte nicht vorbereitet werden.';
+		} finally {
+			relayLoading = false;
+		}
+	}
+
+	function relayStatusLabel(status: string | null): string {
+		if (status === 'detected') return 'Mail erkannt';
+		if (status === 'staged') return 'Zur Freigabe bereit';
+		if (status === 'approved') return 'Freigabe erteilt';
+		if (status === 'answered') return 'Antwortentwurf bereit';
+		if (status === 'applied') return relayDraft ? 'Antwortentwurf bereit' : 'Keine weitere Aktion nötig';
+		if (status === 'shared' || status === 'claimed') return 'Session arbeitet daran';
+		if (status === 'needs_context') return 'Rückfrage der Session';
+		if (status === 'reviewed') return 'Antwort geprüft';
+		if (status === 'closed') return 'Übergabe abgeschlossen';
+		if (status === 'rejected') return 'Vorschlag verworfen';
+		if (status === 'expired') return 'Übergabe abgelaufen';
+		return 'Zur Freigabe bereit';
+	}
+
+	function relayStatusDescription(status: string | null): string {
+		if (status === 'expired') {
+			return 'Der frühere Laufzeitinhalt wurde entfernt. Bei Bedarf kannst du die Übergabe neu vorbereiten.';
+		}
+		if (status === 'needs_context') return 'Die Rückfrage wartet in Übergaben auf deine Antwort.';
+		if (status === 'rejected') return 'Der verworfene Vorschlag und die Entscheidung bleiben in Übergaben sichtbar.';
+		if (relayDraft) return 'Der angenommene Entwurf liegt jetzt lokal bei dieser Mail.';
+		if (status === 'applied') return 'Die Empfehlung der Session wurde ohne Mailentwurf übernommen.';
+		if (stagedRelay) return `Für ${stagedRelay.targetLabel} vorbereitet.`;
+		return 'Antwort und Freigabe bleiben in Übergaben sichtbar.';
+	}
+
+	async function saveRelayDraft(): Promise<void> {
+		if (!relayCaseId || !relayDraft || draftSaving) return;
+		draftSaving = true;
+		draftError = null;
+		draftSaved = false;
+		try {
+			const response = await fetch(`/api/relay/mail-draft/${encodeURIComponent(relayCaseId)}`, {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ subject: draftSubject, body: draftBody })
+			});
+			if (!response.ok) throw new Error((await response.text()).slice(0, 240));
+			await invalidateAll();
+			draftSaved = true;
+			setTimeout(() => { draftSaved = false; }, 1800);
+			toastStore.show('Antwortentwurf lokal gespeichert', 2200);
+		} catch (cause) {
+			draftError = cause instanceof Error ? cause.message : 'Antwortentwurf konnte nicht gespeichert werden.';
+		} finally {
+			draftSaving = false;
+		}
+	}
+
+	async function copyRelayDraft(): Promise<void> {
+		draftError = null;
+		try {
+			await navigator.clipboard.writeText(draftBody);
+			draftCopied = true;
+			setTimeout(() => { draftCopied = false; }, 1800);
+		} catch {
+			draftError = 'Antworttext konnte nicht kopiert werden.';
+		}
+	}
 
 	async function applyCorrection(
 		dom: DomainKey,
@@ -194,7 +327,9 @@
 	const stripeStateValue = $derived(row?.consensus_state);
 
 	// Keyboard: A (action toggle), 1-8 (domain), ? (toggle all evidence cards), Escape
-	let cardBumpKey = $state(0);
+	// EvidenceCard starts with lastBumpSeen=-1. Matching that sentinel avoids
+	// treating the initial render as a "?" shortcut and opening every card.
+	let cardBumpKey = $state(-1);
 
 	function onKey(e: KeyboardEvent) {
 		if (!open || !row) return;
@@ -294,6 +429,9 @@
 		const all = [...h, ...inseratMarkers];
 		return all.slice(0, 2).map((m) => m.split(':')[0]).join(' · ');
 	});
+	const decisionDetailsSummary = $derived(
+		`${rulesCount()} Regeln · ${markersCount()} Signale`
+	);
 </script>
 
 {#if open && row}
@@ -343,7 +481,9 @@
 		<section class="evidence-section">
 			<header class="evidence-head">
 				<span class="ev-h-label">WARUM SO?</span>
-				<span class="ev-h-tag">3 KARTEIKARTEN</span>
+				<span class="ev-h-tag">
+					{row.domain === 'immo' ? 'STIMMEN · REGELN · SIGNALE' : 'STIMMEN · DETAILS'}
+				</span>
 			</header>
 			<div class="ev-one-liner">{summarizeClassification(row)}</div>
 			<!-- B1 2026-06-05: {#key row.uid} forciert Re-Mount der EvidenceCards
@@ -366,32 +506,109 @@
 						<EvidenceVoices voices={row.voices ?? []} />
 					</EvidenceCard>
 
-					<EvidenceCard
-						label="{rulesCount()} Regeln aktiv"
-						summary={rulesSummary()}
-						forceExpandKey={cardBumpKey}
-					>
-						{#snippet visual()}
-							<span class="mini-checkbox"></span>
-						{/snippet}
-						<EvidenceRules activeRules={row.active_rules} />
-					</EvidenceCard>
 
-					<EvidenceCard
-						label="{markersCount()} Marker"
-						summary={markersSummary()}
-						forceExpandKey={cardBumpKey}
-					>
-						{#snippet visual()}
-							<span class="mini-block mini-{row.domain ?? 'unsorted'}"></span>
-						{/snippet}
-						<EvidenceMarkers {row} {inseratMarkers} />
-					</EvidenceCard>
+					{#if row.domain === 'immo'}
+						<!-- Immo keeps the richer inspection layout: distance and
+						     listing signals are meaningful primary evidence here. -->
+						<EvidenceCard
+							label="{rulesCount()} Regeln aktiv"
+							summary={rulesSummary()}
+							forceExpandKey={cardBumpKey}
+						>
+							{#snippet visual()}
+								<span class="mini-checkbox"></span>
+							{/snippet}
+							<EvidenceRules activeRules={row.active_rules} />
+						</EvidenceCard>
+
+						<EvidenceCard
+							label="{markersCount()} Signale"
+							summary={markersSummary()}
+							forceExpandKey={cardBumpKey}
+						>
+							{#snippet visual()}
+								<span class="mini-block mini-{row.domain ?? 'unsorted'}"></span>
+							{/snippet}
+							<EvidenceMarkers {row} {inseratMarkers} />
+						</EvidenceCard>
+					{:else}
+						<!-- For all other domains the full audit trail remains one click
+						     away without letting Immo-era implementation detail dominate. -->
+						<EvidenceCard
+							label="Entscheidungsdetails"
+							summary={decisionDetailsSummary}
+							forceExpandKey={cardBumpKey}
+						>
+							{#snippet visual()}
+								<span class="mini-block mini-{row.domain ?? 'unsorted'}"></span>
+							{/snippet}
+							<div class="decision-details">
+								<h4>Aktive Regeln</h4>
+								<EvidenceRules activeRules={row.active_rules} />
+								<div class="decision-divider"></div>
+								<h4>Signale</h4>
+								<EvidenceMarkers {row} {inseratMarkers} />
+							</div>
+						</EvidenceCard>
+					{/if}
 				</div>
 			{/key}
 		</section>
 
 		<PanelBody body={body?.bodyText ?? null} />
+
+		{#if careerRelayEligible || relayCaseId}
+			<section class="relay-handoff">
+				<div class="relay-copy">
+					<span class="relay-eyebrow">Session Relay</span>
+					{#if relayCaseId}
+						<strong>
+							{#if relayStatus === 'expired'}<CircleAlert size={15} />{:else}<Check size={15} />{/if}
+							{relayStatusLabel(relayStatus)}
+						</strong>
+						<p>{relayStatusDescription(relayStatus)}</p>
+					{:else}
+						<strong>Mit der Karriere-Session bearbeiten</strong>
+						<p>Folio bereitet Mailauszug und passenden bestätigten Kontext zur Prüfung vor.</p>
+					{/if}
+					{#if stagedRelay?.bodyTruncated}<small>Die Vollständigkeit des lokalen Worker-Auszugs ist nicht belegt; Folio kennzeichnet das im Fall.</small>{/if}
+					{#if relayError}<small class="relay-error">{relayError}</small>{/if}
+				</div>
+				{#if relayCaseId && relayStatus !== 'expired'}
+					<a class="relay-link" href="/relay">Übergaben öffnen <ArrowRight size={14} /></a>
+				{:else if careerRelayEligible}
+					<button class="relay-button" type="button" disabled={relayLoading} onclick={prepareCareerRelay}>
+						{#if relayLoading}<LoaderCircle class="spin" size={14} />{:else}<ArrowRight size={14} />{/if}
+						{relayStatus === 'expired' ? 'Neu vorbereiten' : 'Übergabe vorbereiten'}
+					</button>
+				{/if}
+				{#if relayDraft}
+					<div class="relay-draft-editor">
+						<label>
+							<span>Betreff</span>
+							<input bind:value={draftSubject} maxlength="500" />
+						</label>
+						<label>
+							<span>Antwortentwurf</span>
+							<textarea bind:value={draftBody} rows="7" maxlength="50000"></textarea>
+						</label>
+						<div class="relay-draft-footer">
+							<small>Lokale Arbeitskopie · nichts wurde versendet.</small>
+							<div class="relay-draft-actions">
+								<button type="button" class="relay-secondary" onclick={copyRelayDraft}>
+									{#if draftCopied}<Check size={14} /> Kopiert{:else}<Copy size={14} /> Text kopieren{/if}
+								</button>
+								<button type="button" class="relay-button" disabled={draftSaving} onclick={saveRelayDraft}>
+									{#if draftSaving}<LoaderCircle class="spin" size={14} />{:else if draftSaved}<Check size={14} />{:else}<Save size={14} />{/if}
+									{draftSaved ? 'Gespeichert' : 'Speichern'}
+								</button>
+							</div>
+						</div>
+						{#if draftError}<small class="relay-error">{draftError}</small>{/if}
+					</div>
+				{/if}
+			</section>
+		{/if}
 	</aside>
 {/if}
 
@@ -476,6 +693,24 @@
 		flex-direction: column;
 		gap: 8px;
 	}
+	.decision-details {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.decision-details h4 {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		font-weight: 600;
+		letter-spacing: .05em;
+		text-transform: uppercase;
+		color: var(--color-muted-foreground);
+	}
+	.decision-divider {
+		height: 1px;
+		background: var(--color-border);
+	}
 
 	.mini-stripe {
 		display: inline-flex;
@@ -513,5 +748,102 @@
 		height: 14px;
 		border-radius: 3px;
 		background: hsl(217 60% 85%);
+	}
+	.relay-handoff {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 18px;
+		margin: 14px 16px 16px;
+		padding: 14px;
+		border: 1px solid hsl(205 42% 84%);
+		border-radius: 11px;
+		background: hsl(205 48% 97%);
+	}
+	.relay-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+	.relay-eyebrow { color: hsl(205 52% 34%); font-family: var(--font-mono); font-size: 9.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+	.relay-copy strong { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+	.relay-copy p, .relay-copy small { margin: 0; color: var(--color-muted-foreground); font-size: 10.5px; line-height: 1.45; }
+	.relay-copy small { color: hsl(28 66% 38%); }
+	.relay-copy small.relay-error { color: hsl(0 56% 38%); }
+	.relay-button, .relay-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		flex: 0 0 auto;
+		border: 0;
+		border-radius: 8px;
+		padding: 9px 11px;
+		background: hsl(205 52% 34%);
+		color: white;
+		font: inherit;
+		font-size: 10.5px;
+		font-weight: 650;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.relay-button:disabled { cursor: not-allowed; opacity: .45; }
+	.relay-draft-editor {
+		display: flex;
+		grid-column: 1 / -1;
+		flex-direction: column;
+		gap: 9px;
+		padding-top: 12px;
+		border-top: 1px solid hsl(205 35% 87%);
+	}
+	.relay-draft-editor label { display: flex; flex-direction: column; gap: 4px; }
+	.relay-draft-editor label > span {
+		color: hsl(205 38% 31%);
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		font-weight: 650;
+		letter-spacing: .04em;
+		text-transform: uppercase;
+	}
+	.relay-draft-editor input, .relay-draft-editor textarea {
+		box-sizing: border-box;
+		width: 100%;
+		border: 1px solid hsl(205 30% 80%);
+		border-radius: 7px;
+		background: white;
+		color: var(--color-foreground);
+		font: inherit;
+		font-size: 11.5px;
+		line-height: 1.5;
+		padding: 8px 9px;
+	}
+	.relay-draft-editor textarea { min-height: 116px; resize: vertical; }
+	.relay-draft-editor input:focus, .relay-draft-editor textarea:focus {
+		border-color: hsl(205 52% 45%);
+		outline: 2px solid hsl(205 52% 45% / .13);
+	}
+	.relay-draft-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+	.relay-draft-footer small { color: var(--color-muted-foreground); font-size: 10px; }
+	.relay-draft-actions { display: flex; gap: 7px; }
+	.relay-secondary {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		border: 1px solid hsl(205 30% 75%);
+		border-radius: 8px;
+		padding: 8px 10px;
+		background: white;
+		color: hsl(205 45% 31%);
+		font: inherit;
+		font-size: 10.5px;
+		font-weight: 650;
+		cursor: pointer;
+	}
+	.relay-draft-editor small.relay-error { color: hsl(0 56% 38%); }
+	.spin { animation: spin 1s linear infinite; }
+	@keyframes spin { to { transform: rotate(360deg); } }
+	@media (max-width: 900px) {
+		.relay-handoff { align-items: stretch; grid-template-columns: minmax(0, 1fr); }
+		.relay-button, .relay-link { width: 100%; }
+		.relay-draft-footer { align-items: stretch; flex-direction: column; }
+		.relay-draft-actions { width: 100%; }
+		.relay-draft-actions > button { flex: 1; width: auto; }
 	}
 </style>
