@@ -1,6 +1,6 @@
 # Roadmap
 
-Folio is a local-first AI workspace. The current public release is **v0.4.0**; see the
+Folio is a local-first AI workspace. The current public release is **v0.5.0**; see the
 [changelog](../CHANGELOG.md) for shipped details.
 
 The order below reflects current product decisions. A version boundary is a gate, not a promise to
@@ -83,22 +83,23 @@ third-party package loading remains deliberately outside this foundation and is 
 Sonar is the first non-mail consumer: its initial read/review surface keeps imported external notes
 immutable, records human decisions append-only, and has no external publishing capability.
 
-## v0.5.0 — Session Relay and career pilot
+## Shipped in v0.5.0 — Session Relay and career pilot
 
-- Add a provider-neutral filesystem contract that hands a reviewed case to its responsible session
-  and accepts a reply draft, context request, or Objective proposal in return.
-- Require a case-bound human approval for every cloud handoff; local targets need no egress approval.
-- Keep runtime request and response bodies outside repositories and vaults with target-declared
+- A provider-neutral filesystem contract hands a reviewed case to its responsible session and
+  accepts a reply draft, context request, Objective proposal, or explicit no-action conclusion in
+  return.
+- Every cloud handoff requires case-bound human approval; local targets need no egress approval.
+- Runtime request and response bodies stay outside repositories and vaults with target-declared
   retention.
-- Establish Folio-owned canonical memory with candidate/confirmed facts, provenance, temporal
+- Folio-owned canonical memory records candidate/confirmed facts, provenance, temporal
   supersession, tombstones, and a rebuildable SQLite FTS projection.
-- Compile small context bundles from confirmed facts only, filtered by domain and the target's
+- Small context bundles are compiled from confirmed facts only, filtered by domain and the target's
   explicit sensitivity ceiling, and show the exact bundle before approval.
-- Complete one real career workflow from incoming mail through session response to a reviewed Folio
-  result. Cloud targets remain opt-in and absent from a fresh installation.
-- Keep the existing Redaction Gate as an optional `redact-then-share` step where a case needs it;
+- The first real career workflow was completed from incoming mail through session response to a
+  reviewed Folio result. Cloud targets remain opt-in and absent from a fresh installation.
+- The existing Redaction Gate remains an optional `redact-then-share` step where a case needs it;
   do not make its more complex T2 workflow the default path.
-- Update the public privacy promise atomically with the release, never afterward.
+- The public privacy promise was updated with the release.
 
 ## After the career learning gate
 
