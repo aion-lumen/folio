@@ -134,7 +134,8 @@ export const load: PageServerLoad = async ({ url }) => {
 					domain: r.domain,
 					actionability: r.actionability,
 					effective_actionability: unified.effective_actionability,
-					heuristic_reason: r.heuristic_reason
+					heuristic_reason: r.heuristic_reason,
+					heuristic_markers: unified.heuristic_markers
 				},
 				opinions.map((o) => ({
 					validator_model: o.validator_model,

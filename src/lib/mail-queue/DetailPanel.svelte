@@ -327,7 +327,9 @@
 	const stripeStateValue = $derived(row?.consensus_state);
 
 	// Keyboard: A (action toggle), 1-8 (domain), ? (toggle all evidence cards), Escape
-	let cardBumpKey = $state(0);
+	// EvidenceCard starts with lastBumpSeen=-1. Matching that sentinel avoids
+	// treating the initial render as a "?" shortcut and opening every card.
+	let cardBumpKey = $state(-1);
 
 	function onKey(e: KeyboardEvent) {
 		if (!open || !row) return;
@@ -427,6 +429,9 @@
 		const all = [...h, ...inseratMarkers];
 		return all.slice(0, 2).map((m) => m.split(':')[0]).join(' · ');
 	});
+	const decisionDetailsSummary = $derived(
+		`${rulesCount()} Regeln · ${markersCount()} Signale`
+	);
 </script>
 
 {#if open && row}
@@ -476,7 +481,9 @@
 		<section class="evidence-section">
 			<header class="evidence-head">
 				<span class="ev-h-label">WARUM SO?</span>
-				<span class="ev-h-tag">3 KARTEIKARTEN</span>
+				<span class="ev-h-tag">
+					{row.domain === 'immo' ? 'STIMMEN · REGELN · SIGNALE' : 'STIMMEN · DETAILS'}
+				</span>
 			</header>
 			<div class="ev-one-liner">{summarizeClassification(row)}</div>
 			<!-- B1 2026-06-05: {#key row.uid} forciert Re-Mount der EvidenceCards
@@ -499,27 +506,51 @@
 						<EvidenceVoices voices={row.voices ?? []} />
 					</EvidenceCard>
 
-					<EvidenceCard
-						label="{rulesCount()} Regeln aktiv"
-						summary={rulesSummary()}
-						forceExpandKey={cardBumpKey}
-					>
-						{#snippet visual()}
-							<span class="mini-checkbox"></span>
-						{/snippet}
-						<EvidenceRules activeRules={row.active_rules} />
-					</EvidenceCard>
 
-					<EvidenceCard
-						label="{markersCount()} Marker"
-						summary={markersSummary()}
-						forceExpandKey={cardBumpKey}
-					>
-						{#snippet visual()}
-							<span class="mini-block mini-{row.domain ?? 'unsorted'}"></span>
-						{/snippet}
-						<EvidenceMarkers {row} {inseratMarkers} />
-					</EvidenceCard>
+					{#if row.domain === 'immo'}
+						<!-- Immo keeps the richer inspection layout: distance and
+						     listing signals are meaningful primary evidence here. -->
+						<EvidenceCard
+							label="{rulesCount()} Regeln aktiv"
+							summary={rulesSummary()}
+							forceExpandKey={cardBumpKey}
+						>
+							{#snippet visual()}
+								<span class="mini-checkbox"></span>
+							{/snippet}
+							<EvidenceRules activeRules={row.active_rules} />
+						</EvidenceCard>
+
+						<EvidenceCard
+							label="{markersCount()} Signale"
+							summary={markersSummary()}
+							forceExpandKey={cardBumpKey}
+						>
+							{#snippet visual()}
+								<span class="mini-block mini-{row.domain ?? 'unsorted'}"></span>
+							{/snippet}
+							<EvidenceMarkers {row} {inseratMarkers} />
+						</EvidenceCard>
+					{:else}
+						<!-- For all other domains the full audit trail remains one click
+						     away without letting Immo-era implementation detail dominate. -->
+						<EvidenceCard
+							label="Entscheidungsdetails"
+							summary={decisionDetailsSummary}
+							forceExpandKey={cardBumpKey}
+						>
+							{#snippet visual()}
+								<span class="mini-block mini-{row.domain ?? 'unsorted'}"></span>
+							{/snippet}
+							<div class="decision-details">
+								<h4>Aktive Regeln</h4>
+								<EvidenceRules activeRules={row.active_rules} />
+								<div class="decision-divider"></div>
+								<h4>Signale</h4>
+								<EvidenceMarkers {row} {inseratMarkers} />
+							</div>
+						</EvidenceCard>
+					{/if}
 				</div>
 			{/key}
 		</section>
@@ -661,6 +692,24 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
+	}
+	.decision-details {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+	}
+	.decision-details h4 {
+		margin: 0;
+		font-family: var(--font-mono);
+		font-size: 9.5px;
+		font-weight: 600;
+		letter-spacing: .05em;
+		text-transform: uppercase;
+		color: var(--color-muted-foreground);
+	}
+	.decision-divider {
+		height: 1px;
+		background: var(--color-border);
 	}
 
 	.mini-stripe {

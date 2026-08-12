@@ -23,9 +23,7 @@
 	{/if}
 	<ul class="rules" class:dimmed={activeRules.final_blockers && activeRules.final_blockers.length > 0}>
 		{#if activeRules.active_priority}
-			<li><span class="ico">🎯</span><span class="name">Aktive Lebenssituation</span><span class="val">{activeRules.active_priority}</span></li>
-		{:else}
-			<li class="muted">— Keine aktive Lebenssituation für diese Domain</li>
+			<li><span class="ico">🎯</span><span class="name">Aktive Priorität</span><span class="val">{activeRules.active_priority}</span></li>
 		{/if}
 		{#if activeRules.distance_threshold_km != null}
 			<li>

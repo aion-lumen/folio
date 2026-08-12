@@ -52,7 +52,7 @@
 	{/if}
 	{#if heuristicMarkers.length > 0}
 		<div class="grp">
-			<span class="grp-label">Heuristik-Marker</span>
+			<span class="grp-label">Deterministische Signale</span>
 			<div class="chips">
 				{#each heuristicMarkers as m}
 					<span class="chip" class:overridden={isOverridden(m)} class:blocker={finalBlockers.includes(m)}>
@@ -62,7 +62,7 @@
 			</div>
 		</div>
 	{:else if correctionMarkers.length === 0 && inseratMarkers.length === 0}
-		<p class="muted">keine Marker</p>
+		<p class="muted">keine zusätzlichen Signale</p>
 	{/if}
 	{#if inseratMarkers.length > 0}
 		<div class="grp">

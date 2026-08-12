@@ -53,7 +53,9 @@ export function computeActiveRules(
 	heuristicMarkers: string[] | null | undefined,
 	homeCoords: { lat: number; lng: number } | null
 ): ActiveRules {
-	const d = (domain ?? '') as Domain;
+	// `job-lead` is a provenance alias used by the mail worker. For displaying
+	// the applicable rule set it belongs to the existing Job domain.
+	const d = (domain === 'job-lead' ? 'job' : (domain ?? '')) as Domain;
 	const priorityKey = DOMAIN_PRIORITY_MAP[d] ?? null;
 	const priorityActive =
 		priorityKey != null && userContext.active_priorities.includes(priorityKey);
