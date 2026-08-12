@@ -2,8 +2,8 @@
   "schema": "aion-lumen/x-archive-import-manifest/v1",
   "counts": {
     "bookmarks": 0,
-    "following": 184,
-    "likes": 12480
+    "following": 42,
+    "likes": 4242
   },
   "privacy": {
     "network_access": false,

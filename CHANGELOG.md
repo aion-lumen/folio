@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.5.0] - 2026-08-12
 
 ### Added
 
@@ -22,6 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Mail Queue now presents the `job-lead` provenance alias consistently as Job and keeps non-Immo
+  rules and deterministic signals available in initially collapsed decision details. Existing
+  Job-Lead cases therefore correctly show four agreeing voices without a data migration.
 - Session Relay now enforces each target's declared runtime-content retention at explicit workflow
   boundaries. Expired request and response directories are removed while accepted Folio artifacts
   and the append-only decision trail remain.

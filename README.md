@@ -35,11 +35,11 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 
 ## Status
 
-**Status:** v0.4.2 public preview<br>
+**Status:** v0.5.0 public preview<br>
 **License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
 
-Six public version tags are available from `v0.1.0` through `v0.4.2`; see the
+Seven public version tags are available from `v0.1.0` through `v0.5.0`; see the
 [public tags](https://github.com/aion-lumen/folio/tags) and [changelog](CHANGELOG.md).
 
 ## Stack
