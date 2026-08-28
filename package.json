@@ -18,6 +18,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"eval:triage": "tsx evals/triage/run.ts",
+		"career:assess": "tsx scripts/career-assess.ts",
+		"career:seed-memory": "tsx scripts/career-seed-memory.ts",
 		"sonar:classify-following": "tsx scripts/sonar-classify-following.ts"
 	},
 	"devDependencies": {

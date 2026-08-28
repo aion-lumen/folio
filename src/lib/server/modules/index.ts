@@ -1,4 +1,5 @@
 import { areModulesDisabled, getDisabledModuleIds } from '../env.js';
+import { CAREER_MODULE } from './career/manifest.js';
 import { COUNCIL_MODULE } from './council/manifest.js';
 import { LEUCHTFEUER_MODULE } from './leuchtfeuer/manifest.js';
 import { RELAY_MODULE } from './relay/manifest.js';
@@ -8,6 +9,7 @@ import { ModuleRegistry } from './registry.js';
 const registry = new ModuleRegistry(
 	(moduleId) => areModulesDisabled() || getDisabledModuleIds().has(moduleId)
 );
+registry.register(CAREER_MODULE);
 registry.register(COUNCIL_MODULE);
 registry.register(LEUCHTFEUER_MODULE);
 registry.register(RELAY_MODULE);

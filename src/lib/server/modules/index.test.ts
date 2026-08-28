@@ -37,6 +37,7 @@ describe('built-in module registry', () => {
 	});
 
 	it('keeps Council opt-in while core built-ins are registered', () => {
+		expect(hasModuleCapability('career', 'assessments.write')).toBe(true);
 		expect(hasModuleCapability('council', 'records.read')).toBe(false);
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(true);
 		expect(hasModuleCapability('sonar', 'notes.read')).toBe(true);
@@ -79,7 +80,7 @@ describe('built-in module registry', () => {
 
 	it('registry snapshot contains both reference consumers and no paths', () => {
 		const snapshot = getModuleRegistrySnapshot();
-		expect(snapshot.map((item) => item.manifest.id)).toEqual(['council', 'leuchtfeuer', 'relay', 'sonar']);
+		expect(snapshot.map((item) => item.manifest.id)).toEqual(['career', 'council', 'leuchtfeuer', 'relay', 'sonar']);
 		expect(JSON.stringify(snapshot)).not.toContain(home);
 	});
 });

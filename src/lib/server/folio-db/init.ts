@@ -388,6 +388,56 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_facts_fts USING fts5(
     tokenize = 'unicode61'
 );
 
+-- Career pilot: one stable position record plus append-only fit assessments.
+-- Personal evidence remains canonical in memory_facts; assessments only retain
+-- references to confirmed facts and the exact policy result used at the time.
+CREATE TABLE IF NOT EXISTS career_cases (
+    case_id          TEXT PRIMARY KEY,
+    identity_key     TEXT NOT NULL UNIQUE,
+    source_kind      TEXT NOT NULL,
+    source_ref       TEXT NOT NULL,
+    external_id      TEXT,
+    employer         TEXT NOT NULL,
+    title            TEXT NOT NULL,
+    source_url       TEXT,
+    checked_at       TEXT NOT NULL,
+    created_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_career_cases_checked
+    ON career_cases(checked_at DESC, created_at DESC);
+CREATE TRIGGER IF NOT EXISTS career_cases_no_update
+    BEFORE UPDATE ON career_cases BEGIN
+        SELECT RAISE(ABORT, 'career_cases is immutable');
+    END;
+CREATE TRIGGER IF NOT EXISTS career_cases_no_delete
+    BEFORE DELETE ON career_cases BEGIN
+        SELECT RAISE(ABORT, 'career_cases is immutable');
+    END;
+
+CREATE TABLE IF NOT EXISTS career_assessments (
+    assessment_id         TEXT PRIMARY KEY,
+    case_id               TEXT NOT NULL,
+    requirements_json     TEXT NOT NULL,
+    decision              TEXT NOT NULL CHECK(decision IN ('SKIP','CLARIFY','APPLY','APPLY_WITH_GAPS')),
+    blockers_json         TEXT NOT NULL,
+    reason                TEXT NOT NULL,
+    context_fact_ids_json TEXT NOT NULL,
+    policy_version        TEXT NOT NULL,
+    recorded_by           TEXT NOT NULL,
+    recorded_at           TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES career_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_career_assessments_case
+    ON career_assessments(case_id, recorded_at DESC);
+CREATE TRIGGER IF NOT EXISTS career_assessments_no_update
+    BEFORE UPDATE ON career_assessments BEGIN
+        SELECT RAISE(ABORT, 'career_assessments is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS career_assessments_no_delete
+    BEFORE DELETE ON career_assessments BEGIN
+        SELECT RAISE(ABORT, 'career_assessments is append-only');
+    END;
+
 -- v0.5.0 Session Relay: metadata and the approval ledger live in Folio.
 -- Unapproved request bodies remain under ~/.folio/session-exchange. Only approved
 -- handoff artifacts and bound responses enter the configured session bridge.
