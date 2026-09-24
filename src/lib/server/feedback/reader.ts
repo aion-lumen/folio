@@ -75,6 +75,18 @@ export function getFeedbackRowById(id: number): FeedbackRow | null {
 	return row ?? null;
 }
 
+/** Bounded metadata lookup for local companion retrieval. */
+export function getFeedbackRowsByTerms(terms: string[], limit = 200): FeedbackRow[] {
+	const normalized = [...new Set(terms.map((term) => term.trim().toLocaleLowerCase('de-CH')).filter(Boolean))].slice(0, 12);
+	if (!normalized.length || limit < 1 || limit > 500) return [];
+	const clauses = normalized.map(() => "(lower(subject) LIKE ? ESCAPE '\\' OR lower(sender) LIKE ? ESCAPE '\\')");
+	const params = normalized.flatMap((term) => {
+		const escaped = `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+		return [escaped, escaped];
+	});
+	return getConn().prepare(`SELECT * FROM feedback WHERE ${clauses.join(' OR ')} ORDER BY mail_date DESC, id DESC LIMIT ?`).all(...params, limit) as FeedbackRow[];
+}
+
 export function getFeedbackCounts(): FeedbackCounts {
 	const db = getConn();
 	const byUserFinalAction: Record<string, number> = {};
@@ -114,6 +126,7 @@ export function getHeuristicMarkersForFeedbackId(feedbackId: number): string[] {
 // aufgerufen (1-3 pro Workflow); IN(?,?,...) ist OK fuer diese Skala.
 export interface FeedbackBrief {
 	id: number;
+	imap_uid: number;
 	subject: string;
 	sender: string;
 	account_id: string | null;
@@ -125,7 +138,7 @@ export function getFeedbackBriefsByIds(ids: number[]): Map<number, FeedbackBrief
 	const placeholders = ids.map(() => '?').join(',');
 	const rows = getConn()
 		.prepare(
-			`SELECT id, subject, sender, account_id, mail_date
+			`SELECT id, imap_uid, subject, sender, account_id, mail_date
 			 FROM feedback WHERE id IN (${placeholders})`
 		)
 		.all(...ids) as FeedbackBrief[];
@@ -135,4 +148,19 @@ export function getFeedbackBriefsByIds(ids: number[]): Map<number, FeedbackBrief
 
 export function getDisagreementRows(limit = 50): FeedbackRow[] {
 	return getFeedbackRows({ disagreementOnly: true, limit });
+}
+
+/** Exact event-time window for bounded local reconciliation jobs. */
+export function getFeedbackRowsByMailDate(fromInclusive: string, toExclusive: string, limit = 5000): FeedbackRow[] {
+	const from = new Date(fromInclusive);
+	const to = new Date(toExclusive);
+	if (!Number.isFinite(from.getTime()) || !Number.isFinite(to.getTime()) || from >= to || limit < 1 || limit > 20_000) {
+		throw new Error('invalid_mail_date_window');
+	}
+ const rows=getConn().prepare(`SELECT * FROM feedback
+  WHERE julianday(mail_date)>=julianday(?) AND julianday(mail_date)<julianday(?)
+  ORDER BY julianday(mail_date) DESC, id DESC LIMIT ?`).all(from.toISOString(),to.toISOString(),limit+1) as FeedbackRow[];
+ // A bounded read must not silently claim exhaustive coverage when truncated.
+ if(rows.length>limit)throw Error('mail_date_window_limit_exceeded');
+ return rows;
 }

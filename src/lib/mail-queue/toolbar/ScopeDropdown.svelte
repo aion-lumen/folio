@@ -5,7 +5,8 @@
 -->
 <script lang="ts">
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
-	import { ACCOUNTS, ACCOUNT_IDS, type AccountId } from '$lib/util/mail-account.js';
+	import { page } from '$app/state';
+	import { accountMeta,accountIds,accountClass,type AccountId } from '$lib/util/mail-account.js';
 
 	let {
 		countsByAccount,
@@ -17,7 +18,7 @@
 
 	const selected = $derived(mailQueueStore.filters.account);
 	const selectedLabel = $derived(
-		selected === 'all' ? 'Alle' : ACCOUNTS[selected as AccountId]?.label ?? 'Alle'
+		selected === 'all' ? 'Alle' : accountMeta(selected,page.data.mailAccounts).label
 	);
 	const selectedCount = $derived(
 		selected === 'all' ? allRowsCount : (countsByAccount[selected] ?? 0)
@@ -60,10 +61,7 @@
 	>
 		{#if selected !== 'all'}
 			<span
-				class="inline-block h-2 w-2 rounded-full"
-				class:bg-account-gmail={selected === 'gmail'}
-				class:bg-account-yahoo={selected === 'yahoo'}
-				class:bg-account-mirhamed={selected === 'mirhamed_ch'}
+				class="inline-block h-2 w-2 rounded-full {accountClass(selected).dot}"
 			></span>
 		{/if}
 		{selectedLabel}
@@ -86,8 +84,8 @@
 				<span>Alle</span>
 				<span class="font-mono text-[10px] opacity-70">{allRowsCount}</span>
 			</button>
-			{#each ACCOUNT_IDS as id}
-				{@const acc = ACCOUNTS[id]}
+			{#each accountIds(countsByAccount,page.data.mailAccounts) as id}
+				{@const acc = accountMeta(id,page.data.mailAccounts)}
 				<button
 					type="button"
 					class="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-xs text-left hover:bg-muted
@@ -96,10 +94,7 @@
 				>
 					<span class="flex items-center gap-1.5">
 						<span
-							class="inline-block h-2 w-2 rounded-full"
-							class:bg-account-gmail={id === 'gmail'}
-							class:bg-account-yahoo={id === 'yahoo'}
-							class:bg-account-mirhamed={id === 'mirhamed_ch'}
+							class="inline-block h-2 w-2 rounded-full {accountClass(id).dot}"
 						></span>
 						{acc.label}
 					</span>

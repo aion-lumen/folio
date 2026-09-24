@@ -1,11 +1,12 @@
 <!--
-  F.9 BUG-K2 — Scope-Layer (Browsing): Inline-Pills "Alle / gmail / yahoo / mirhamed.ch".
+  F.9 BUG-K2 — Scope-Layer (Browsing): Inline-Pills "Alle / gmail / yahoo / custom".
   Active = farblich gefüllt mit Account-Color (Design-Regel A "Form folgt Lebenszyklus").
   Counts pro Account inline. Triage-Variante ist ScopeDropdown.
 -->
 <script lang="ts">
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
-	import { ACCOUNTS, ACCOUNT_IDS, type AccountId } from '$lib/util/mail-account.js';
+	import { page } from '$app/state';
+	import { accountMeta,accountIds,accountClass,type AccountId } from '$lib/util/mail-account.js';
 
 	let {
 		countsByAccount,
@@ -37,8 +38,8 @@
 	</button>
 
 	<!-- Per-Account pills -->
-	{#each ACCOUNT_IDS as id}
-		{@const acc = ACCOUNTS[id]}
+	{#each accountIds(countsByAccount,page.data.mailAccounts) as id}
+		{@const acc = accountMeta(id,page.data.mailAccounts)}
 		{@const isActive = selected === id}
 		<button
 			type="button"
@@ -50,10 +51,7 @@
 			title={acc.label}
 		>
 			<span
-				class="inline-block h-2 w-2 rounded-full"
-				class:bg-account-gmail={id === 'gmail'}
-				class:bg-account-yahoo={id === 'yahoo'}
-				class:bg-account-mirhamed={id === 'mirhamed_ch'}
+				class="inline-block h-2 w-2 rounded-full {accountClass(id).dot}"
 			></span>
 			{acc.label}
 			<span class="font-mono text-[10px] opacity-70">{countsByAccount[id] ?? 0}</span>

@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-preview.1] - 2026-09-25
+
+Public preview: Ledger, calendar, career and contract workflows are source-backed early features. Optional companion runtimes are configured separately; this is not a turnkey bank connection or trading platform.
+
+### Added
+
+- Add a household overview with income/expense charts, cash-flow projection, period selection and expandable transaction evidence.
+- Distinguish confirmed own-account transfers, evidenced fees, estimates and unresolved matches.
+- Add a calendar overview with source-linked mail proposals and approval-bound event creation.
+- Add an application overview with contact details, application/rejection history and conservative mail reconciliation.
+- Add a subscription and fixed-cost inventory with source-backed lifecycle events and visible uncertainties.
+- Separate inbox work requiring a decision from completed automation and technical backlog.
+- Add an optional local model comparison bench for mail triage; requires an explicitly provided test cohort and the separate local multi-agent runtime.
+- Existing module chat and manual import workflows remain available.
+
+### Fixed
+
+- Configure career and mail sources explicitly; show unavailable sources and stale calendar sync.
+- Correct statement period labels, duplicate liquidity display and historical forecast notices.
+
 ## [0.5.0] - 2026-08-12
 
 ### Added
@@ -190,3 +210,5 @@ companion (Hermes Agent) as backend.
 - Demo GIF / screencast deferred to a later release
 
 [0.1.0]: https://github.com/aion-lumen/life-dashboard/releases/tag/v0.1.0
+
+[0.6.0-preview.1]: https://github.com/aion-lumen/folio/compare/v0.5.0...v0.6.0-preview.1

@@ -1,7 +1,8 @@
+import { localMailSource } from '$lib/server/mail-intake/source.js';
 // F.4.E — GET /api/mail/body/[uid]
 // Returns body + classification-meta for one mail row.
 // Yahoo (real feedback.db): looks up task_id, fetches Kanban-Task body+executor-comment.
-// Gmail/mirhamed.ch (mock): synthesizes body from mock subject/sender.
+// Gmail/custom (mock): synthesizes body from mock subject/sender.
 
 import { error, json } from '@sveltejs/kit';
 import { getFeedbackRowById } from '$lib/server/feedback/reader.js';
@@ -11,7 +12,7 @@ import type { RequestHandler } from './$types.js';
 
 export interface MailBodyResponse {
 	uid: string;
-	source: 'kanban' | 'mock' | 'unavailable';
+	source: 'intake' | 'feedback' | 'kanban' | 'mock' | 'unavailable';
 	board: string | null;
 	taskId: string | null;
 	taskTitle: string | null;
@@ -85,20 +86,21 @@ export const GET: RequestHandler = ({ params }) => {
 	}
 	if (!row) throw error(404, `feedback row not found: ${uid}`);
 
-	const body = lookupMailBody(row.task_id);
+	const body = lookupMailBody(row.task_id==='dryrun-task-id'?'':row.task_id);
+	const source = localMailSource(row);
 	const response: MailBodyResponse = {
 		uid,
-		source: body.source,
+		source: source.source,
 		board: body.board,
 		taskId: body.taskId,
 		taskTitle: body.taskTitle,
-		bodyText: body.bodyText,
-		bodyTruncated: body.bodyTruncated,
+		bodyText: source.bodyText,
+		bodyTruncated: source.bodyTruncated,
 		summary: body.summary,
 		evidence: body.evidence,
 		reasoning: body.reasoning,
 		classification: body.classification,
 		confidence: body.confidence
 	};
-	return json(response);
+	return json(response, { headers: { 'Cache-Control': 'private, no-store' } });
 };

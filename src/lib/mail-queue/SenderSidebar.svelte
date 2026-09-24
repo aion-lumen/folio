@@ -4,7 +4,7 @@
 <script lang="ts">
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
 	import { topSenders } from '$lib/util/mail-sender.js';
-	import { ACCOUNT_CLASS } from '$lib/util/mail-account.js';
+	import { accountClass } from '$lib/util/mail-account.js';
 
 	const TOP_N = 20;
 
@@ -83,7 +83,7 @@
 							<span class="flex items-center gap-0.5">
 								{#each s.accountIds as aid}
 									<span
-										class="h-1.5 w-1.5 rounded-full {ACCOUNT_CLASS[aid].dot}"
+										class="h-1.5 w-1.5 rounded-full {accountClass(aid).dot}"
 										title={aid}
 									></span>
 								{/each}

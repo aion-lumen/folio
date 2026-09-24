@@ -75,8 +75,8 @@
 		color: var(--color-muted-foreground);
 		flex: 1;
 	}
-	.arrow { opacity: 0.4; color: var(--color-muted-foreground); transition: opacity 150ms, transform 150ms; }
-	.card:hover .arrow { opacity: 1; transform: translateX(2px); }
+	.card :global(.arrow) { opacity: 0.4; color: var(--color-muted-foreground); transition: opacity 150ms, transform 150ms; }
+	.card:hover :global(.arrow) { opacity: 1; transform: translateX(2px); }
 	.primary {
 		font-size: 14px;
 		margin: 4px 0 4px;

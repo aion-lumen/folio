@@ -14,9 +14,7 @@ When configured, life-mail runs periodically and:
 4. Routes the result: creates a vault note, links to an objective, or escalates to Hermes
 5. Writes a status snapshot to `_meta/mail/state.json`
 
-This ingestion path runs entirely locally; email content does not leave your machine. The separate,
-case-bound handover to an online session is described in [Session Relay](session-relay.md) and
-happens only after explicit approval.
+Everything runs locally. No email content leaves your machine.
 
 ## Dashboard integration
 

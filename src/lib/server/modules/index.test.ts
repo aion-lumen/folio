@@ -37,9 +37,20 @@ describe('built-in module registry', () => {
 	});
 
 	it('keeps Council opt-in while core built-ins are registered', () => {
+		expect(hasModuleCapability('career', 'assessments.write')).toBe(true);
+		expect(hasModuleCapability('career', 'panel.render')).toBe(true);
+		expect(hasModuleCapability('career', 'leads.read')).toBe(true);
+		expect(hasModuleCapability('career', 'events.write')).toBe(true);
 		expect(hasModuleCapability('council', 'records.read')).toBe(false);
 		expect(hasModuleCapability('leuchtfeuer', 'metrics.read')).toBe(true);
+		expect(hasModuleCapability('ledger-books', 'batches.read')).toBe(true);
+		expect(hasModuleCapability('ledger-books', 'intake.read')).toBe(true);
+		expect(hasModuleCapability('ledger-books', 'observations.read')).toBe(true);
+		expect(hasModuleCapability('ledger-books', 'observations.write')).toBe(true);
 		expect(hasModuleCapability('sonar', 'notes.read')).toBe(true);
+		expect(hasModuleCapability('sonar', 'publish.approve')).toBe(true);
+		expect(hasModuleCapability('sonar', 'publish.read')).toBe(true);
+		expect(hasModuleCapability('sonar', 'publish.execute')).toBe(true);
 		expect(hasModuleCapability('relay', 'egress.approve')).toBe(true);
 		expect(hasModuleCapability('relay', 'responses.apply')).toBe(true);
 		writeFileSync(
@@ -51,6 +62,15 @@ describe('built-in module registry', () => {
 		expect(getModuleDatabasePath('sonar', 'archive-cache', 'archive.read')).toBe(join(home, '.folio', 'sonar'));
 		expect(hasModuleCapability('council', 'records.read')).toBe(true);
 		expect(getModuleDatabasePath('council', 'primary', 'records.read')).toContain('council.db');
+		expect(getModuleDatabasePath('ledger-books', 'staging', 'batches.read')).toBe(
+			join(home, '.ledger', 'books', 'staging', 'dkb-review.json')
+		);
+		expect(getModuleDatabasePath('ledger-books', 'observation-exchange', 'observations.write')).toBe(
+			join(home, '.folio', 'session-exchange', 'ledger', 'inbox', 'finance-observations.json')
+		);
+		expect(getModuleDatabasePath('ledger-books', 'observation-intake', 'intake.read')).toBe(
+			join(home, '.ledger', 'books', 'staging', 'finance-observation-intake.json')
+		);
 	});
 
 	it('applies global and per-module emergency stops dynamically', () => {
@@ -79,7 +99,14 @@ describe('built-in module registry', () => {
 
 	it('registry snapshot contains both reference consumers and no paths', () => {
 		const snapshot = getModuleRegistrySnapshot();
-		expect(snapshot.map((item) => item.manifest.id)).toEqual(['council', 'leuchtfeuer', 'relay', 'sonar']);
+		expect(snapshot.map((item) => item.manifest.id)).toEqual([
+			'career',
+			'council',
+			'ledger-books',
+			'leuchtfeuer',
+			'relay',
+			'sonar'
+		]);
 		expect(JSON.stringify(snapshot)).not.toContain(home);
 	});
 });

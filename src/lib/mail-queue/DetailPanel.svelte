@@ -8,7 +8,7 @@
 <script lang="ts">
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { invalidateAll } from '$app/navigation';
-	import { ArrowRight, Check, CircleAlert, Copy, LoaderCircle, Save } from 'lucide-svelte';
+	import { ArrowRight, Brain, Check, CircleAlert, Copy, LoaderCircle, Save } from 'lucide-svelte';
 	import { page } from '$app/state';
 	import { tlog } from '$lib/util/debug-trace.js';
 	import { mailQueueStore } from '$lib/stores/mailQueue.svelte.js';
@@ -21,13 +21,15 @@
 		type ActionabilityKey
 	} from '$lib/util/mail-account.js';
 
-	import PanelHeader from './panel/PanelHeader.svelte';
+	import { MAIL_WORK_LABELS } from '$lib/util/mail-work-status.js';
+ import PanelHeader from './panel/PanelHeader.svelte';
 	import VerdictStage from './panel/VerdictStage.svelte';
 	import EvidenceCard from './panel/EvidenceCard.svelte';
 	import EvidenceVoices from './panel/EvidenceVoices.svelte';
 	import EvidenceRules from './panel/EvidenceRules.svelte';
 	import EvidenceMarkers from './panel/EvidenceMarkers.svelte';
 	import PanelBody from './panel/PanelBody.svelte';
+	import PanelAttachments from './panel/PanelAttachments.svelte';
 	import { summarizeClassification } from './summarize-classification.js';
 	import StatusPillen from '$lib/shared/StatusPillen.svelte';
 	import { canReclassify } from '$lib/util/reclassify.js';
@@ -147,6 +149,9 @@
 	let saveError = $state<string | null>(null);
 	let relayLoading = $state(false);
 	let relayError = $state<string | null>(null);
+	let memoryLoading = $state(false);
+	let memoryError = $state<string | null>(null);
+	let memoryResult = $state<{ count: number; candidateCount: number; created: boolean } | null>(null);
 	let stagedRelay = $state<{
 		caseId: string;
 		status: string;
@@ -177,7 +182,42 @@
 		row?.uid;
 		stagedRelay = null;
 		relayError = null;
+		memoryError = null;
+		memoryResult = null;
 	});
+
+	async function proposeMailMemory(): Promise<void> {
+		if (!row || !canReclassifyRow || memoryLoading) return;
+		const feedbackId = Number(row.uid);
+		if (!Number.isInteger(feedbackId)) return;
+		memoryLoading = true;
+		memoryError = null;
+		try {
+			const response = await fetch('/api/memory/from-mail', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ feedback_id: feedbackId })
+			});
+			if (!response.ok) {
+				const raw = await response.text();
+				let message = raw.slice(0, 240);
+				try { const payload = JSON.parse(raw) as { message?: string; error?: string }; message = payload.message ?? payload.error ?? message; } catch { /* plain response */ }
+				throw new Error(message);
+			}
+			const result = await response.json() as { count: number; candidate_count: number; created: boolean };
+			memoryResult = {
+				count: result.count,
+				candidateCount: result.candidate_count,
+				created: result.created
+			};
+			if (result.candidate_count > 0) toastStore.show(`${result.candidate_count} Wissenskandidat${result.candidate_count === 1 ? '' : 'en'} vorgeschlagen`, 2600);
+			else toastStore.show('Keine dauerhafte Tatsache gefunden', 2400);
+		} catch (cause) {
+			memoryError = cause instanceof Error ? cause.message : 'Wissensprüfung fehlgeschlagen.';
+		} finally {
+			memoryLoading = false;
+		}
+	}
 
 	$effect(() => {
 		relayDraftKey;
@@ -444,6 +484,7 @@
 		{/if}
 
 		<PanelHeader {row} onClose={close} />
+  {#if row.work}<div class="border-b border-border px-4 py-3 text-sm"><b>{MAIL_WORK_LABELS[row.work.state]}</b><p class="text-muted-foreground">{row.work.reason}</p>{#if row.work.href}<a class="underline" href={row.work.href}>Vorgang öffnen →</a>{/if}</div>{/if}
 
 		{#if canReclassifyRow}
 			<VerdictStage
@@ -555,7 +596,37 @@
 			{/key}
 		</section>
 
-		<PanelBody body={body?.bodyText ?? null} />
+		<PanelBody body={body?.bodyText ?? null} truncated={body?.bodyTruncated ?? true} />
+		{#if row && canReclassifyRow}<PanelAttachments feedbackId={Number(row.uid)} />{/if}
+
+		{#if canReclassifyRow}
+			<section class="memory-proposal">
+				<div class="memory-copy">
+					<span class="memory-eyebrow">Folio-Gedächtnis</span>
+					<strong><Brain size={15} /> Dauerhaftes Wissen prüfen</strong>
+					{#if memoryResult}
+						{#if memoryResult.candidateCount > 0}
+							<p>{memoryResult.candidateCount} belegte{memoryResult.candidateCount === 1 ? 'r Kandidat wartet' : ' Kandidaten warten'} auf deine Bestätigung.</p>
+						{:else if memoryResult.count > 0}
+							<p>Diese Mail wurde bereits geprüft; es wartet kein neuer Kandidat.</p>
+						{:else}
+							<p>Keine dauerhafte Tatsache gefunden. Die Mail bleibt unverändert.</p>
+						{/if}
+					{:else}
+						<p>Das lokale Modell schlägt höchstens drei belegte Fakten vor. Vorschläge bleiben offen, bis du oder eine von dir freigegebene unabhängige Prüfung sie bestätigt.</p>
+					{/if}
+					{#if memoryError}<small class="memory-error">{memoryError}</small>{/if}
+				</div>
+				{#if memoryResult?.candidateCount}
+					<a class="memory-link" href="/memory">Kandidaten prüfen <ArrowRight size={14} /></a>
+				{:else}
+					<button class="memory-button" type="button" disabled={memoryLoading || memoryResult != null} onclick={proposeMailMemory}>
+						{#if memoryLoading}<LoaderCircle class="spin" size={14} />{:else}<Brain size={14} />{/if}
+						{memoryLoading ? 'Prüft lokal …' : 'Wissen vorschlagen'}
+					</button>
+				{/if}
+			</section>
+		{/if}
 
 		{#if careerRelayEligible || relayCaseId}
 			<section class="relay-handoff">
@@ -749,6 +820,39 @@
 		border-radius: 3px;
 		background: hsl(217 60% 85%);
 	}
+	.memory-proposal {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) auto;
+		align-items: center;
+		gap: 18px;
+		margin: 14px 16px 0;
+		padding: 14px;
+		border: 1px solid hsl(164 30% 78%);
+		border-radius: 11px;
+		background: hsl(164 36% 97%);
+	}
+	.memory-copy { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+	.memory-eyebrow { color: hsl(164 42% 29%); font-family: var(--font-mono); font-size: 9.5px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
+	.memory-copy strong { display: flex; align-items: center; gap: 6px; font-size: 12px; }
+	.memory-copy p { margin: 0; color: var(--color-muted-foreground); font-size: 10.5px; line-height: 1.45; }
+	.memory-copy small.memory-error { color: hsl(0 56% 38%); font-size: 10.5px; }
+	.memory-button, .memory-link {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		border: 0;
+		border-radius: 8px;
+		padding: 9px 11px;
+		background: hsl(164 42% 31%);
+		color: white;
+		font: inherit;
+		font-size: 10.5px;
+		font-weight: 650;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.memory-button:disabled { cursor: not-allowed; opacity: .55; }
 	.relay-handoff {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
@@ -840,6 +944,8 @@
 	.spin { animation: spin 1s linear infinite; }
 	@keyframes spin { to { transform: rotate(360deg); } }
 	@media (max-width: 900px) {
+		.memory-proposal { align-items: stretch; grid-template-columns: minmax(0, 1fr); }
+		.memory-button, .memory-link { width: 100%; }
 		.relay-handoff { align-items: stretch; grid-template-columns: minmax(0, 1fr); }
 		.relay-button, .relay-link { width: 100%; }
 		.relay-draft-footer { align-items: stretch; flex-direction: column; }

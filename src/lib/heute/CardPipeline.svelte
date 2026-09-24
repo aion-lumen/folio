@@ -88,7 +88,7 @@
 		align-items: center;
 		gap: 8px;
 	}
-	.card-head .icon { color: var(--color-foreground); }
+	.card-head :global(.icon) { color: var(--color-foreground); }
 	.title {
 		font-size: 13px;
 		font-weight: 600;
@@ -97,8 +97,8 @@
 		color: var(--color-muted-foreground);
 		flex: 1;
 	}
-	.arrow { opacity: 0.4; color: var(--color-muted-foreground); transition: opacity 150ms, transform 150ms; }
-	.card:hover .arrow { opacity: 1; transform: translateX(2px); }
+	.card :global(.arrow) { opacity: 0.4; color: var(--color-muted-foreground); transition: opacity 150ms, transform 150ms; }
+	.card:hover :global(.arrow) { opacity: 1; transform: translateX(2px); }
 
 	.primary {
 		display: inline-flex;

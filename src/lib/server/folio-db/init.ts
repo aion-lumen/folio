@@ -2,7 +2,7 @@
 // WAL-mode für concurrent reads/writes. State-directory auto-create.
 
 import Database from 'better-sqlite3';
-import { mkdirSync } from 'fs';
+import { chmodSync, existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 import { getFolioDbPath } from '../env.js';
 
@@ -329,10 +329,140 @@ CREATE TABLE IF NOT EXISTS hermes_turns (
 CREATE INDEX IF NOT EXISTS idx_hermes_turns_session
     ON hermes_turns(session_id, started_at DESC);
 
--- v0.5.0 baseline: Folio-owned canonical memory. Search is a disposable
--- projection; facts and their provenance remain in the ordinary SQLite table.
+-- Folio-owned canonical memory. Vault documents remain canonical text;
+-- SQLite owns atomic entities, facts, relations, episodes and their lifecycle.
+-- Search/graph/embedding indexes are disposable projections of these tables.
+-- Human gold labels for real-mail evaluation are deliberately separate from
+-- operational corrections: only the primary pipeline domain drives workflow;
+-- secondary domains are additive context for memory and later evaluation.
+CREATE TABLE IF NOT EXISTS memory_mail_domain_reviews (
+    review_id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    run_id                 TEXT NOT NULL,
+    feedback_id            INTEGER NOT NULL,
+    verdict                TEXT NOT NULL CHECK(verdict IN ('included','excluded')),
+    primary_domain         TEXT NOT NULL CHECK(primary_domain IN (
+                              'immo','job','shopping','finance','kontakt','werbung','system','unsorted'
+                            )),
+    secondary_domains_json TEXT NOT NULL DEFAULT '[]',
+    review_category        TEXT CHECK(review_category IS NULL OR review_category IN (
+                              'normal','boundary','cross_domain','detail_rich'
+                            )),
+    review_traits_json     TEXT NOT NULL DEFAULT '[]',
+    action_required        INTEGER NULL CHECK(action_required IS NULL OR action_required IN (0,1)),
+    deadline_present       INTEGER NULL CHECK(deadline_present IS NULL OR deadline_present IN (0,1)),
+    label_schema           TEXT NOT NULL DEFAULT 'v1-exclusive'
+                            CHECK(label_schema IN ('v1-exclusive','v2-multilabel')),
+    note                   TEXT,
+    reviewed_by_user_id    INTEGER NOT NULL,
+    reviewed_at            TEXT NOT NULL,
+    FOREIGN KEY (reviewed_by_user_id) REFERENCES users(id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_mail_domain_reviews_run
+    ON memory_mail_domain_reviews(run_id, feedback_id, review_id DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_mail_domain_reviews_cohort
+    ON memory_mail_domain_reviews(run_id, primary_domain, verdict, review_id DESC);
+CREATE TRIGGER IF NOT EXISTS memory_mail_domain_reviews_no_update
+    BEFORE UPDATE ON memory_mail_domain_reviews BEGIN
+        SELECT RAISE(ABORT, 'memory_mail_domain_reviews is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS memory_mail_domain_reviews_no_delete
+    BEFORE DELETE ON memory_mail_domain_reviews BEGIN
+        SELECT RAISE(ABORT, 'memory_mail_domain_reviews is append-only');
+    END;
+
+-- Source provenance is deliberately thinner than canonical memory. A reviewed
+-- Reorg document can be linked to one or more domains without treating its
+-- filename, path or content as an established fact.
+CREATE TABLE IF NOT EXISTS memory_sources (
+    source_id          TEXT PRIMARY KEY,
+    source_kind        TEXT NOT NULL,
+    source_ref         TEXT NOT NULL UNIQUE,
+    title              TEXT NOT NULL,
+    relative_path      TEXT,
+    content_hash       TEXT,
+    sensitivity        TEXT NOT NULL CHECK(sensitivity IN ('public','private','sensitive')),
+    status             TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected','tombstoned')),
+    origin_run_id      TEXT,
+    origin_document_id TEXT,
+    recorded_at        TEXT NOT NULL,
+    updated_at         TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_memory_sources_status
+    ON memory_sources(status, updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_sources_origin
+    ON memory_sources(origin_run_id, origin_document_id);
+
+CREATE TABLE IF NOT EXISTS memory_source_domains (
+    source_id    TEXT NOT NULL,
+    domain       TEXT NOT NULL,
+    role         TEXT NOT NULL CHECK(role IN ('primary','secondary')),
+    status       TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected')),
+    reviewed_by  TEXT,
+    recorded_at  TEXT NOT NULL,
+    PRIMARY KEY (source_id, domain),
+    FOREIGN KEY (source_id) REFERENCES memory_sources(source_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_source_domains_scope
+    ON memory_source_domains(domain, status, role, recorded_at DESC);
+
+CREATE TABLE IF NOT EXISTS memory_proposals (
+    proposal_id            TEXT PRIMARY KEY,
+    domain                 TEXT NOT NULL,
+    source_kind            TEXT NOT NULL,
+    source_ref             TEXT NOT NULL,
+    status                 TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected')),
+    extractor_id           TEXT NOT NULL,
+    selection_method       TEXT NOT NULL DEFAULT 'workflow',
+    created_at             TEXT NOT NULL,
+    reviewed_at            TEXT,
+    reviewed_by            TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memory_proposals_source
+    ON memory_proposals(domain, source_ref, status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS memory_entities (
+    entity_id              TEXT PRIMARY KEY,
+    proposal_id            TEXT,
+    domain                 TEXT NOT NULL,
+    entity_type            TEXT NOT NULL,
+    canonical_key          TEXT NOT NULL,
+    canonical_label        TEXT NOT NULL,
+    sensitivity            TEXT NOT NULL CHECK(sensitivity IN ('public','private','sensitive')),
+    status                 TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected','merged','tombstoned')),
+    source_kind            TEXT NOT NULL,
+    source_ref             TEXT NOT NULL,
+    source_excerpt         TEXT,
+    derived_from_external  INTEGER NOT NULL DEFAULT 0 CHECK(derived_from_external IN (0,1)),
+    valid_from             TEXT,
+    valid_to               TEXT,
+    merged_into_entity_id  TEXT,
+    recorded_at            TEXT NOT NULL,
+    confirmed_at           TEXT,
+    confirmed_by           TEXT,
+    FOREIGN KEY (proposal_id) REFERENCES memory_proposals(proposal_id),
+    FOREIGN KEY (merged_into_entity_id) REFERENCES memory_entities(entity_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_entities_scope
+    ON memory_entities(domain, entity_type, status, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_entities_key
+    ON memory_entities(domain, canonical_key, status);
+
+CREATE TABLE IF NOT EXISTS memory_entity_aliases (
+    alias_id       TEXT PRIMARY KEY,
+    entity_id      TEXT NOT NULL,
+    alias_text     TEXT NOT NULL,
+    normalized_alias TEXT NOT NULL,
+    source_kind    TEXT NOT NULL,
+    source_ref     TEXT NOT NULL,
+    recorded_at    TEXT NOT NULL,
+    FOREIGN KEY (entity_id) REFERENCES memory_entities(entity_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_alias_unique
+    ON memory_entity_aliases(entity_id, normalized_alias);
+
 CREATE TABLE IF NOT EXISTS memory_facts (
     fact_id                TEXT PRIMARY KEY,
+    proposal_id            TEXT,
     domain                 TEXT NOT NULL,
     data_class             TEXT NOT NULL,
     sensitivity            TEXT NOT NULL CHECK(sensitivity IN ('public','private','sensitive')),
@@ -344,18 +474,86 @@ CREATE TABLE IF NOT EXISTS memory_facts (
     source_ref             TEXT NOT NULL,
     source_excerpt         TEXT,
     derived_from_external  INTEGER NOT NULL DEFAULT 0 CHECK(derived_from_external IN (0,1)),
+    entity_ref             TEXT,
+    entity_type            TEXT,
+    entity_label           TEXT,
+    subject_entity_id      TEXT,
+    object_entity_id       TEXT,
     valid_from             TEXT,
     valid_to               TEXT,
     supersedes_fact_id     TEXT,
     recorded_at            TEXT NOT NULL,
     confirmed_at           TEXT,
     confirmed_by           TEXT,
+    FOREIGN KEY (proposal_id) REFERENCES memory_proposals(proposal_id),
+    FOREIGN KEY (subject_entity_id) REFERENCES memory_entities(entity_id),
+    FOREIGN KEY (object_entity_id) REFERENCES memory_entities(entity_id),
     FOREIGN KEY (supersedes_fact_id) REFERENCES memory_facts(fact_id)
 );
 CREATE INDEX IF NOT EXISTS idx_memory_facts_scope
     ON memory_facts(domain, sensitivity, status, recorded_at DESC);
 CREATE INDEX IF NOT EXISTS idx_memory_facts_source
     ON memory_facts(source_kind, source_ref);
+
+CREATE TABLE IF NOT EXISTS memory_relations (
+    relation_id            TEXT PRIMARY KEY,
+    proposal_id            TEXT,
+    domain                 TEXT NOT NULL,
+    relation_type          TEXT NOT NULL,
+    subject_entity_id      TEXT NOT NULL,
+    object_entity_id       TEXT NOT NULL,
+    sensitivity            TEXT NOT NULL CHECK(sensitivity IN ('public','private','sensitive')),
+    status                 TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected','superseded','tombstoned')),
+    source_kind            TEXT NOT NULL,
+    source_ref             TEXT NOT NULL,
+    source_excerpt         TEXT,
+    derived_from_external  INTEGER NOT NULL DEFAULT 0 CHECK(derived_from_external IN (0,1)),
+    valid_from             TEXT,
+    valid_to               TEXT,
+    supersedes_relation_id TEXT,
+    recorded_at            TEXT NOT NULL,
+    confirmed_at           TEXT,
+    confirmed_by           TEXT,
+    FOREIGN KEY (proposal_id) REFERENCES memory_proposals(proposal_id),
+    FOREIGN KEY (subject_entity_id) REFERENCES memory_entities(entity_id),
+    FOREIGN KEY (object_entity_id) REFERENCES memory_entities(entity_id),
+    FOREIGN KEY (supersedes_relation_id) REFERENCES memory_relations(relation_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_relations_subject
+    ON memory_relations(domain, subject_entity_id, status, recorded_at DESC);
+CREATE INDEX IF NOT EXISTS idx_memory_relations_object
+    ON memory_relations(domain, object_entity_id, status, recorded_at DESC);
+
+CREATE TABLE IF NOT EXISTS memory_episodes (
+    episode_id             TEXT PRIMARY KEY,
+    proposal_id            TEXT,
+    domain                 TEXT NOT NULL,
+    episode_type           TEXT NOT NULL,
+    title                  TEXT NOT NULL,
+    summary                TEXT NOT NULL,
+    occurred_at            TEXT NOT NULL,
+    sensitivity            TEXT NOT NULL CHECK(sensitivity IN ('public','private','sensitive')),
+    status                 TEXT NOT NULL CHECK(status IN ('candidate','confirmed','rejected','tombstoned')),
+    source_kind            TEXT NOT NULL,
+    source_ref             TEXT NOT NULL,
+    source_excerpt         TEXT,
+    derived_from_external  INTEGER NOT NULL DEFAULT 0 CHECK(derived_from_external IN (0,1)),
+    recorded_at            TEXT NOT NULL,
+    confirmed_at           TEXT,
+    confirmed_by           TEXT,
+    FOREIGN KEY (proposal_id) REFERENCES memory_proposals(proposal_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_episodes_scope
+    ON memory_episodes(domain, occurred_at DESC, status);
+
+CREATE TABLE IF NOT EXISTS memory_episode_entities (
+    episode_id   TEXT NOT NULL,
+    entity_id    TEXT NOT NULL,
+    role         TEXT NOT NULL,
+    PRIMARY KEY (episode_id, entity_id, role),
+    FOREIGN KEY (episode_id) REFERENCES memory_episodes(episode_id),
+    FOREIGN KEY (entity_id) REFERENCES memory_entities(entity_id)
+);
 
 CREATE TABLE IF NOT EXISTS memory_events (
     event_id     TEXT PRIMARY KEY,
@@ -378,6 +576,113 @@ CREATE TRIGGER IF NOT EXISTS memory_events_no_delete
         SELECT RAISE(ABORT, 'memory_events is append-only');
     END;
 
+CREATE TABLE IF NOT EXISTS memory_ledger (
+    event_id      TEXT PRIMARY KEY,
+    proposal_id   TEXT,
+    object_kind   TEXT NOT NULL CHECK(object_kind IN ('proposal','entity','fact','relation','episode','projection')),
+    object_id     TEXT NOT NULL,
+    event_type    TEXT NOT NULL,
+    actor_kind    TEXT NOT NULL CHECK(actor_kind IN ('human','system','import')),
+    actor_id      TEXT NOT NULL,
+    detail_json   TEXT NOT NULL DEFAULT '{}',
+    recorded_at   TEXT NOT NULL,
+    FOREIGN KEY (proposal_id) REFERENCES memory_proposals(proposal_id)
+);
+CREATE INDEX IF NOT EXISTS idx_memory_ledger_object
+    ON memory_ledger(object_kind, object_id, recorded_at);
+CREATE TRIGGER IF NOT EXISTS memory_ledger_no_update
+    BEFORE UPDATE ON memory_ledger BEGIN
+        SELECT RAISE(ABORT, 'memory_ledger is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS memory_ledger_no_delete
+    BEFORE DELETE ON memory_ledger BEGIN
+        SELECT RAISE(ABORT, 'memory_ledger is append-only');
+    END;
+
+-- Memory sleep/consolidation is a review workflow, not a second truth store.
+-- Provenance attestations and quorum receipts reference original records; they
+-- never replace human review or store a second copy of a fact's value.
+CREATE TABLE IF NOT EXISTS memory_fact_origins (
+    fact_id TEXT PRIMARY KEY REFERENCES memory_facts(fact_id),
+    root_ref TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    field_locator TEXT NOT NULL,
+    excerpt TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+CREATE TRIGGER IF NOT EXISTS memory_fact_origins_no_update BEFORE UPDATE ON memory_fact_origins
+BEGIN SELECT RAISE(ABORT, 'fact origins are immutable'); END;
+CREATE TRIGGER IF NOT EXISTS memory_fact_origins_no_delete BEFORE DELETE ON memory_fact_origins
+BEGIN SELECT RAISE(ABORT, 'fact origins are immutable'); END;
+
+CREATE TABLE IF NOT EXISTS memory_change_requests (
+    request_id TEXT PRIMARY KEY,
+    owner_id TEXT NOT NULL,
+    fact_id TEXT NOT NULL REFERENCES memory_facts(fact_id),
+    evidence_fact_id TEXT REFERENCES memory_facts(fact_id),
+    snapshot_digest TEXT NOT NULL,
+    snapshot_json TEXT NOT NULL,
+    instruction TEXT NOT NULL,
+    draft_json TEXT NOT NULL,
+    model TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('pending','applied','rejected')),
+    replacement_fact_id TEXT REFERENCES memory_facts(fact_id),
+    created_at TEXT NOT NULL,
+    reviewed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS memory_origin_attestations (
+    attestation_id TEXT PRIMARY KEY,
+    source_ref TEXT NOT NULL,
+    source_digest TEXT NOT NULL,
+    family_key TEXT NOT NULL,
+    document_key TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    evidence_ref TEXT NOT NULL,
+    rationale TEXT NOT NULL,
+    supported_fact_ids TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('verified','revoked')),
+    reviewed_by TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_memory_origin_source ON memory_origin_attestations(source_ref, recorded_at);
+CREATE TRIGGER IF NOT EXISTS memory_origin_no_update BEFORE UPDATE ON memory_origin_attestations
+BEGIN SELECT RAISE(ABORT, 'memory origins are append-only'); END;
+CREATE TRIGGER IF NOT EXISTS memory_origin_no_delete BEFORE DELETE ON memory_origin_attestations
+BEGIN SELECT RAISE(ABORT, 'memory origins are append-only'); END;
+
+CREATE TABLE IF NOT EXISTS memory_quorum_receipts (
+    receipt_id TEXT PRIMARY KEY,
+    claim_key TEXT NOT NULL,
+    canonical_fact_id TEXT NOT NULL REFERENCES memory_facts(fact_id),
+    evidence_digest TEXT NOT NULL,
+    supporting_fact_ids TEXT NOT NULL,
+    origin_ids TEXT NOT NULL,
+    source_count INTEGER NOT NULL CHECK(source_count >= 4),
+    policy_version TEXT NOT NULL,
+    recorded_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_quorum_evidence ON memory_quorum_receipts(claim_key, evidence_digest);
+CREATE TRIGGER IF NOT EXISTS memory_quorum_no_update BEFORE UPDATE ON memory_quorum_receipts
+BEGIN SELECT RAISE(ABORT, 'memory quorum receipts are append-only'); END;
+CREATE TRIGGER IF NOT EXISTS memory_quorum_no_delete BEFORE DELETE ON memory_quorum_receipts
+BEGIN SELECT RAISE(ABORT, 'memory quorum receipts are append-only'); END;
+
+-- A receipt is usable only while a fresh evidence evaluation still matches it.
+-- The frozen report remains inspectable until one human accepts or rejects the
+-- complete bundle. Applying a bundle changes canonical objects transactionally.
+CREATE TABLE IF NOT EXISTS memory_consolidation_runs (
+    run_id                 TEXT PRIMARY KEY,
+    status                 TEXT NOT NULL CHECK(status IN ('candidate','applied','rejected')),
+    report_json            TEXT NOT NULL,
+    generated_at           TEXT NOT NULL,
+    reviewed_at            TEXT,
+    reviewed_by            TEXT,
+    applied_summary_json   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_memory_consolidation_status
+    ON memory_consolidation_runs(status, generated_at DESC);
+
 CREATE VIRTUAL TABLE IF NOT EXISTS memory_facts_fts USING fts5(
     fact_id UNINDEXED,
     domain UNINDEXED,
@@ -387,6 +692,105 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memory_facts_fts USING fts5(
     source_excerpt,
     tokenize = 'unicode61'
 );
+CREATE VIRTUAL TABLE IF NOT EXISTS memory_objects_fts USING fts5(
+    object_kind UNINDEXED,
+    object_id UNINDEXED,
+    domain UNINDEXED,
+    title,
+    body,
+    tokenize = 'unicode61'
+);
+
+-- Career cases are stable position records with append-only, evidence-bound assessments.
+-- Personal evidence remains canonical in Memory; assessments retain only confirmed fact IDs.
+CREATE TABLE IF NOT EXISTS career_cases (
+    case_id          TEXT PRIMARY KEY,
+    identity_key     TEXT NOT NULL UNIQUE,
+    source_kind      TEXT NOT NULL,
+    source_ref       TEXT NOT NULL,
+    external_id      TEXT,
+    employer         TEXT NOT NULL,
+    title            TEXT NOT NULL,
+    source_url       TEXT,
+    checked_at       TEXT NOT NULL,
+    created_at       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_career_cases_checked
+    ON career_cases(checked_at DESC, created_at DESC);
+CREATE TRIGGER IF NOT EXISTS career_cases_no_update
+    BEFORE UPDATE ON career_cases BEGIN
+        SELECT RAISE(ABORT, 'career_cases is immutable');
+    END;
+CREATE TRIGGER IF NOT EXISTS career_cases_no_delete
+    BEFORE DELETE ON career_cases BEGIN
+        SELECT RAISE(ABORT, 'career_cases is immutable');
+    END;
+
+CREATE TABLE IF NOT EXISTS career_assessments (
+    assessment_id         TEXT PRIMARY KEY,
+    case_id               TEXT NOT NULL,
+    requirements_json     TEXT NOT NULL,
+    decision              TEXT NOT NULL CHECK(decision IN ('SKIP','CLARIFY','APPLY','APPLY_WITH_GAPS')),
+    blockers_json         TEXT NOT NULL,
+    reason                TEXT NOT NULL,
+    context_fact_ids_json TEXT NOT NULL,
+    policy_version        TEXT NOT NULL,
+    recorded_by           TEXT NOT NULL,
+    recorded_at           TEXT NOT NULL,
+	fit_score              INTEGER CHECK(fit_score IS NULL OR (fit_score >= 0 AND fit_score <= 10)),
+    FOREIGN KEY (case_id) REFERENCES career_cases(case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_career_assessments_case
+    ON career_assessments(case_id, recorded_at DESC);
+CREATE TRIGGER IF NOT EXISTS career_assessments_no_update
+    BEFORE UPDATE ON career_assessments BEGIN
+        SELECT RAISE(ABORT, 'career_assessments is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS career_assessments_no_delete
+    BEFORE DELETE ON career_assessments BEGIN
+        SELECT RAISE(ABORT, 'career_assessments is append-only');
+    END;
+
+-- Career mobile v1: one append-only event family projects high-fit leads and
+-- owner decisions. It contains no capability to submit an application.
+CREATE TABLE IF NOT EXISTS career_lead_events (
+    event_id               TEXT PRIMARY KEY,
+    schema_version         TEXT NOT NULL,
+    event_type             TEXT NOT NULL CHECK(event_type IN (
+        'HIGH_FIT_LEAD_CREATED','ALERT_ACKNOWLEDGED','ALERT_SNOOZED',
+        'APPLICATION_STARTED','APPLICATION_SUBMITTED','LEAD_DECLINED'
+    )),
+    lead_id                TEXT NOT NULL,
+    case_id                TEXT NOT NULL,
+    assessment_id          TEXT NOT NULL,
+    expected_revision      INTEGER NOT NULL,
+    previous_event_id      TEXT,
+    availability_event_id  TEXT NOT NULL,
+    source_snapshot_ref    TEXT NOT NULL,
+    source_snapshot_hash   TEXT NOT NULL,
+    policy_version         TEXT NOT NULL,
+    occurred_at            TEXT NOT NULL,
+    recorded_at            TEXT NOT NULL,
+    actor_kind             TEXT NOT NULL,
+    actor_id               TEXT NOT NULL,
+    idempotency_key        TEXT NOT NULL UNIQUE,
+    run_id_or_correlation_id TEXT,
+    payload_json           TEXT NOT NULL,
+    FOREIGN KEY (case_id) REFERENCES career_cases(case_id),
+    FOREIGN KEY (assessment_id) REFERENCES career_assessments(assessment_id)
+);
+CREATE INDEX IF NOT EXISTS idx_career_lead_events_lead
+    ON career_lead_events(lead_id, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_career_lead_events_case
+    ON career_lead_events(case_id, recorded_at DESC);
+CREATE TRIGGER IF NOT EXISTS career_lead_events_no_update
+    BEFORE UPDATE ON career_lead_events BEGIN
+        SELECT RAISE(ABORT, 'career_lead_events is append-only');
+    END;
+CREATE TRIGGER IF NOT EXISTS career_lead_events_no_delete
+    BEFORE DELETE ON career_lead_events BEGIN
+        SELECT RAISE(ABORT, 'career_lead_events is append-only');
+    END;
 
 -- v0.5.0 Session Relay: metadata and the approval ledger live in Folio.
 -- Unapproved request bodies remain under ~/.folio/session-exchange. Only approved
@@ -453,7 +857,7 @@ CREATE TRIGGER IF NOT EXISTS relay_events_no_delete
 CREATE TABLE IF NOT EXISTS relay_applications (
     application_id  TEXT PRIMARY KEY,
     case_id          TEXT NOT NULL UNIQUE,
-    artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','no_action')),
+    artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','memory_candidate','no_action')),
     target_ref       TEXT NOT NULL,
     applied_by       TEXT NOT NULL,
     applied_at       TEXT NOT NULL,
@@ -481,14 +885,66 @@ export function getFolioDb(): Database.Database {
 	// Reopen when the resolved path changes (vault switch real↔demo) — vault-scoped store.
 	if (_conn && _connPath === path) return _conn;
 	if (_conn) _conn.close();
-	mkdirSync(dirname(path), { recursive: true });
+	const stateDirectory = dirname(path);
+	mkdirSync(stateDirectory, { recursive: true, mode: 0o700 });
+	chmodSync(stateDirectory, 0o700);
 	_conn = new Database(path);
+	chmodSync(path, 0o600);
 	_connPath = path;
 	_conn.pragma('journal_mode = WAL');
 	// better-sqlite3/SQLite does not make the schema's FK declarations a reliable
 	// runtime guard unless enforcement is enabled on every connection.
 	_conn.pragma('foreign_keys = ON');
 	_conn.exec(SCHEMA);
+	// The first memory baseline shipped facts before the canonical graph tables.
+	// Keep that database readable and add nullable links without rewriting any
+	// confirmed history. New proposal bundles use the dedicated target tables.
+	const memoryFactColumns = _conn
+		.prepare('PRAGMA table_info(memory_facts)')
+		.all() as Array<{ name: string }>;
+	for (const column of [
+		'proposal_id',
+		'entity_ref',
+		'entity_type',
+		'entity_label',
+		'subject_entity_id',
+		'object_entity_id'
+	]) {
+		if (!memoryFactColumns.some((item) => item.name === column)) {
+			_conn.exec(`ALTER TABLE memory_facts ADD COLUMN ${column} TEXT NULL`);
+		}
+	}
+	_conn.exec(`CREATE INDEX IF NOT EXISTS idx_memory_facts_entity
+		ON memory_facts(domain, subject_entity_id, object_entity_id, status, recorded_at DESC)`);
+	// The first real-mail gold pass used one mutually exclusive category. Keep
+	// those append-only decisions intact and add a v2 multi-label projection for
+	// new reviews. Existing rows deliberately retain the v1 schema marker.
+	const mailReviewColumns = _conn
+		.prepare('PRAGMA table_info(memory_mail_domain_reviews)')
+		.all() as Array<{ name: string }>;
+	if (!mailReviewColumns.some((item) => item.name === 'review_traits_json')) {
+		_conn.exec("ALTER TABLE memory_mail_domain_reviews ADD COLUMN review_traits_json TEXT NOT NULL DEFAULT '[]'");
+	}
+	if (!mailReviewColumns.some((item) => item.name === 'label_schema')) {
+		_conn.exec("ALTER TABLE memory_mail_domain_reviews ADD COLUMN label_schema TEXT NOT NULL DEFAULT 'v1-exclusive'");
+	}
+	if (!mailReviewColumns.some((item) => item.name === 'action_required')) {
+		_conn.exec('ALTER TABLE memory_mail_domain_reviews ADD COLUMN action_required INTEGER NULL CHECK(action_required IS NULL OR action_required IN (0,1))');
+	}
+	if (!mailReviewColumns.some((item) => item.name === 'deadline_present')) {
+		_conn.exec('ALTER TABLE memory_mail_domain_reviews ADD COLUMN deadline_present INTEGER NULL CHECK(deadline_present IS NULL OR deadline_present IN (0,1))');
+	}
+	const careerAssessmentColumns = _conn
+		.prepare('PRAGMA table_info(career_assessments)')
+		.all() as Array<{ name: string }>;
+	if (!careerAssessmentColumns.some((item) => item.name === 'fit_score')) {
+		_conn.exec('ALTER TABLE career_assessments ADD COLUMN fit_score INTEGER NULL CHECK(fit_score IS NULL OR (fit_score >= 0 AND fit_score <= 10))');
+	}
+	// SQLite can create WAL/SHM sidecars after opening the database. They contain
+	// the same private state and therefore need the same owner-only boundary.
+	for (const privatePath of [path, `${path}-wal`, `${path}-shm`]) {
+		if (existsSync(privatePath)) chmodSync(privatePath, 0o600);
+	}
 
 	// Early 0.4.1 worktrees created hermes_turns before `aborted` became a
 	// first-class terminal state. SQLite cannot ALTER a CHECK constraint, so copy
@@ -522,18 +978,18 @@ export function getFolioDb(): Database.Database {
 		`);
 	}
 
-	// Relay gained a first-class "no action needed" result after the first real
-	// mail pilot. Preserve existing applications while widening the CHECK vocabulary.
+	// Relay applications are append-only accepted artifacts. Preserve existing
+	// rows whenever a new reviewed result kind widens the CHECK vocabulary.
 	const relayApplicationsSql = _conn
 		.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='relay_applications'")
 		.get() as { sql: string } | undefined;
-	if (relayApplicationsSql && !relayApplicationsSql.sql.includes("'no_action'")) {
+	if (relayApplicationsSql && !relayApplicationsSql.sql.includes("'memory_candidate'")) {
 		_conn.exec(`
 			BEGIN;
 			CREATE TABLE relay_applications__new (
 				application_id  TEXT PRIMARY KEY,
 				case_id          TEXT NOT NULL UNIQUE,
-				artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','no_action')),
+				artifact_kind   TEXT NOT NULL CHECK(artifact_kind IN ('mail_draft','objective','context_request','memory_candidate','no_action')),
 				target_ref       TEXT NOT NULL,
 				applied_by       TEXT NOT NULL,
 				applied_at       TEXT NOT NULL,

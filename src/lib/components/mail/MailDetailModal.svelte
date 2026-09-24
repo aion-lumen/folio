@@ -1,4 +1,5 @@
 <script lang="ts">
+	import ManualMailRun from './ManualMailRun.svelte';
 	let { onClose }: { onClose: () => void } = $props();
 
 	// Svelte-action für Portal: bewegt das Element zu document.body damit es nicht
@@ -19,12 +20,6 @@
 		perAccount?: { name: string; hoursAgo: number }[];
 	}
 
-	interface AccountInfo {
-		name: string;
-		displayName: string;
-		host: string;
-	}
-
 	interface MailEntry {
 		t: string;
 		fr: string;
@@ -33,20 +28,8 @@
 		res: string;
 	}
 
-	interface StreamLine {
-		c: 'info' | 'ok' | 'warn' | 'err';
-		t?: string;
-		x: string;
-	}
-
 	let status = $state<MailStatus | null>(null);
 	let recent = $state<MailEntry[]>([]);
-	let accounts = $state<AccountInfo[]>([]);
-	let selectedAccount = $state('');
-	let running = $state(false);
-	let streamLines = $state<StreamLine[]>([]);
-	let done = $state(false);
-	let eventSource = $state<EventSource | null>(null);
 
 	// Bug-fix 2026-05-25: list aktualisiert sich beim Modal-Open initial PLUS
 	// periodic alle 30s while open. Plus manueller Refresh-Button (siehe template).
@@ -63,26 +46,12 @@
 			// Bug-fix 2026-05-25: 'recent'-Liste kommt jetzt aus feedback.db (Worker-Imports)
 			// statt aus dem Vault-Filesystem (legacy life-mail markdown-notes). Worker
 			// schreibt in feedback.db — Modal soll diese frischen Imports zeigen.
-			const [s, r, a] = (await Promise.all([
+			const [s, r] = (await Promise.all([
 				fetch(`/api/vault/mail/status?_=${ts}`).then((res) => res.json()),
-				fetch(`/api/mail/recent-imports?limit=10&_=${ts}`).then((res) => res.json()),
-				fetch('/api/life-mail/accounts').then((res) => res.json())
-			])) as [MailStatus, MailEntry[], { accounts: AccountInfo[] }];
+				fetch(`/api/mail/recent-imports?limit=10&_=${ts}`).then((res) => res.json())
+			])) as [MailStatus, MailEntry[]];
 			status = s;
 			recent = Array.isArray(r) ? r : [];
-			if (accounts.length === 0) {
-				accounts = a.accounts ?? [];
-				// Default-Account nur initial setzen (sonst springt User-Selection zurück)
-				if (accounts.length > 0 && !selectedAccount) {
-					const perAccount = s.perAccount ?? [];
-					const mostIdle = [...accounts].sort((x, y) => {
-						const hx = perAccount.find((p) => p.name === x.name)?.hoursAgo ?? Infinity;
-						const hy = perAccount.find((p) => p.name === y.name)?.hoursAgo ?? Infinity;
-						return hy - hx;
-					})[0];
-					selectedAccount = mostIdle?.name ?? accounts[0].name;
-				}
-			}
 			lastRefreshAt = Date.now();
 		} catch (err) {
 			console.warn('[MailDetailModal] loadAll failed:', err);
@@ -96,70 +65,9 @@
 		// Periodic refresh while modal is mounted (open). Stops on cleanup.
 		const interval = setInterval(() => { void loadAll(); }, 30_000);
 		return () => {
-			eventSource?.close();
 			clearInterval(interval);
 		};
 	});
-
-	function startRun() {
-		if (running) return;
-		running = true;
-		streamLines = [];
-		done = false;
-
-		const account = selectedAccount || accounts[0]?.name;
-		const runUrl = account ? `/api/life-mail/run?account=${encodeURIComponent(account)}` : '/api/life-mail/run';
-
-		fetch(runUrl, { method: 'POST' }).then(async (res) => {
-			if (!res.ok) {
-				const msg = await res.text();
-				streamLines = [...streamLines, { c: 'err', x: msg }];
-				running = false;
-				return;
-			}
-			const reader = res.body?.getReader();
-			if (!reader) { running = false; return; }
-
-			const decoder = new TextDecoder();
-			let buf = '';
-
-			while (true) {
-				const { done: d, value } = await reader.read();
-				if (d) break;
-				buf += decoder.decode(value, { stream: true });
-				const parts = buf.split('\n\n');
-				buf = parts.pop() ?? '';
-				for (const part of parts) {
-					const line = part.replace(/^data: /, '').trim();
-					if (!line) continue;
-					if (line === '[DONE]') {
-						running = false;
-						done = true;
-						reader.cancel();
-						return;
-					}
-					try {
-						const parsed = JSON.parse(line) as StreamLine;
-						streamLines = [...streamLines, parsed];
-					} catch {
-						streamLines = [...streamLines, { c: 'info', x: line }];
-					}
-				}
-			}
-			running = false;
-			done = true;
-		}).catch((err: Error) => {
-			streamLines = [...streamLines, { c: 'err', x: err.message }];
-			running = false;
-		});
-	}
-
-	function cancelRun() {
-		eventSource?.close();
-		eventSource = null;
-		running = false;
-		streamLines = [...streamLines, { c: 'warn', x: '✗ Abgebrochen durch Nutzer' }];
-	}
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key === 'Escape') onClose();
@@ -305,52 +213,7 @@
 				{/if}
 
 				<!-- Pipeline action -->
-				<div>
-					<div class="mm-sec-head">Pipeline</div>
-					<div class="mm-pipe" class:running>
-						{#if accounts.length > 0}
-							<div class="mm-account-row">
-								<label class="mm-acc-label" for="mm-account-sel">Account</label>
-								<select
-									id="mm-account-sel"
-									class="mm-acc-select"
-									bind:value={selectedAccount}
-									disabled={running}
-								>
-									{#each accounts as acc}
-										<option value={acc.name}>{acc.displayName}</option>
-									{/each}
-								</select>
-							</div>
-						{/if}
-						<div class="mm-pipe-row">
-							<div class="mm-pipe-txt">
-								<div class="t">{running ? 'Lauf aktiv …' : done ? 'Lauf abgeschlossen' : 'Jetzt prüfen'}</div>
-								<div class="sub">{running ? 'streamt stdout · Esc bricht ab' : 'ruft life-mail pipeline einmalig auf'}</div>
-							</div>
-							{#if running}
-								<button class="mm-btn ghost" onclick={cancelRun}>Abbrechen</button>
-							{:else}
-								<button class="mm-btn" onclick={startRun}>
-									<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-										<polygon points="5 3 19 12 5 21 5 3" />
-									</svg>
-									{done ? 'Erneut prüfen' : 'Jetzt prüfen'}
-								</button>
-							{/if}
-						</div>
-						{#if running || streamLines.length > 0}
-							<div class="mm-stream">
-								{#each streamLines as line}
-									<span class="line {line.c}">
-										{#if line.t}<span class="ts">{line.t}</span>{/if}{line.x}
-									</span>
-								{/each}
-								{#if running}<span class="line cursor"></span>{/if}
-							</div>
-						{/if}
-					</div>
-				</div>
+				<div><div class="mm-sec-head">Pipeline</div><ManualMailRun compact /></div>
 
 				<!-- Recent mails — 2026-05-25 mit Refresh-Button + Link zu Mail-Queue gefiltert auf recent imported -->
 				<div class:mm-refreshing={isRefreshing}>
@@ -750,35 +613,6 @@
 		border: 1px solid var(--color-border);
 	}
 	.mm-btn.ghost:hover { background: var(--color-muted); color: var(--color-foreground); }
-
-	.mm-stream {
-		background: hsl(222 47% 6%);
-		color: hsl(142 55% 75%);
-		font-family: var(--font-mono);
-		font-size: 11px;
-		line-height: 1.55;
-		border-radius: 6px;
-		padding: 10px 12px;
-		max-height: 180px;
-		overflow-y: auto;
-		white-space: pre-wrap;
-		word-break: break-word;
-	}
-	.mm-stream .line { display: block; }
-	.mm-stream .line .ts { color: hsl(210 20% 50%); margin-right: 8px; }
-	.mm-stream .line.info { color: hsl(210 20% 80%); }
-	.mm-stream .line.ok   { color: hsl(142 60% 70%); }
-	.mm-stream .line.warn { color: hsl(45 95% 70%); }
-	.mm-stream .line.err  { color: hsl(0 80% 72%); }
-	.mm-stream .cursor::after {
-		content: "▌";
-		color: hsl(142 71% 55%);
-		animation: mm-blink 1s steps(2) infinite;
-		margin-left: 2px;
-	}
-	@keyframes mm-blink {
-		50% { opacity: 0; }
-	}
 
 	/* Recent mails */
 	.mm-empty {

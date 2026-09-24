@@ -208,7 +208,9 @@ class ChatStore {
 								continue;
 							}
 							const events = [...this.messages[idx].events];
-							if (
+							if (event.type === 'system_notice' && event.content?.startsWith('Absagenprüfung:') && events.at(-1)?.type === 'system_notice' && events.at(-1)?.content?.startsWith('Absagenprüfung:')) {
+								events[events.length - 1] = event;
+							} else if (
 								event.type === 'text' &&
 								events.length > 0 &&
 								events[events.length - 1].type === 'text'

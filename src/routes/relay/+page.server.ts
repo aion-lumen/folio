@@ -1,3 +1,4 @@
+import {projects,stageProjectContext} from '$lib/server/relay/project-context.js';
 import { fail } from '@sveltejs/kit';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, renameSync, writeFileSync } from 'node:fs';
@@ -65,6 +66,7 @@ function ensureDemoCase(): void {
 	const subject = 'Einladung zum zweiten Gespräch';
 	const body = `Guten Tag Alex\n\nwir möchten Sie gerne zu einem zweiten Gespräch einladen. Wären Dienstag um 10:00 Uhr oder Mittwoch um 14:00 Uhr für Sie möglich?\n\nFreundliche Grüsse\nMara Keller`;
 	const memoryContext = compileMemoryContext({
+		consumer_id: 'relay-career',
 		domain: 'career',
 		query: `${subject}\n${body}`,
 		max_sensitivity: DEMO_CAREER_TARGET.memory_max_sensitivity ?? 'public'
@@ -139,6 +141,7 @@ export const load: PageServerLoad = async () => {
 	});
 	return {
 		cases,
+		projects: projects().map(p=>({id:p.id,label:p.label})),
 		targetsConfigured: targets.length > 0,
 		targets: targets.map((target) => ({
 			id: target.id,
@@ -154,6 +157,11 @@ export const load: PageServerLoad = async () => {
 };
 
 export const actions: Actions = {
+ projectContext: async ({locals,request}) => {
+  if(locals.user.role!=='owner')return fail(403,{message:'Owner access required'});
+  requireModuleCapability('relay','cases.stage');
+  try {const f=await request.formData();stageProjectContext(String(f.get('project')??''),String(f.get('task')??''));return {contextPrepared:true};}catch(e){return fail(400,{message:(e as Error).message});}
+ },
 	configureCareer: async () => {
 		requireModuleCapability('relay', 'targets.configure');
 		if (isDemoVaultActive()) return fail(409, { message: 'Das Demo-Ziel ist bereits isoliert eingerichtet.' });
@@ -271,6 +279,9 @@ export const actions: Actions = {
 			const target = loadSessionTargets().find((item) => item.id === relayCase.target_id);
 			if (!target) return fail(409, { message: 'Ziel ist nicht mehr konfiguriert.' });
 			const response = getRelayResponseForReview(caseId, target);
+			if (response.result.kind === 'orientation_proposal') {
+				return fail(409, { message: 'Orientierungsvorschläge werden im Domänenkompass geprüft.' });
+			}
 			let targetRef: string | undefined;
 			if (response.result.kind === 'objective_proposal') {
 				if (!response.result.chapter_slug) return fail(409, { message: 'Der Objective-Vorschlag nennt kein Kapitel.' });

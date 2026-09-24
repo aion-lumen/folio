@@ -88,7 +88,7 @@ export interface RelayFollowUp {
 	created_at: string;
 }
 
-export type RelayResponseKind = 'reply_draft' | 'needs_context' | 'objective_proposal' | 'no_action_needed';
+export type RelayResponseKind = 'reply_draft' | 'needs_context' | 'objective_proposal' | 'orientation_proposal' | 'no_action_needed';
 
 export interface RelayReplyDraft {
 	kind: 'reply_draft';
@@ -109,12 +109,19 @@ export interface RelayObjectiveProposal {
 	deadline?: string;
 }
 
+export interface RelayOrientationProposal {
+	kind: 'orientation_proposal';
+	question_id: string;
+	answer: string;
+	sensitivity: MemorySensitivity;
+}
+
 export interface RelayNoActionNeeded {
 	kind: 'no_action_needed';
 	reason: string;
 }
 
-export type RelayResponseResult = RelayReplyDraft | RelayNeedsContext | RelayObjectiveProposal | RelayNoActionNeeded;
+export type RelayResponseResult = RelayReplyDraft | RelayNeedsContext | RelayObjectiveProposal | RelayOrientationProposal | RelayNoActionNeeded;
 
 export interface RelayResponsePayload {
 	schema: 'folio/session-relay-response/v1';

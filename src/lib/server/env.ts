@@ -1,3 +1,4 @@
+import { isLedgerDemo, ledgerDemoRoot } from './ledger-demo.js';
 import { createRequire } from 'node:module';
 import { existsSync, readFileSync } from 'fs';
 import { homedir } from 'os';
@@ -36,6 +37,7 @@ export function readActiveVaultMeta(): {
 	council: boolean;
 	modules: Readonly<Record<string, boolean>>;
 } {
+	if (isLedgerDemo()) return { path: join(ledgerDemoRoot(), 'vault'), demo: true, council: false, modules: {} };
 	try {
 		const raw = readFileSync(join(homedir(), '.folio', 'active-vault.json'), 'utf-8');
 		const parsed = JSON.parse(raw) as {
@@ -69,6 +71,7 @@ export function readActiveVaultMeta(): {
 
 /** True when the active vault is a demo vault → stores must resolve to *-demo.db. */
 export function isDemoVaultActive(): boolean {
+	if (isLedgerDemo()) return true;
 	// A process-scoped override is used by hermetic evals and the isolated demo
 	// launcher. It must beat a persisted real-vault selection without rewriting it.
 	const override = process.env.FOLIO_VAULT_OVERRIDE;
@@ -77,6 +80,7 @@ export function isDemoVaultActive(): boolean {
 }
 
 export function getVaultPath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'vault');
 	// 0) FOLIO_VAULT_OVERRIDE — process-scoped override for hermetic evals and the isolated
 	//    demo launcher. It forces the vault regardless of active-vault.json, WITHOUT writing
 	//    user state.
@@ -103,6 +107,7 @@ export function getHermesApiUrl(): string {
 // loadHermesEnvVars() liest die Datei einmalig, cached. Read-only auf .env (Constraint).
 let _hermesEnvCache: Record<string, string> | null = null;
 export function loadHermesEnvVars(): Record<string, string> {
+	if (isLedgerDemo()) return {};
 	if (_hermesEnvCache) return _hermesEnvCache;
 	try {
 		const content = readFileSync(join(getHermesHomePath(), '.env'), 'utf-8');
@@ -144,6 +149,7 @@ export function getHermesApiKey(): string {
 }
 
 export function getFeedbackDbPath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'state/feedback.db');
 	// Vault-scoped: a demo vault binds to the demo mail store (never the real feedback.db).
 	if (isDemoVaultActive()) return join(getAionLumenPath(), 'state/feedback-demo.db');
 	return process.env.FEEDBACK_DB_PATH
@@ -152,6 +158,7 @@ export function getFeedbackDbPath(): string {
 }
 
 export function getFolioDbPath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'state/folio.db');
 	// Default lives outside the project tree so vite/chokidar does not watch it.
 	// Watching state/folio.db-wal caused full page reloads on every validator write.
 	if (isDemoVaultActive()) return join(homedir(), '.folio/folio-demo.db');
@@ -162,10 +169,19 @@ export function getFolioDbPath(): string {
 
 /** Runtime-only Session Relay files. Never stored in the repository or vault. */
 export function getSessionExchangePath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'session-exchange');
 	if (isDemoVaultActive()) return join(homedir(), '.folio', 'session-exchange-demo');
 	return process.env.FOLIO_SESSION_EXCHANGE_PATH
 		?? kitEnv().FOLIO_SESSION_EXCHANGE_PATH
 		?? join(homedir(), '.folio', 'session-exchange');
+}
+
+/** Append-only operational events emitted by local, read-only watches. */
+export function getWatchEventsPath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'watch-events');
+	return process.env.FOLIO_WATCH_EVENTS_PATH
+		?? kitEnv().FOLIO_WATCH_EVENTS_PATH
+		?? join(homedir(), '.folio', 'watch-events');
 }
 
 /**
@@ -175,6 +191,7 @@ export function getSessionExchangePath(): string {
  * staging payloads stay in getSessionExchangePath() outside the connected tree.
  */
 export function getSessionBridgePath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'bridge');
 	if (isDemoVaultActive()) {
 		return process.env.FOLIO_SESSION_BRIDGE_PATH
 			?? kitEnv().FOLIO_SESSION_BRIDGE_PATH
@@ -199,6 +216,7 @@ export function getTrustedSourcesPath(): string {
 
 /** Root of aion-lumen/multi-agent (Python pipeline). Override: AION_LUMEN_PATH */
 export function getAionLumenPath(): string {
+	if (isLedgerDemo()) return join(ledgerDemoRoot(), 'pipeline');
 	return process.env.AION_LUMEN_PATH
 		?? kitEnv().AION_LUMEN_PATH
 		?? join(homedir(), 'Projects/aion-lumen/multi-agent');
@@ -388,4 +406,11 @@ export function getHomePlz(): HomePlz | null {
 		};
 	}
 	return null;
+}
+
+/** Native-app launches do not inherit the interactive shell's local CLI paths. */
+export function localMailProcessEnv(): NodeJS.ProcessEnv {
+ return {...process.env,...loadHermesEnvVars(),
+  PATH:[join(homedir(),'.local/bin'),join(homedir(),'.lmstudio/bin'),process.env.PATH??''].join(':'),
+  FOLIO_DB_PATH:getFolioDbPath(),FEEDBACK_DB_PATH:getFeedbackDbPath()};
 }

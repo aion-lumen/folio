@@ -48,7 +48,7 @@ Exclusion reasons are disjoint and evaluated in the displayed order. Attribution
 (`non_get` before `non_200`, `missing_route`, then `ua_bot`). The buckets are therefore exclusive,
 not independent diagnostic counters. Static sites derive routes from the HTML files in their live
 site tree. Server-rendered sites use a small reviewed route
-manifest under `ops/leuchtfeuer/routes/`, including optional `/*` prefix patterns for dynamic pages.
+operator-provided route manifest, including optional `/*` prefix patterns for dynamic pages.
 
 Daily files without `eligibility_rule: get-200-deployed-route-v1` are legacy aggregates. Folio keeps
 them on disk but deliberately excludes them from displayed reach totals and from Story/System. This

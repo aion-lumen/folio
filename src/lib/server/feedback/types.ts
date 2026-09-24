@@ -3,7 +3,7 @@
 export interface FeedbackRow {
 	id: number;
 	task_id: string;
-	account_id: string; // F.6: accounts.toml-key ('yahoo' | 'gmail' | 'mirhamed')
+	account_id: string; // F.6: accounts.toml-key ('yahoo' | 'gmail' | 'custom')
 	imap_uid: number;
 	sender: string;
 	subject: string;

@@ -224,6 +224,7 @@
 		line-height: 1.4;
 		margin: 0 0 6px;
 		display: -webkit-box;
+		line-clamp: 2;
 		-webkit-line-clamp: 2;
 		-webkit-box-orient: vertical;
 		overflow: hidden;

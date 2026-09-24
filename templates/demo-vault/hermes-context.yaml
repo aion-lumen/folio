@@ -21,6 +21,7 @@ sources:
   campaign: true
   leuchtfeuer: true
   dashboard: true
+  finance_observations: false
   selected_objectives: true
   vault_guidance: true
 

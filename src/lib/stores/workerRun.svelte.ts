@@ -46,7 +46,7 @@ export interface LastEndedRun {
 
 class WorkerRunStore {
 	// Form-State (Cleanup 2026-05-27: board nicht mehr im Form; manager generiert intern)
-	account = $state<'yahoo' | 'gmail' | 'mirhamed'>('yahoo');
+	account = $state<string>('');
 	mode = $state<'learning' | 'silent'>('silent');
 	// 2026-06-11 Bauteil Pipeline-Findings (F4): default 30 per directive.
 	// Pipeline-Page hydrates from localStorage on mount.

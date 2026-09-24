@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { invalidateAll } from '$app/navigation';
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import type { InboxScanItem } from '$lib/server/inbox/types.js';
 	import type { TriageAssessment } from '$lib/server/agent/types.js';
 	import type { TriagePreflight } from '$lib/server/agent/preflight.js';
@@ -11,8 +11,8 @@
 	let triageBusy = $state(false);
 	let message = $state<string | null>(null);
 	let error = $state<string | null>(null);
-	let preflight = $state<TriagePreflight>(data.triagePreflight);
-	let lastActivity = $state<RecentInboxActivity | null>(data.lastActivity);
+	let preflight = $state<TriagePreflight>(untrack(()=>data.triagePreflight));
+	let lastActivity = $state<RecentInboxActivity | null>(untrack(()=>data.lastActivity));
 	let triageProgress = $state<{ done: number; total: number; current: string } | null>(null);
 
 	const validItems = $derived(data.scan.items.filter((i: InboxScanItem) => i.status === 'valid'));

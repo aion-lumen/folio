@@ -1,12 +1,14 @@
 // F.9 Block-3 — Root-Layout-Server. Vault-Gate verschoben nach (vault)/+layout.server.ts.
 // Root liefert global-needed vaultName für Header + Regelwerk für Action-Labels.
 
+import { isLedgerDemo } from '$lib/server/ledger-demo.js';
 import { basename } from 'path';
 import { getVaultPath } from '$lib/server/env.js';
 import { loadRegelwerkValidated } from '$lib/server/regelwerk/loader.js';
 import type { LayoutServerLoad } from './$types.js';
 
 export const load: LayoutServerLoad = async () => {
+	if (isLedgerDemo()) return { vaultName: 'Ledger Demo', vaultPath: '', regelwerk: null, ledgerDemo: true };
 	let vaultName = 'vault';
 	let vaultPath = '';
 	try {
@@ -23,5 +25,5 @@ export const load: LayoutServerLoad = async () => {
 	// user_context.yaml synchronisieren.
 	const regelwerk = loadRegelwerkValidated();
 
-	return { vaultName, vaultPath, regelwerk };
+	return { vaultName, vaultPath, regelwerk, ledgerDemo: false };
 };

@@ -1,10 +1,18 @@
 # Roadmap
 
-Folio is a local-first AI workspace. The current public release is **v0.5.0**; see the
+Folio is a local-first AI workspace. The current public preview is **v0.6.0-preview.1**; see the
 [changelog](../CHANGELOG.md) for shipped details.
 
 The order below reflects current product decisions. A version boundary is a gate, not a promise to
 ship every adjacent idea together.
+
+## v0.6.0 Preview — overview linked to evidence
+
+- Household income, expenses and cash flow, expandable down to a transaction and statement.
+- Confirmed own-account transfers separated from household income and spending; estimates and missing evidence remain visible.
+- Calendar proposals, application tracking and subscription lifecycle evidence, with explicit boundaries for uncertain matches and external actions.
+- Optional local model comparison bench for mail triage; its companion runtime and test cohort must be configured separately.
+- Daily-use validation of the new modules comes before a stable release. Trading remains a separate future stage; no real-money execution is included.
 
 ## Stable foundations
 
@@ -108,8 +116,7 @@ immutable, records human decisions append-only, and has no external publishing c
 - Consider direct provider adapters only when the filesystem pilot shows that they reduce real work.
 - Hand individual task types from cloud sessions to local Hermes agents only after measured shadow
   results, while retaining the same Relay and memory contracts.
-- Ledger is a later consumer of the same gated session interface; real-money execution remains
-  outside this roadmap stage.
+- Ledger now provides a read-only household overview in the 0.6.0 preview; trading and real-money execution remain outside this release.
 
 ## Local routines — exploration
 

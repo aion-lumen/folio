@@ -1,5 +1,5 @@
 // F.4.C Mock-Daten-Port — Dev/Storybook only, nicht Produktionspfad.
-// Yahoo-Rows kommen aus echter feedback.db; Mock deckt gmail + mirhamed_ch ab.
+// Yahoo-Rows kommen aus echter feedback.db; Mock deckt gmail + konto_c ab.
 // ~200 deterministische Rows + 4 Disagreements (Repro-RNG). Ersetzbar wenn
 // Multi-Account-IMAP vollständig integriert ist — bis dahin UI-Fixture.
 
@@ -189,7 +189,7 @@ const gmailZuPruefenTpl: Template[] = [
 	}
 ];
 
-const mirhamedKeepTpl: Template[] = [
+const customKeepTpl: Template[] = [
 	{
 		addr: 'noreply@steueramt.zh.ch',
 		name: 'Steueramt ZH',
@@ -204,7 +204,7 @@ const mirhamedKeepTpl: Template[] = [
 	}
 ];
 
-const mirhamedZuPruefenTpl: Template[] = [
+const customZuPruefenTpl: Template[] = [
 	{
 		addr: 'noreply@swisspass.ch',
 		name: 'SwissPass',
@@ -283,9 +283,9 @@ function buildMockRows(): MockRow[] {
 		})
 	);
 
-	// mirhamed_ch (~10 rows — small custom domain)
-	rows.push(...generate(mirhamedKeepTpl, 'keep', 'mirhamed_ch', 8, 180));
-	rows.push(...generate(mirhamedZuPruefenTpl, 'move_zu_pruefen', 'mirhamed_ch', 2, 60));
+	// konto_c (~10 rows — small custom domain)
+	rows.push(...generate(customKeepTpl, 'keep', 'konto_c', 8, 180));
+	rows.push(...generate(customZuPruefenTpl, 'move_zu_pruefen', 'konto_c', 2, 60));
 
 	return rows;
 }
@@ -316,7 +316,7 @@ const STRESS_ACTIONS = [
 	'move_paketzustellung',
 	'move_zu_pruefen'
 ];
-const STRESS_ACCOUNTS: AccountId[] = ['gmail', 'yahoo', 'mirhamed_ch'];
+const STRESS_ACCOUNTS: AccountId[] = ['gmail', 'yahoo', 'konto_c'];
 const STRESS_TIERS: (1 | 2 | 3)[] = [1, 2, 3];
 
 export function getStressRows(count: number): MockRow[] {
@@ -334,7 +334,7 @@ export function getStressRows(count: number): MockRow[] {
 				? `${['news', 'updates', 'no-reply', 'team'][intBetween(0, 3)]}@${['nzz.ch', 'srf.ch', 'spiegel.de', 'zeit.de'][intBetween(0, 3)]}`
 				: account === 'yahoo'
 				? `${['info', 'noreply', 'service'][intBetween(0, 2)]}@${['immowelt.de', 'immoscout24.ch', 'amazon.de', 'paypal.com'][intBetween(0, 3)]}`
-				: `${['post', 'kontakt', 'service'][intBetween(0, 2)]}@${['mirhamed.ch', 'bafu.admin.ch', 'sbb.ch'][intBetween(0, 2)]}`;
+				: `${['post', 'kontakt', 'service'][intBetween(0, 2)]}@${['example.test', 'bafu.admin.ch', 'sbb.ch'][intBetween(0, 2)]}`;
 		rows.push({
 			id: `m_${String(900000 + i).padStart(6, '0')}`,
 			account,

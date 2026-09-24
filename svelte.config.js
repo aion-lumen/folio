@@ -7,6 +7,9 @@ const config = {
 		runes: ({ filename }) => (filename.split(/[/\\]/).includes('node_modules') ? undefined : true)
 	},
 	kit: {
+		// The build launcher supplies one version to every Vite build phase.
+		// Time-based defaults can otherwise diverge between SSR and hydration.
+		version: { name: process.env.FOLIO_BUILD_VERSION ?? 'development' },
 		// adapter-node: explicit self-hosted Node target for this local-first app
 		// (avoids the adapter-auto "could not detect environment" build warning).
 		adapter: adapter()

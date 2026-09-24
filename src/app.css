@@ -93,16 +93,16 @@
    * Token-Mapping: docs/f4-token-mapping.md (Architekt-Sign-off T1-T8 approved 2026-05-17)
    * ──────────────────────────────────────────────────────────────────── */
 
-  /* ── Account-Colors (Multi-Account-UI gmail/yahoo/mirhamed.ch) ── */
+  /* ── Account-Colors (Multi-Account-UI gmail/yahoo/custom) ── */
   --color-account-gmail:           hsl(215 80% 50%);
   --color-account-gmail-soft:      hsl(215 80% 96%);
   --color-account-gmail-deep:      hsl(215 80% 30%);
   --color-account-yahoo:           hsl(280 60% 54%);
   --color-account-yahoo-soft:      hsl(280 50% 96%);
   --color-account-yahoo-deep:      hsl(280 65% 32%);
-  --color-account-mirhamed:        hsl(158 62% 38%);
-  --color-account-mirhamed-soft:   hsl(158 40% 95%);
-  --color-account-mirhamed-deep:   hsl(160 75% 22%);
+  --color-account-custom:        hsl(158 62% 38%);
+  --color-account-custom-soft:   hsl(158 40% 95%);
+  --color-account-custom-deep:   hsl(160 75% 22%);
 
   /* ── Mail-Action-Colors (5 final_action-Semantik-Farben) ── */
   --color-action-keep-bg:                hsl(210 40% 96%);

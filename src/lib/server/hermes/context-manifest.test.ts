@@ -15,6 +15,7 @@ sources:
   campaign: true
   leuchtfeuer: false
   dashboard: true
+  finance_observations: true
   selected_objectives: true
   vault_guidance: true
 vault_guidance:
@@ -30,7 +31,7 @@ describe('hermes-context.yaml', () => {
 		expect(parsed).toMatchObject({
 			schemaVersion: 1,
 			promptVersion: 'test-v1',
-			sources: { memory: false, campaign: true },
+			sources: { memory: false, campaign: true, financeObservations: true },
 			vaultGuidance: { chapterFiles: ['_campaign/chapters/01-test.md'] }
 		});
 		expect(parsed.fingerprint).toMatch(/^[a-f0-9]{16}$/);
@@ -48,6 +49,12 @@ describe('hermes-context.yaml', () => {
 		).toThrow('sources.memory must be a boolean');
 	});
 
+	it('keeps finance access disabled for a legacy manifest without this optional source', () => {
+  const parsed=parseHermesContextManifest(manifest().replace('  finance_observations: true\n', ''));
+  expect(parsed.sources.financeObservations).toBe(false);
+  expect(()=>parseHermesContextManifest(manifest().replace('finance_observations: true','finance_observations: maybe'))).toThrow();
+ });
+
 	it('renders only the active vault placeholder', () => {
 		expect(renderManifestText('Read {{vault_root}}/objectives', '/vault/')).toBe(
 			'Read /vault/objectives'
@@ -60,6 +67,7 @@ describe('hermes-context.yaml', () => {
 		);
 		expect(parsed.promptVersion).toBe('folio-hermes-demo-context-v1');
 		expect(parsed.sources.memory).toBe(false);
+		expect(parsed.sources.financeObservations).toBe(false);
 		expect(parsed.vaultGuidance.chapterFiles).toEqual([
 			'_campaign/chapters/01-neustart.md',
 			'_campaign/chapters/02-integration.md',

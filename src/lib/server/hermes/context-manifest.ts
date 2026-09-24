@@ -19,6 +19,7 @@ export interface HermesContextManifest {
 		campaign: boolean;
 		leuchtfeuer: boolean;
 		dashboard: boolean;
+		financeObservations: boolean;
 		selectedObjectives: boolean;
 		vaultGuidance: boolean;
 	};
@@ -80,6 +81,10 @@ export function parseHermesContextManifest(source: string): HermesContextManifes
 			campaign: booleanValue(sources.campaign, 'sources.campaign'),
 			leuchtfeuer: booleanValue(sources.leuchtfeuer, 'sources.leuchtfeuer'),
 			dashboard: booleanValue(sources.dashboard, 'sources.dashboard'),
+			financeObservations: booleanValue(
+				sources.finance_observations ?? false,
+				'sources.finance_observations'
+			),
 			selectedObjectives: booleanValue(
 				sources.selected_objectives,
 				'sources.selected_objectives'

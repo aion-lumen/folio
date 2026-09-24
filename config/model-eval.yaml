@@ -1,0 +1,72 @@
+schema: folio/model-eval-catalog/v1
+suite:
+  id: mail-triage-lens-v2
+  label: Mail-Triage Lens · 40 synthetische Fälle
+  cases: 40
+candidates:
+  - id: qwen36
+    label: Qwen 3.6 35B A3B
+    model_id: qwen3.6-35b-a3b-ud-mlx
+    response_strip: code_fence
+    variant: MLX · 4-bit
+    default: true
+  - id: gemma31
+    label: Gemma 4 31B QAT
+    model_id: google/gemma-4-31b-qat
+    response_strip: code_fence
+    variant: GGUF · Q4_0
+    default: false
+  - id: qwen38
+    label: Qwen 3.8 27B
+    model_id: qwen3.8-27b-mlx
+    response_strip: code_fence
+    variant: MLX · 4-bit
+    default: true
+  - id: gemma26
+    label: Gemma 4 26B A4B
+    model_id: gemma-4-26b-a4b-it-mlx
+    response_strip: code_fence
+    variant: MLX · 4-bit
+    default: false
+  - id: qwen-thinking
+    label: Qwen 3 30B A3B Thinking
+    model_id: qwen3-30b-a3b-thinking-2507
+    response_strip: think
+    variant: MLX · 4-bit
+    default: false
+  - id: ministral3-14b
+    label: Ministral 3 14B Instruct
+    model_id: ministral-3-14b-instruct-2512
+    response_strip: code_fence
+    variant: GGUF · Q4_K_M
+    default: false
+  - id: nemotron3-nano
+    label: NVIDIA Nemotron 3 Nano 30B A3B
+    model_id: nvidia-nemotron-3-nano-30b-a3b
+    response_strip: think
+    variant: GGUF · Q4_K_M
+    default: false
+  - id: lfm2-24b
+    label: Liquid LFM2 24B A2B
+    model_id: lfm2-24b-a2b
+    response_strip: code_fence
+    variant: GGUF · Q6_K
+    default: false
+  - id: granite41-8b
+    label: IBM Granite 4.1 8B
+    model_id: ibm/granite-4.1-8b
+    response_strip: code_fence
+    variant: GGUF · Q8_0
+    default: false
+  - id: glm47-flash
+    label: GLM-4.7 Flash 30B A3B
+    model_id: zai-org/glm-4.7-flash
+    response_strip: think
+    variant: MLX · 6-bit
+    default: true
+  - id: phi4-mini
+    label: Phi-4 Mini Instruct
+    model_id: phi-4-mini-instruct
+    response_strip: code_fence
+    variant: GGUF · Q8_0
+    default: false

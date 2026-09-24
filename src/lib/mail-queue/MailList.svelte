@@ -7,12 +7,13 @@
   Spalten: EMPFANGEN | ACCT* | SENDER | BETREFF | DOMAIN·AKTION | STIMMEN | MARKER
 -->
 <script lang="ts">
+	import { page } from '$app/state';
 	import { untrack } from 'svelte';
 	import { createVirtualizer } from '@tanstack/svelte-virtual';
 	import { mailQueueStore, isDisagreement } from '$lib/stores/mailQueue.svelte.js';
 	import { mailDetailStore } from '$lib/stores/mailDetail.svelte.js';
 	import {
-		ACCOUNT_CLASS,
+		accountClass, accountMeta,
 		ACTION_CLASS,
 		ACTION_LABELS,
 		DOMAIN_CLASS,
@@ -132,8 +133,8 @@
 						</span>
 						{#if showAcct}
 							<span class="inline-flex items-center gap-1.5">
-								<span class="h-2 w-2 rounded-full {ACCOUNT_CLASS[r.account].dot}"></span>
-								<span class="text-xs">{r.account === 'mirhamed_ch' ? 'mirhamed' : r.account}</span>
+								<span class="h-2 w-2 rounded-full {accountClass(r.account).dot}"></span>
+								<span class="text-xs">{accountMeta(r.account, page.data.mailAccounts).label}</span>
 							</span>
 						{/if}
 						<span class="truncate text-xs font-mono text-muted-foreground" title={r.from_addr}>

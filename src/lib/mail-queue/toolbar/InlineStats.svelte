@@ -18,7 +18,7 @@
 
 <div class="flex items-center gap-2 text-xs text-muted-foreground">
 	<span>
-		<span class="font-mono font-semibold text-foreground">{unreviewed}</span> offen
+		<span class="font-mono font-semibold text-foreground">{unreviewed}</span> ungesichtet
 	</span>
 	<span class="opacity-40">·</span>
 	<button

@@ -1,0 +1,37 @@
+{
+  "name": "Folio",
+  "short_name": "Folio",
+  "description": "Deine Kampagne, offenen Entscheidungen und Rückfragen. Folio für unterwegs.",
+  "start_url": "/mobile",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f3ee",
+  "theme_color": "#f4f3ee",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icons/folio-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icons/folio-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Prüfen",
+      "url": "/mobile?view=review"
+    },
+    {
+      "name": "Kampagne",
+      "url": "/mobile?view=campaign"
+    }
+  ],
+  "id": "/mobile",
+  "lang": "de"
+}

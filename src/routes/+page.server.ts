@@ -1,3 +1,7 @@
+import {calendarAttention} from '$lib/server/calendar/attention.js';
+import {isDemoVaultActive} from '$lib/server/env.js';
+import {loadFocus} from '$lib/server/focus/store.js';
+import {sources as calendarSources} from '$lib/server/calendar/planning.js';
 // F.9 Block-4 — Heute-Hub Server-Load.
 // Aggregiert minimal über alle Module: feedback-Counts, letzter Worker-Run.
 // Vault-Daten kommen aus parent +layout.server.ts (vaultName) — kein eigenes Vault-Read,
@@ -52,7 +56,7 @@ async function vaultExists(): Promise<boolean> {
 	}
 }
 
-export const load: PageServerLoad = async () => {
+export const load: PageServerLoad = async ({locals}) => {
 	const vaultPresent = await vaultExists();
 
 	// Mail-Counts (alle Accounts) — robustes Fallback bei feedback.db-Fehler.
@@ -145,6 +149,9 @@ export const load: PageServerLoad = async () => {
 	}
 
 	return {
+		focus: locals.user.role === 'owner' ? loadFocus() : {items:[],warning:''},
+		calendarAttention: locals.user.role==='owner'&&!isDemoVaultActive()?await calendarAttention():{items:[],syncedAt:null,unavailable:true},
+		calendarSources: locals.user.role === 'owner' && !isDemoVaultActive() ? calendarSources().filter(s=>s.source_ref.startsWith('mail:')) : [],
 		vaultPresent,
 		inboxPending,
 		inboxTriage,

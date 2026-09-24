@@ -8,20 +8,25 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { Home, Map, Inbox, Workflow, Users, Radar, Send, Settings } from 'lucide-svelte';
+	import { BriefcaseBusiness, CalendarDays, Brain, Compass, Home, Map, Inbox, Landmark, Workflow, Users, Radar, Send, Settings } from 'lucide-svelte';
 	import WorkerPill from './ActivityBar/WorkerPill.svelte';
 
-	type Workspace = 'heute' | 'vault' | 'mail' | 'pipeline' | 'relay' | 'council' | 'sonar' | 'settings' | 'other';
+	type Workspace = 'heute' | 'vault' | 'memory' | 'strategy' | 'mail' | 'pipeline' | 'relay' | 'council' | 'sonar' | 'ledger' | 'calendar' | 'career' | 'settings' | 'other';
 
 	function detectWorkspace(pathname: string): Workspace {
 		// Post-Block-3 URL-Tree: / ist Heute-Hub, Vault wandert nach /vault.
 		if (pathname === '/' || pathname === '/heute') return 'heute';
 		if (pathname.startsWith('/vault')) return 'vault';
+		if (pathname.startsWith('/memory')) return 'memory';
+		if (pathname.startsWith('/strategy')) return 'strategy';
 		if (pathname.startsWith('/mail-queue')) return 'mail';
 		if (pathname.startsWith('/pipeline')) return 'pipeline';
 		if (pathname.startsWith('/relay')) return 'relay';
 		if (pathname.startsWith('/council')) return 'council';
 		if (pathname.startsWith('/sonar')) return 'sonar';
+		if (pathname.startsWith('/ledger')) return 'ledger';
+		if (pathname.startsWith('/calendar')) return 'calendar';
+		if (pathname.startsWith('/career')) return 'career';
 		if (pathname.startsWith('/settings')) return 'settings';
 		// /setup is its own pre-app route, not part of workspace nav
 		return 'other';
@@ -39,12 +44,17 @@
 	// F.9 Block-3: / IST Heute-Hub (kein separates /heute). Plan-Decision.
 	const items: NavItem[] = [
 		{ key: 'heute', label: 'Heute', href: '/', Icon: Home },
+		{ key: 'calendar', label: 'Kalender', href: '/calendar', Icon: CalendarDays },
+		{ key: 'career', label: 'Bewerbungen', href: '/career', Icon: BriefcaseBusiness },
 		{ key: 'vault', label: 'Vault', href: '/vault', Icon: Map },
+		{ key: 'memory', label: 'Gedächtnis', href: '/memory', Icon: Brain },
+		{ key: 'strategy', label: 'Kompass', href: '/strategy', Icon: Compass },
 		{ key: 'mail', label: 'Mail', href: '/mail-queue', Icon: Inbox },
 		{ key: 'pipeline', label: 'Pipeline', href: '/pipeline', Icon: Workflow },
 		{ key: 'relay', label: 'Übergaben', href: '/relay', Icon: Send },
 		{ key: 'council', label: 'Council', href: '/council', Icon: Users },
-		{ key: 'sonar', label: 'Sonar', href: '/sonar', Icon: Radar }
+		{ key: 'sonar', label: 'Sonar', href: '/sonar', Icon: Radar },
+		{ key: 'ledger', label: 'Ledger', href: '/ledger/wealth', Icon: Landmark }
 	];
 
 	function go(href: string, e: MouseEvent) {

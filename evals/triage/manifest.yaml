@@ -32,8 +32,10 @@ fixtures:
   - file: clear-task-sprache.md
     expected: task
     chapter_slug: 01-neustart
+  # Retrospective note with no new goal: follows the prompt rule for observations.
+  # Label corrected on 2026-09-24; older result files use the former label `unclear`.
   - file: meeting-notes.md
-    expected: unclear
+    expected: not-a-task
 
 models:
   - gemma-4-26b-a4b-it-mlx

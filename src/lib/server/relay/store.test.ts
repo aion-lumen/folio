@@ -93,13 +93,16 @@ describe('Session Relay core egress gate', () => {
 		const { relay } = await store();
 		const context = {
 			schema: 'folio/memory-context/v1' as const,
+			consumer_id: 'relay-career' as const,
 			domain: 'career',
 			max_sensitivity: 'private' as const,
 			query_terms: ['interview'],
 			facts: [{
 				fact_id: randomUUID(), domain: 'career', data_class: 'availability',
-				sensitivity: 'private' as const, subject: 'Afschin', predicate: 'available',
+				sensitivity: 'private' as const, subject: 'Alex', predicate: 'available',
 				value: 'Tuesday at 10:00', source_kind: 'owner', source_ref: 'profile:1',
+				entity_ref: null, entity_type: null, entity_label: null,
+				subject_entity_id: null, object_entity_id: null,
 				valid_from: null, valid_to: null
 			}],
 			compiled_at: new Date().toISOString()
@@ -228,6 +231,41 @@ describe('Session Relay core egress gate', () => {
 		expect(db.prepare('SELECT artifact_kind, target_ref FROM relay_applications WHERE case_id = ?').get(staged.case_id))
 			.toEqual({ artifact_kind: 'no_action', target_ref: `relay:${staged.case_id}` });
 		expect(relay.getRelayMailDraft(staged.case_id)).toBeNull();
+	});
+
+	it('round-trips an exact orientation proposal as a reviewable Memory artifact', async () => {
+		const { db, relay } = await store();
+		const staged = relay.stageRelayCase({
+			domain: 'career', source_kind: 'orientation', source_ref: 'orientation:career-direction',
+			subject: 'Richtung: Berufliche Ausrichtung',
+			body: JSON.stringify({ schema: 'folio/orientation-question/v1', question: { id: 'career-direction' } }),
+			capability: 'analyze', data_classes: ['memory_context'], target: cloudTarget
+		});
+		relay.approveRelayEgress(staged.case_id, 'owner');
+		relay.shareRelayCase(staged.case_id, cloudTarget);
+		const request = readFileSync(join(relay.getRelayInboxPath('career'), staged.case_id, 'request.md'), 'utf8');
+		expect(request).toContain('Answer the named orientation question at strategy level');
+		expect(request).toContain('"kind": "orientation_proposal"');
+		const path = relay.getRelayResponseDropPath(staged.case_id, 'career');
+		mkdirSync(dirname(path), { recursive: true });
+		writeFileSync(path, JSON.stringify({
+			schema: 'folio/session-relay-response/v1', case_id: staged.case_id,
+			request_hash: staged.request_hash, target_id: cloudTarget.id,
+			result: {
+				kind: 'orientation_proposal', question_id: 'career-direction',
+				answer: 'Eine lokale KI-Plattform verantworten.', sensitivity: 'private'
+			},
+			created_at: new Date().toISOString()
+		}), { mode: 0o600 });
+
+		expect(relay.ingestRelayResponse(staged.case_id, cloudTarget).status).toBe('answered');
+		expect(relay.getRelayResponseForReview(staged.case_id, cloudTarget).result).toEqual({
+			kind: 'orientation_proposal', question_id: 'career-direction',
+			answer: 'Eine lokale KI-Plattform verantworten.', sensitivity: 'private'
+		});
+		expect(relay.applyRelayResponse(staged.case_id, 'owner', cloudTarget, 'memory-candidate:fact-1').status).toBe('applied');
+		expect(db.prepare('SELECT artifact_kind, target_ref FROM relay_applications WHERE case_id = ?').get(staged.case_id))
+			.toEqual({ artifact_kind: 'memory_candidate', target_ref: 'memory-candidate:fact-1' });
 	});
 
 	it('rejects a response bound to a different request or target', async () => {

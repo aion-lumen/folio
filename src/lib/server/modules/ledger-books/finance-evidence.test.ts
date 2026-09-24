@@ -1,0 +1,12 @@
+import {describe,it,expect} from 'vitest';
+import {appendInvoiceEvidence,evidenceReviewInput,invoiceSourceMatches,reusableAdvisoryReview} from './finance-evidence.js';
+import {canonicalHash} from './reconciliation.js';
+import type {BankEvidence,MailEvidence,EvidenceLink} from './finance-discovery.js';
+const mail:MailEvidence={id:1,ref:'mail:test:12',date:'2026-07-01',subject:'Invoice',sender:'example.invalid',body:'source body',truncated:false,sha256:'x'};
+const bank:BankEvidence={observation_id:'b1',account_ref:'acct_a',booking_date:'2026-07-10',amount:'-10',currency:'EUR',direction:'debit',purpose:'test',counterparty:'Test',references:[]};
+const link:EvidenceLink={id:'b1:1',mail_id:1,bank_id:'b1',reasons:['reference'],status:'possible_match'};
+describe('verified attachment corpus and resumable review',()=>{
+ it('requires every source binding rather than UID or sender alone',()=>{const s={feedback_id:1,ref:mail.ref,body_sha256:'abc'};expect(invoiceSourceMatches(s,mail,'abc')).toBe(true);for(const changed of [{...s,feedback_id:2},{...s,ref:'mail:other:12'},{...s,body_sha256:'changed'}])expect(invoiceSourceMatches(changed,mail,'abc')).toBe(false);});
+ it('deduplicates the same PDF for one mail, preserving both proven mail origins',()=>{const m={...mail},seen=new Set<string>();expect(appendInvoiceEvidence(m,'a'.repeat(64),'text',seen)).toBe(true);const before=m.body;expect(appendInvoiceEvidence(m,'a'.repeat(64),'text',seen)).toBe(false);expect(m.body).toBe(before);expect(appendInvoiceEvidence({...mail,id:2},'a'.repeat(64),'text',seen)).toBe(true);expect(m.sha256).not.toBe(mail.sha256);});
+ it('keeps unchanged independent reviews and invalidates changed sources',()=>{const input=evidenceReviewInput(link,[bank],[mail]);const review={schema:'folio/advisory-finance-link/v1',automatic_confirmation:false,batch_sha256:'batch',input,votes:['qwen','gemma'].map(model=>({model,input_sha256:canonicalHash(input),relation:'supported'}))};expect(reusableAdvisoryReview(review,input,'batch')).toBe(true);expect(reusableAdvisoryReview(review,evidenceReviewInput(link,[bank],[{...mail,sha256:'new'}]),'batch')).toBe(false);expect(reusableAdvisoryReview(review,input,'changed')).toBe(false);expect(reusableAdvisoryReview({...review,votes:[review.votes[0],review.votes[0]]},input,'batch')).toBe(false);expect(reusableAdvisoryReview({...review,automatic_confirmation:true},input,'batch')).toBe(false);});
+});

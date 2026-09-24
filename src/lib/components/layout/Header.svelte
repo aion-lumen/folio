@@ -261,9 +261,6 @@
 		letter-spacing: -0.01em;
 		white-space: nowrap;
 	}
-	.wordmark-sep {
-		color: var(--color-lumen, hsl(45 96% 55%));
-	}
 
 	/* ── Breadcrumb ── */
 	.breadcrumb {

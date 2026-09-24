@@ -1,9 +1,15 @@
+import { existsSync } from 'node:fs';
+import {accounts} from '$lib/server/mail-intake/accounts.js';
+import {normalizeAccountId, unregisteredMailAccounts} from '$lib/util/mail-account.js';
+import { mailWorkContext } from '$lib/server/mail-intake/work-status.js';
+import { MAIL_WORK_LABELS, type MailWorkState } from '$lib/util/mail-work-status.js';
 // F.4.C — URL-Filter-Binding + Mock-Splice (P1 serverside Mock-Daten-Einspeisung).
-// Yahoo-Rows aus echter feedback.db (F.3-Reader), gmail+mirhamed aus Mock (F.4-Vorbau).
+// All configured accounts share the read-only feedback store.
 // Filters aus URL parsen, Filter-aware fetching + sortieren.
 
 import type { PageServerLoad } from './$types.js';
-import { getFeedbackRows } from '$lib/server/feedback/reader.js';
+import { getFeedbackRowById, getFeedbackRows } from '$lib/server/feedback/reader.js';
+import { companionMail } from '$lib/server/focus/mail.js';
 import {
 	getLatestCorrectionMap,
 	getLatestMailOverrideMap,
@@ -14,7 +20,7 @@ import {
 import { applyTimeDecay, loadUserContext } from '$lib/server/feedback/time-decay.js';
 import { loadRegelwerk } from '$lib/server/regelwerk/loader.js';
 import { computeActiveRules } from '$lib/server/regelwerk/active-rules.js';
-import { getHomePlz } from '$lib/server/env.js';
+import { getHomePlz, getFeedbackDbPath } from '$lib/server/env.js';
 import { hasModuleCapability } from '$lib/server/modules/index.js';
 import { mailRelaySourceRef } from '$lib/server/relay/mail.js';
 import { enforceRelayRetention, listRelayCases, listRelayMailDrafts } from '$lib/server/relay/store.js';
@@ -31,6 +37,7 @@ import {
 	type UnifiedMailRow
 } from '$lib/stores/mailQueue.svelte.js';
 import type { ActionabilityKey } from '$lib/util/mail-account.js';
+import type { FeedbackRow } from '$lib/server/feedback/types.js';
 
 // SQLite-Standard "YYYY-MM-DD HH:MM:SS" (UTC, Space-Separator) vs ISO
 // "YYYY-MM-DDTHH:MM:SS.sssZ". String-Vergleich kippt weil 'T'(84) > ' '(32)
@@ -42,6 +49,11 @@ function parseTs(s: string): number {
 
 export const load: PageServerLoad = async ({ url }) => {
 	const filters = filtersFromUrl(url.searchParams);
+ const sourceAvailable=existsSync(getFeedbackDbPath());
+	const searchQuery = url.searchParams.get('q')?.trim().slice(0, 200) ?? '';
+	const feedbackParam = url.searchParams.get('feedback') ?? '';
+	const selectedFeedbackId = /^[1-9]\d{0,8}$/.test(feedbackParam) ? Number(feedbackParam) : null;
+	const selectedFeedback = selectedFeedbackId && sourceAvailable ? getFeedbackRowById(selectedFeedbackId) : null;
 	const stressParam = url.searchParams.get('stress');
 	const stressCount = stressParam ? parseInt(stressParam, 10) : 0;
 
@@ -50,8 +62,10 @@ export const load: PageServerLoad = async ({ url }) => {
 		// F.4.F Performance-Smoke: replace data with N synthetic rows.
 		allRows = getStressRows(stressCount).map(unifyMockRow);
 	} else {
-		// Normal mode: yahoo (feedback.db) + mock (gmail + mirhamed_ch)
-		const yahooRowsRaw = getFeedbackRows({ limit: 5000 });
+		// Only imported rows; synthetic stress data requires an explicit query parameter.
+		const yahooRowsRaw = !sourceAvailable ? [] : selectedFeedback ? [selectedFeedback] : searchQuery
+			? companionMail(searchQuery, 100).sources.map((source) => getFeedbackRowById(source.feedbackId)).filter((row): row is FeedbackRow => row !== null)
+			: getFeedbackRows({ limit: 5000 });
 		// F.5 + F.7 In-Memory-JOINs: corrections, reviewed-set, validator-opinions.
 		const correctionMap = getLatestCorrectionMap();
 		// 2026-06-06 Bauteil 2: latest-wins User-Override fuer Mail-Status
@@ -87,6 +101,7 @@ export const load: PageServerLoad = async ({ url }) => {
 		if (hasModuleCapability('relay', 'responses.read')) {
 			for (const draft of listRelayMailDrafts()) relayDraftByCase.set(draft.case_id, draft);
 		}
+		const workContext=mailWorkContext();
 		const yahooRows: UnifiedMailRow[] = yahooRowsRaw.map((r) => {
 			const unified = unifyFeedbackRow(r);
 			const relayCase = relayBySource.get(mailRelaySourceRef(r.account_id, r.imap_uid));
@@ -127,7 +142,7 @@ export const load: PageServerLoad = async ({ url }) => {
 				applyTimeDecay(r.domain, r.actionability, r.mail_date, userContext) ??
 				unified.actionability ??
 				null;
-			// Lens-UI: build 4-Voice array + pre-compute Stimmen-Streifen state.
+			// Lens-UI: build four base voices plus an optional disagreement review.
 			const opinions = validatorOpinionsMap.get(r.id) ?? [];
 			const voices = buildVotesForFeedback(
 				{
@@ -173,6 +188,7 @@ export const load: PageServerLoad = async ({ url }) => {
 					: null,
 				correction: correctionMap.get(r.id) ?? null,
 				reviewed: reviewedIds.has(r.id),
+				work: workContext.status(r),
 				validator_opinion: validatorMap.get(r.id) ?? null,
 				voices,
 				consensus_state: consensusState,
@@ -191,7 +207,12 @@ export const load: PageServerLoad = async ({ url }) => {
 	}
 
 	// Apply filters serverside (account, actions, sender, disagreement, sort)
-	const filteredRows = applyFilters(workingRows, filters);
+	const workParam=url.searchParams.get('work')??'all';
+	const workFilter=workParam in MAIL_WORK_LABELS?workParam as MailWorkState:'all';
+	const scopeRows=applyFilters(workingRows,filters);
+	const workCounts:Record<string,number>={all:scopeRows.length,decision:0,automatic:0,technical:0,inbox:0};
+	for(const row of scopeRows)workCounts[row.work?.state??'inbox']++;
+	const filteredRows=workFilter==='all'?scopeRows:scopeRows.filter(r=>r.work?.state===workFilter);
 
 	// 4) Stats für AccountFilterRow (always all-accounts counts, even when filter active)
 	const countsByAccount: Record<string, number> = {};
@@ -204,13 +225,18 @@ export const load: PageServerLoad = async ({ url }) => {
 	}
 
 	// F.9 Block-2: recentRuns wandern auf /pipeline (eigene Route, eigener Load).
+	const registeredAccounts = accounts();
 	return {
-		rows: filteredRows,
-		allRowsCount: allRows.length,
+		rows: filteredRows,workFilter,workCounts,
+  mailAccounts:Object.fromEntries(registeredAccounts.map(a=>[normalizeAccountId(a.id),{id:normalizeAccountId(a.id),label:a.label,addr:'',desc:''}])),
+  unregisteredAccounts: unregisteredMailAccounts(countsByAccount, registeredAccounts.map(a => a.id)),
+		selectedFeedbackId: selectedFeedback?.id ?? null,
+		sourceAvailable, allRowsCount: allRows.length,
 		countsByAccount,
 		unreviewedByAccount,
 		filters,
 		unreviewedOnly,
+		searchQuery,
 		// Council capability for this vault — gates the "→ Übernommen" action (demo = not registered).
 		councilRegistered: hasModuleCapability('council', 'ingest.write')
 	};

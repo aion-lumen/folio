@@ -1,7 +1,13 @@
+import { accounts as configuredMailAccounts } from '../mail-intake/accounts.js';
+import { advanceValidatorStatus, type ValidatorLiveStatus } from './live-status.js';
+import { accounts, accountSettingsPath } from '../mail-intake/accounts.js';
 // F.7 — Subprocess-Manager für Worker-Runs.
 // Singleton (1 Run at-a-time), spawn via child_process, SSE-Subscribe-Pattern.
 // Folio-Restart kills Worker (kein Persistence; Operator macht Re-Run).
 
+import { locked as intakeLocked } from '../mail-intake/state.js';
+import { resolve } from 'node:path';
+import { getFolioDbPath, localMailProcessEnv } from '../env.js';
 import { spawn, type ChildProcess } from 'child_process';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
@@ -11,6 +17,10 @@ import {
 	updateWorkerRunStatus
 } from '$lib/server/folio-db/writer.js';
 import { getAionLumenPath, getPythonBinPath, isDemoVaultActive, loadHermesEnvVars } from '$lib/server/env.js';
+import { readModelEvalRunStatus } from '$lib/server/model-eval/runner.js';
+import { readMemoryEvalRunStatus } from '$lib/server/memory/eval-runner.js';
+import { readMailSelectionRunStatus } from '$lib/server/memory/selection-runner.js';
+import { validatorProcessEnv } from './validator-env.js';
 import type { ActiveRunInfo, RunEndEvent, RunLogLine, RunStreamMsg, StartRunInput } from './types.js';
 
 // F.7-Bugfix + F.9: loadHermesEnvVars lebt jetzt in env.ts (geteilt mit Hermes-Chat-API).
@@ -19,6 +29,12 @@ const WORKER_SCRIPT = 'scripts/production_worker.py';
 const VALIDATOR_SCRIPT = 'scripts/validator_batch.py';
 const LOG_BUFFER_MAX = 500;
 const CANCEL_GRACE_MS = 5000;
+
+export function childProcessNeedsForceKill(
+	proc: Pick<ChildProcess, 'exitCode' | 'signalCode'>
+): boolean {
+	return proc.exitCode === null && proc.signalCode === null;
+}
 
 // Cleanup 2026-05-27: slugifyBoard + ensureBoardExists raus (Hermes-Kanban-
 // Board-Item-Mechanik obsolet durch Pipeline-Redesign). board-slug wird
@@ -30,6 +46,7 @@ function defaultBoardSlug(account: string): string {
 }
 
 interface RunContext {
+ liveStatus?: ValidatorLiveStatus;
 	uuid: string;
 	proc: ChildProcess;
 	logBuffer: RunLogLine[];
@@ -47,7 +64,7 @@ interface RunContext {
 let _active: RunContext | null = null;
 
 export function isBusy(): boolean {
-	return _active !== null;
+	return _active !== null || intakeLocked();
 }
 
 export function getActiveRun(): ActiveRunInfo | null {
@@ -64,7 +81,12 @@ export function getActiveRun(): ActiveRunInfo | null {
 	};
 }
 
+export function getLiveValidatorStatus(): ValidatorLiveStatus {
+ return _active?.mode === 'validator' ? _active.liveStatus ?? {activity:null,target:null} : {activity:null,target:null};
+}
+
 function pushLine(ctx: RunContext, line: string, stream: 'stdout' | 'stderr') {
+	if(ctx.mode === 'validator') ctx.liveStatus = advanceValidatorStatus(ctx.liveStatus ?? {activity:null,target:null}, line);
 	const entry: RunLogLine = { line, t: new Date().toISOString(), stream };
 	ctx.logBuffer.push(entry);
 	if (ctx.logBuffer.length > LOG_BUFFER_MAX) {
@@ -109,6 +131,16 @@ function attachStreamListener(
 }
 
 export function startRun(input: StartRunInput): { uuid: string; board_slug: string } {
+	if (!input.intake && intakeLocked()) throw new Error('Automatischer Maileingang läuft');
+	if (readModelEvalRunStatus().state === 'running') {
+		throw new Error('Modellpruefstand aktiv: Mail-Triage startet erst nach dem Vergleichslauf');
+	}
+	if (readMemoryEvalRunStatus().state === 'running') {
+		throw new Error('Memory-Pruefstand aktiv: Mail-Triage startet erst nach dem Vergleichslauf');
+	}
+	if (readMailSelectionRunStatus().state === 'running') {
+		throw new Error('Hermes-Kohortenauswahl aktiv: Mail-Triage startet erst nach dem Vergleichslauf');
+	}
 	// Demo capability wall: a demo vault must NEVER read a real IMAP account.
 	// This is a hard block (not a warning) — the real IMAP fetch lives in production_worker.
 	if (isDemoVaultActive()) {
@@ -122,11 +154,12 @@ export function startRun(input: StartRunInput): { uuid: string; board_slug: stri
 	}
 	// Cleanup 2026-05-27: kein user-facing Board mehr. Intern auto-generierter
 	// Slug für DB-Logging-Zwecke (worker_runs.board bleibt NOT NULL).
+	if(input.intake && !accounts().some(a=>a.id===input.account))throw Error('Unknown intake account');
 	const slug = defaultBoardSlug(input.account);
 
 	const uuid = randomUUID();
 	const startedAt = new Date().toISOString();
-	const args = [
+	const args = input.intake ? [resolve('scripts/incoming-mail.py'), '--worker-root', getAionLumenPath(), '--folio-db', getFolioDbPath(), '--account', input.account, '--run-uuid', uuid, '--batch', String(input.trancheSize), '--activated', input.intake.activatedAt, '--accounts-file', accountSettingsPath(), ...(input.intake.history?['--history']:[]), ...(input.intake.unreadFirst&&!input.intake.history?['--unread-first']:[])] : [
 		WORKER_SCRIPT,
 		'--account', input.account,
 		'--mode', input.mode,
@@ -139,8 +172,7 @@ export function startRun(input: StartRunInput): { uuid: string; board_slug: stri
 	const proc = spawn(getPythonBinPath(), args, {
 		cwd: getAionLumenPath(),
 		env: {
-			...process.env,
-			...loadHermesEnvVars(),
+			...localMailProcessEnv(),
 			FOLIO_RUN_UUID: uuid // env-Fallback
 		},
 		stdio: ['ignore', 'pipe', 'pipe']
@@ -169,7 +201,7 @@ export function startRun(input: StartRunInput): { uuid: string; board_slug: stri
 		trancheSize: input.trancheSize,
 		mailsProcessed: 0,
 		stderrBuffer: '',
-		triggeredBy: 'manual' // user-initiated worker-run is always manual
+		triggeredBy: input.intake ? 'auto' : 'manual'
 	};
 	_active = ctx;
 
@@ -214,7 +246,7 @@ export function startRun(input: StartRunInput): { uuid: string; board_slug: stri
 		// Direktive D: Auto-Validator nach completed silent-Worker mit explizitem
 		// --mail-ids-Handoff aus worker_run_logs (kein last-tranche-Race).
 		if (
-			ctx.mode === 'silent' &&
+			!input.intake && ctx.mode === 'silent' &&
 			status === 'completed' &&
 			ctx.mailsProcessed > 0
 		) {
@@ -287,12 +319,26 @@ export interface StartValidatorRunOpts {
 	mailIds?: number[];
 	account?: string;
 	parentRunUuid?: string;
+	intake?: boolean;
+	/** Exclusive local-model fence owned by the parent mail-intake runtime. */
+	modelFenceToken?: string;
 }
 
 export function startValidatorRun(
 	scope: ValidatorScope,
 	opts: StartValidatorRunOpts = {}
 ): { uuid: string } {
+	if (!opts.intake && intakeLocked()) throw new Error('Automatischer Maileingang läuft');
+	if ((opts.intake || opts.triggeredBy === 'auto') && !opts.mailIds?.length) throw new Error('Empty automatic validator scope');
+	if (readModelEvalRunStatus().state === 'running') {
+		throw new Error('Modellpruefstand aktiv: Validator startet erst nach dem Vergleichslauf');
+	}
+	if (readMemoryEvalRunStatus().state === 'running') {
+		throw new Error('Memory-Pruefstand aktiv: Validator startet erst nach dem Vergleichslauf');
+	}
+	if (readMailSelectionRunStatus().state === 'running') {
+		throw new Error('Hermes-Kohortenauswahl aktiv: Validator startet erst nach dem Vergleichslauf');
+	}
 	if (_active) {
 		throw new Error(`Another run is active (uuid=${_active.uuid})`);
 	}
@@ -302,21 +348,18 @@ export function startValidatorRun(
 	const trancheSize = opts.trancheSize ?? 0;
 	const mailIds = opts.mailIds ?? [];
 	const args = [VALIDATOR_SCRIPT];
+	if (opts.intake) args.push('--classification-only');
 	if (mailIds.length > 0) {
 		args.push('--mail-ids', mailIds.join(','));
 	}
 	args.push('--scope', scope);
-	if (opts.account) {
+	if (opts.account && !opts.intake) {
 		args.push('--account', opts.account);
 	}
 	args.push('--run-uuid', uuid);
 	const proc = spawn(getPythonBinPath(), args, {
 		cwd: getAionLumenPath(),
-		env: {
-			...process.env,
-			...loadHermesEnvVars(),
-			FOLIO_RUN_UUID: uuid
-		},
+		env: validatorProcessEnv({ ...localMailProcessEnv(), FOLIO_RUN_UUID: uuid }, opts.modelFenceToken),
 		stdio: ['ignore', 'pipe', 'pipe']
 	});
 
@@ -393,6 +436,12 @@ export function startValidatorRun(
 			}
 		}
 		_active = null;
+		if (status === 'completed' && !opts.intake && mailIds.length && configuredMailAccounts().some(account=>account.id===runAccount)) {
+			void import('../mail-intake/state.js').then(({ config, save, runs }) => {
+				if (!config()?.enabled || runs().some(run => run.validator_id === uuid)) return;
+				save({ id: randomUUID(), account: runAccount, state:'pending', phase:'validate', worker_id:opts.parentRunUuid, validator_id:uuid, items:[...new Set(mailIds)].map(id=>({id,stage:'extract' as const})), attempts:0, started_at: new Date().toISOString() });
+			}).catch(() => console.error('[worker-runner] Memory handoff failed'));
+		}
 	});
 
 	proc.on('error', (err) => {
@@ -427,7 +476,8 @@ export function cancelActiveRun(): boolean {
 		// ignore
 	}
 	setTimeout(() => {
-		if (_active === ctx && !ctx.proc.killed) {
+		// `killed` means only that Node sent a signal, not that the child exited.
+		if (_active === ctx && childProcessNeedsForceKill(ctx.proc)) {
 			try {
 				ctx.proc.kill('SIGKILL');
 			} catch {

@@ -1,0 +1,48 @@
+schema: folio/model-eval-labels/v2
+suite: mail-triage-lens-v2
+source_fixture: demo_quickstart.json
+contract:
+  purpose: Blind classification from the mail fields visible to one local model.
+  visible_fields: [sender, subject, body_excerpt]
+  excluded_pipeline_signals: [heuristic, mail_age, time_decay, other_model_votes]
+labels:
+  90001: { domain: immo, action: actionable }
+  90002: { domain: immo, action: actionable }
+  90003: { domain: immo, action: actionable }
+  90004: { domain: immo, action: actionable }
+  90005: { domain: immo, action: actionable }
+  90006: { domain: immo, action: actionable }
+  90007: { domain: immo, action: actionable }
+  90008: { domain: werbung, action: archive-silent, note: "Marktnewsletter ohne konkretes Objekt." }
+  90009: { domain: werbung, action: archive-silent, note: "Portalnewsletter ohne konkretes Objekt." }
+  90010: { domain: werbung, action: archive-silent, note: "Marketingauswahl ohne konkretes Objekt." }
+  90011: { domain: werbung, action: archive-silent, note: "Marktüberblick ohne konkretes Objekt." }
+  90012: { domain: werbung, action: archive-silent, note: "Ratgeber ohne konkretes Objekt." }
+  90013: { domain: kontakt, action: actionable, note: "Direkte Nachricht einer Person; kein Stellenangebot." }
+  90014: { domain: job, action: actionable, note: "Konkretes befristetes Freelance-Angebot." }
+  90015: { domain: job, action: actionable, note: "Konkrete Treffer bei aktiver Jobsuche; Alter ist für die Lens nicht sichtbar." }
+  90016: { domain: job, action: actionable, note: "Konkrete Treffer bei aktiver Jobsuche; Alter ist für die Lens nicht sichtbar." }
+  90017: { domain: werbung, action: archive-silent, note: "Allgemeiner Karriere-Newsletter ohne konkrete Stelle." }
+  90018: { domain: werbung, action: archive-silent, note: "Ratgeber und Kurswerbung ohne konkrete Stelle." }
+  90019: { domain: shopping, action: actionable }
+  90020: { domain: shopping, action: actionable }
+  90021: { domain: shopping, action: actionable }
+  90022: { domain: shopping, action: actionable }
+  90023: { domain: shopping, action: actionable }
+  90024: { domain: shopping, action: actionable }
+  90025: { domain: shopping, action: archive, note: "Bestellbestätigung als Referenz; noch keine Zustellaktion." }
+  90026: { domain: shopping, action: archive, note: "Zustellung ist bereits abgeschlossen." }
+  90027: { domain: shopping, action: archive, note: "Zustellung ist bereits abgeschlossen." }
+  90028: { domain: finance, action: actionable }
+  90029: { domain: finance, action: archive, note: "Rückerstattung läuft automatisch; kein Eingriff verlangt." }
+  90030: { domain: finance, action: actionable, note: "Möglicher Kartenmissbrauch verlangt bei Nichtautorisierung sofortiges Handeln." }
+  90031: { domain: finance, action: actionable }
+  90032: { domain: werbung, action: archive-silent, note: "Bank-Marketing ohne Kontovorgang." }
+  90033: { domain: finance, action: archive, note: "Kontoauszug liegt zur Referenz bereit; keine Aktion verlangt." }
+  90034: { domain: werbung, action: archive-silent }
+  90035: { domain: werbung, action: archive-silent }
+  90036: { domain: werbung, action: archive-silent }
+  90037: { domain: werbung, action: archive-silent }
+  90038: { domain: werbung, action: archive-silent }
+  90039: { domain: werbung, action: archive-silent }
+  90040: { domain: werbung, action: archive-silent }

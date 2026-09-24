@@ -7,7 +7,7 @@ import { tlog, ttrace } from '$lib/util/debug-trace.js';
 
 export interface MailBodyResponse {
 	uid: string;
-	source: 'kanban' | 'mock' | 'unavailable';
+	source: 'intake' | 'feedback' | 'kanban' | 'mock' | 'unavailable';
 	board: string | null;
 	taskId: string | null;
 	taskTitle: string | null;
@@ -45,7 +45,7 @@ class MailDetailStore {
 		if (row) {
 			this.cachedRow = { uid, row };
 		}
-		if (!this.cache[uid]) {
+		if (!this.cache[uid] || !this.cache[uid].bodyText || this.cache[uid].bodyTruncated) {
 			this.fetch(uid);
 		}
 	}

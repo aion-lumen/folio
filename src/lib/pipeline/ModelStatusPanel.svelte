@@ -34,8 +34,8 @@
 		lastRunAt = null
 	}: {
 		models: ModelEntry[];
-		/** 'validator' | 'lens' — drives the eyebrow caption. */
-		stack: 'validator' | 'lens';
+		/** Selects the short eyebrow caption. */
+		stack: 'worker' | 'validator' | 'eval';
 		/** True during a live run; cards are bright. False = dimmed idle look. */
 		active: boolean;
 		/** Progress bar inputs when active. unit='Mails' for validator, 'Objekte'
@@ -45,7 +45,9 @@
 		lastRunAt?: string | null;
 	} = $props();
 
-	const stackLabel = $derived(stack === 'validator' ? 'Validator-Stack' : 'Council-Lens-Stack');
+	const stackLabel = $derived(
+		stack === 'validator' ? 'Validator-Stack' : stack === 'worker' ? 'Mail-Klassifikation' : 'Modellvergleich'
+	);
 	const eyebrow = $derived.by(() => {
 		if (active) return `MODELL-STATUS · ${stackLabel} läuft`;
 		if (lastRunAt) return `MODELL-STATUS · ${stackLabel}`;

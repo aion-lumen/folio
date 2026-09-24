@@ -1,0 +1,80 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
+import { canonicalHash } from '../modules/ledger-books/reconciliation.js';
+import { sha256 } from '../file-intake/document-security.js';
+import { listPaymentConfirmedMemory, recordPaymentConfirmations } from './payment-confirmation.js';
+const state=vi.hoisted(()=>({db:null as any,evidence:[] as any[],files:new Map<string,Buffer>(),receipt:{} as any,disabled:false,subject:'Invoice subject'}));
+vi.mock('../feedback/reader.js',()=>({getFeedbackRowById:()=>({subject:state.subject})}));
+vi.mock('../folio-db/init.js',()=>({getFolioDb:()=>state.db}));
+vi.mock('./store.js',()=>({getMemoryFact:(id:string)=>state.db.prepare('SELECT * FROM memory_facts WHERE fact_id=?').get(id)}));
+vi.mock('../env.js',()=>({areModulesDisabled:()=>state.disabled,getDisabledModuleIds:()=>new Set(),getFolioDbPath:()=>'/synthetic/db',getSessionExchangePath:()=>'/synthetic/exchange',isDemoVaultActive:()=>false}));
+vi.mock('../modules/ledger-books/reconciliation.js',async(importOriginal)=>({...await importOriginal<any>(),readReconciliationEvidence:()=>state.evidence}));
+vi.mock('../file-intake/document-security.js',async(importOriginal)=>({...await importOriginal<any>(),securityRoot:()=>'/synthetic',storedSecurityReceipt:()=>state.receipt,documentBytes:(p:string)=>{const b=state.files.get(p);if(!b)throw Error('missing');return b;}}));
+function fixture(){
+ state.db?.close();state.db=new Database(':memory:');state.files.clear();state.disabled=false;state.subject='Invoice subject';
+ state.db.exec(`CREATE TABLE memory_facts(fact_id TEXT,proposal_id TEXT,domain TEXT,predicate TEXT,source_kind TEXT,source_ref TEXT,status TEXT,supersedes_fact_id TEXT,confirmed_by TEXT,value_text TEXT);
+ CREATE TABLE memory_proposals(proposal_id TEXT,status TEXT);
+ CREATE TABLE memory_episodes(episode_id TEXT,proposal_id TEXT,title TEXT);
+ CREATE TABLE mail_intake_sources(feedback_id INTEGER,account TEXT,uid INTEGER,uidvalidity INTEGER,body TEXT,truncated INTEGER);
+ CREATE TABLE memory_sources(source_ref TEXT,status TEXT);
+ CREATE TABLE memory_ledger(event_id TEXT PRIMARY KEY,proposal_id TEXT,object_kind TEXT,object_id TEXT,event_type TEXT,actor_kind TEXT,actor_id TEXT,detail_json TEXT,recorded_at TEXT);
+ INSERT INTO memory_facts VALUES('f','p','finance','paid','mail','mail:test:1','candidate',NULL,NULL,'11.90 EUR');
+ INSERT INTO memory_proposals VALUES('p','candidate');
+ INSERT INTO memory_episodes VALUES('e','p','Invoice issued');
+ INSERT INTO mail_intake_sources VALUES(1,'test',1,5,'Invoice source',0);`);
+ const invoiceBytes=Buffer.from('synthetic invoice'),bankBytes=Buffer.from('synthetic bank'),text=Buffer.from('synthetic cleared invoice text');
+ const invoiceHash=sha256(invoiceBytes),bankHash=sha256(bankBytes),receiptId='00000000-0000-4000-8000-000000000000',extractionId='00000000-0000-4000-8000-000000000001';
+ state.receipt={receipt_id:receiptId,status:'clean',original_sha256:invoiceHash};const receiptBytes=Buffer.from(JSON.stringify(state.receipt));
+ const extraction={status:'extracted',original_sha256:invoiceHash,security_receipt_sha256:sha256(receiptBytes),text_sha256:sha256(text)};const extractionBytes=Buffer.from(JSON.stringify(extraction));
+ const files:Record<string,Buffer>={[`/synthetic/receipts/${receiptId}.json`]:receiptBytes,[`/synthetic/quarantine/${invoiceHash}/original`]:invoiceBytes,[`/synthetic/quarantine/${bankHash}/original`]:bankBytes,[`/synthetic/extractions/${receiptId}/pdf/${extractionId}/receipt.json`]:extractionBytes,[`/synthetic/extractions/${receiptId}/pdf/${extractionId}/text.txt`]:text};for(const [p,b]of Object.entries(files))state.files.set(p,b);
+ const request={reference_profile:'vodafone-rgn/v1',window:{to:'2026-09-30'}};
+ const c={match_request:request,normalized_invoice:{profile:'vodafone-cable/v1',match_request:request,invoice_number:'00123456789/26/09',invoice_date:'2026-09-13',counterparty:'Vodafone West GmbH',amount:'11.90',currency:'EUR'},memory_binding:{schema:'folio/payment-memory-binding/v1',fact_id:'f',proposal_id:'p',fact_sha256:canonicalHash(state.db.prepare('SELECT * FROM memory_facts').get()),proposal_sha256:canonicalHash(state.db.prepare('SELECT * FROM memory_proposals').get()),source:{feedback_id:1,ref:'mail:test:1',uidvalidity:5,body_sha256:sha256('Invoice source')},episodes:[{episode_id:'e',sha256:canonicalHash(state.db.prepare('SELECT * FROM memory_episodes').get())}]},invoice_document:{receipt_id:receiptId,original_sha256:invoiceHash,security_sha256:sha256(receiptBytes),extraction_id:extractionId,extraction_sha256:sha256(extractionBytes),text_sha256:sha256(text)}};
+ const ev={ref:`src_${bankHash}:text-line:12`,sha256:bankHash};
+ const r={status:'matched',system_confirmation:{confirmed:true},rule:{version:'v2'},reconciliation_target:'participant_payment_to_provider',matches:[{observation_id:'obs',evidence:[ev]}],result_id:'recon_test',generated_at:'2026-09-30T00:00:00Z'};
+ state.evidence=[{candidate:c,result:r,stale:false,batch:{entries:[{observation_id:'obs',currency:'EUR',direction:'debit',amount:'-11.90',booking_date:'2026-09-25',evidence:[ev]}],sources:[{source_ref:`src_${bankHash}`,source_sha256:bankHash}]}}];
+}
+beforeEach(fixture);
+describe('Bank evidence to Memory',()=>{
+ it('accepts the bound legacy issuer only with its matching invoice and reference profiles',()=>{
+  const c=state.evidence[0].candidate;
+  c.normalized_invoice.profile='vodafone-bw-cable/v1';
+  c.normalized_invoice.counterparty='Vodafone BW GmbH';
+  expect(recordPaymentConfirmations().recorded).toBe(0);
+  c.match_request.reference_profile='vodafone-bw-rgn/v1';
+  expect(recordPaymentConfirmations().recorded).toBe(1);
+  c.normalized_invoice.counterparty='Vodafone West GmbH';
+  expect(listPaymentConfirmedMemory()).toEqual([]);
+ });
+ it('revokes a receipt if the subject used as evidence changes',()=>{
+  state.evidence[0].candidate.memory_binding.source.subject_sha256=sha256(state.subject);
+  expect(recordPaymentConfirmations().recorded).toBe(1);
+  state.subject='Different invoice';expect(listPaymentConfirmedMemory()).toEqual([]);
+  expect(state.db.prepare('SELECT count(*) n FROM memory_ledger').get().n).toBe(1);
+ });
+ it('only records the exact facts accepted by this bounded agent run',()=>{
+  expect(recordPaymentConfirmations(new Set(['other']))).toEqual({recorded:0,active:0});
+  expect(recordPaymentConfirmations(new Set(['f'])).recorded).toBe(1);
+ });
+ it('requires bound independent local reviews for newly prepared agent candidates',()=>{
+  const c=state.evidence[0].candidate;
+  state.db.exec("ALTER TABLE memory_facts ADD COLUMN source_excerpt TEXT DEFAULT 'Invoice source'");
+  c.memory_binding.fact_sha256=canonicalHash(state.db.prepare('SELECT * FROM memory_facts').get());
+  c.preparation_policy='payment-agent/v1';
+  expect(recordPaymentConfirmations().recorded).toBe(0);
+  const {booking_date,amount,currency,direction,status,counterparty,purpose}=state.evidence[0].batch.entries[0];
+  const input={id:'f',invoice:c.normalized_invoice,invoice_text:'synthetic cleared invoice text',mail_excerpt:'Invoice source',bank_entries:[{booking_date,amount,currency,direction,status,counterparty,purpose}],coverage_complete:true,today:'2026-09-17'};
+  const vote={input_sha256:canonicalHash(input),fields_supported:true,payment_evidence:'paid'};
+  c.local_review={input,votes:[{...vote,model:'qwen'},{...vote,model:'gemma'}]};
+  c.local_review.votes.forEach((v:any)=>v.payment_evidence='not_proven');
+  expect(recordPaymentConfirmations().recorded).toBe(0);
+  c.local_review.votes.forEach((v:any)=>v.payment_evidence='paid');
+  expect(recordPaymentConfirmations().recorded).toBe(1);
+  state.evidence[0].batch.entries[0].booking_date='2026-09-26';
+  expect(listPaymentConfirmedMemory()).toEqual([]);
+  state.evidence[0].batch.entries[0].booking_date='2026-09-25';
+  c.local_review.votes[1].model='qwen';expect(listPaymentConfirmedMemory()).toEqual([]);
+  c.local_review.votes[1].model='gemma';c.local_review.input.invoice_text='Changed';expect(listPaymentConfirmedMemory()).toEqual([]);
+ });
+ it('records one system receipt, closes only bound work, preserves original and is idempotent',()=>{expect(listPaymentConfirmedMemory()).toEqual([]);expect(recordPaymentConfirmations()).toEqual({recorded:1,active:1});expect(recordPaymentConfirmations()).toEqual({recorded:0,active:1});const claims=listPaymentConfirmedMemory();expect(claims[0].value).toContain('am 2026-09-25');expect(claims[0].bank_locator).toBe('text-line:12');expect(claims[0].episode_ids).toEqual(['e']);expect(state.db.prepare('SELECT status,confirmed_by FROM memory_facts').get()).toEqual({status:'candidate',confirmed_by:null});const event=state.db.prepare('SELECT actor_kind,detail_json FROM memory_ledger').get();expect(event.actor_kind).toBe('system');expect(JSON.parse(event.detail_json).is_user_confirmation).toBe(false);});
+ it.each(['stale','rejected-fact','changed-episode','changed-mail','truncated','uid-epoch','disabled','unbound-bank','invoice-tampered','bank-missing'])('revokes %s without deleting the audit receipt',(kind)=>{recordPaymentConfirmations();const c=state.evidence[0].candidate;if(kind==='stale')state.evidence[0].stale=true;if(kind==='rejected-fact')state.db.exec("UPDATE memory_facts SET status='rejected'");if(kind==='changed-episode')state.db.exec("UPDATE memory_episodes SET title='Another claim'");if(kind==='changed-mail')state.db.exec("UPDATE mail_intake_sources SET body='changed'");if(kind==='truncated')state.db.exec('UPDATE mail_intake_sources SET truncated=1');if(kind==='uid-epoch')state.db.exec('UPDATE mail_intake_sources SET uidvalidity=6');if(kind==='disabled')state.disabled=true;if(kind==='unbound-bank')state.evidence[0].batch.sources[0].source_ref+='wrong';if(kind==='invoice-tampered')state.files.set(`/synthetic/quarantine/${c.invoice_document.original_sha256}/original`,Buffer.from('changed'));if(kind==='bank-missing')state.files.delete(`/synthetic/quarantine/${state.evidence[0].batch.sources[0].source_sha256}/original`);expect(listPaymentConfirmedMemory()).toEqual([]);expect(recordPaymentConfirmations().recorded).toBe(0);expect(state.db.prepare('SELECT count(*) n FROM memory_ledger').get().n).toBe(1);});
+});

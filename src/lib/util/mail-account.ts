@@ -1,94 +1,31 @@
-// F.4.C — Account-Type + Inferenz + Color-Map + Confidence-Thresholds.
-// Multi-Account-Vorbau (F.4-Plan v13 D2): UI baut für gmail/yahoo/mirhamed.ch.
-// F.6 wird inferAccount() durch echte account_id-Column ersetzen.
-
-// konto_a / konto_b are demo-only, structurally-masked account labels (never real
-// identifiers) — the demo mail store seeds account_id='konto-a'/'konto-b'.
-export type AccountId = 'gmail' | 'yahoo' | 'mirhamed_ch' | 'konto_a' | 'konto_b';
-export const ACCOUNT_IDS: AccountId[] = ['gmail', 'yahoo', 'mirhamed_ch', 'konto_a', 'konto_b'];
-
-export interface AccountMeta {
-	id: AccountId;
-	label: string;
-	addr: string;
-	desc: string;
+// Mail identities come from configuration and imported source metadata.
+export type AccountId = string;
+export interface AccountMeta {id:string;label:string;addr:string;desc:string;}
+export function accountMeta(id:string,configured:Record<string,AccountMeta>={}):AccountMeta {
+ return Object.prototype.hasOwnProperty.call(configured,id)?configured[id]:{id,label:id==='unassigned'?'Ohne Kontozuordnung':id,addr:'',desc:''};
+}
+export function accountIds(counts:Record<string,number>,configured:Record<string,AccountMeta>={}):string[]{
+ return [...new Set([...Object.keys(configured),...Object.keys(counts)])];
+}
+export function accountClass(id:string){
+ const hash=[...id].reduce((n,c)=>(n*31+c.charCodeAt(0))>>>0,0);
+ return [
+  {dot:'bg-account-gmail',soft:'bg-account-gmail-soft',deep:'text-account-gmail-deep'},
+  {dot:'bg-account-yahoo',soft:'bg-account-yahoo-soft',deep:'text-account-yahoo-deep'},
+  {dot:'bg-account-custom',soft:'bg-account-custom-soft',deep:'text-account-custom-deep'}
+ ][hash%3];
+}
+// The sender is not evidence of the receiving account.
+export function inferAccount(_sender?:string|null):AccountId{return 'unassigned';}
+export function normalizeAccountId(value?:string|null):AccountId{
+ return value?.trim().replace(/-history$/,'').replace(/^konto-([ab])$/,'konto_$1')||'unassigned';
 }
 
-// NOTE: `addr`/`desc` are placeholder display metadata only — never put real
-// e-mail addresses here. Account config (IMAP creds) lives outside this repo.
-export const ACCOUNTS: Record<AccountId, AccountMeta> = {
-	gmail: {
-		id: 'gmail',
-		label: 'gmail',
-		addr: 'you@example.com',
-		desc: 'Personal · primary'
-	},
-	yahoo: {
-		id: 'yahoo',
-		label: 'yahoo',
-		addr: 'you@example.net',
-		desc: 'Secondary'
-	},
-	mirhamed_ch: {
-		id: 'mirhamed_ch',
-		label: 'mirhamed.ch',
-		addr: 'you@example.org',
-		desc: 'Custom domain'
-	},
-	konto_a: {
-		id: 'konto_a',
-		label: 'konto-a',
-		addr: 'demo@example.com',
-		desc: 'Demo account A'
-	},
-	konto_b: {
-		id: 'konto_b',
-		label: 'konto-b',
-		addr: 'demo@example.net',
-		desc: 'Demo account B'
-	}
-};
-
-// Account-Color-Token-Map (Tailwind utility-class-strings aus app.css @theme).
-export const ACCOUNT_CLASS: Record<AccountId, { dot: string; soft: string; deep: string }> = {
-	gmail: {
-		dot: 'bg-account-gmail',
-		soft: 'bg-account-gmail-soft',
-		deep: 'text-account-gmail-deep'
-	},
-	yahoo: {
-		dot: 'bg-account-yahoo',
-		soft: 'bg-account-yahoo-soft',
-		deep: 'text-account-yahoo-deep'
-	},
-	mirhamed_ch: {
-		dot: 'bg-account-mirhamed',
-		soft: 'bg-account-mirhamed-soft',
-		deep: 'text-account-mirhamed-deep'
-	},
-	// Demo accounts reuse existing account color tokens (no new @theme tokens needed).
-	konto_a: {
-		dot: 'bg-account-yahoo',
-		soft: 'bg-account-yahoo-soft',
-		deep: 'text-account-yahoo-deep'
-	},
-	konto_b: {
-		dot: 'bg-account-gmail',
-		soft: 'bg-account-gmail-soft',
-		deep: 'text-account-gmail-deep'
-	}
-};
-
-// Infer Account aus sender-domain. F.4-Vorbau: feedback.db hat kein account_id-Column.
-// Engineer-Pre-Decision P1: yahoo aus DB (alle echten Rows = Yahoo), gmail+mirhamed aus Mock.
-// inferAccount() ist Fallback wenn account-id nicht explizit gesetzt ist.
-export function inferAccount(senderAddr: string | null | undefined): AccountId {
-	if (!senderAddr) return 'yahoo';
-	const lower = senderAddr.toLowerCase();
-	if (lower.endsWith('@gmail.com') || lower.endsWith('@googlemail.com')) return 'gmail';
-	if (lower.endsWith('@mirhamed.ch')) return 'mirhamed_ch';
-	// All else: yahoo (incl. all yahoo-classified-rows in feedback.db die von 3rd-party-Senders kommen)
-	return 'yahoo';
+/** Imported mail remains visible even if its receiving account is no longer registered. */
+export function unregisteredMailAccounts(counts: Record<string, number>, registeredIds: string[]): string[] {
+ const registered = new Set(registeredIds.map(normalizeAccountId));
+ return [...new Set(Object.entries(counts).filter(([, count]) => count > 0)
+  .map(([id]) => normalizeAccountId(id)))].filter((id) => !registered.has(id)).sort();
 }
 
 // Confidence-Thresholds — mq-shared.jsx:64 (per Plan v15 P4)

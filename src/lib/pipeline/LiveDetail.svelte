@@ -17,11 +17,15 @@
 	let {
 		activeRun,
 		summary,
-		logs = []
+		logs = [],
+		showProgress = true,
+		hideCouncil = false
 	}: {
 		activeRun: WorkerRunRow;
 		summary: WorkerRunSummaryRow | null;
 		logs?: WorkerRunLogRow[];
+		showProgress?: boolean;
+		hideCouncil?: boolean;
 	} = $props();
 
 	const stationLabel = $derived(activeRun.mode === 'validator' ? 'Validator' : 'Worker');
@@ -87,7 +91,7 @@
 			{ n: summary.uebernommen ?? 0, label: 'Übernommen', tone: 'green' },
 			{ n: summary.actionable ?? 0, label: 'Actionable', tone: 'blue' },
 			{ n: summary.archive_silent ?? 0, label: 'Stumm', tone: 'slate' },
-			{ n: summary.council_objects ?? 0, label: 'Council-Objekt', tone: 'ember' },
+			...(!hideCouncil ? [{ n: summary.council_objects ?? 0, label: 'Council-Objekt', tone: 'ember' as const }] : []),
 			{ n: summary.marker_count ?? 0, label: 'Marker', tone: 'ember' }
 		];
 	});
@@ -99,7 +103,7 @@
 			<span>aktive Station <b>{stationLabel}</b></span>
 			<span>läuft seit <b>{elapsed}</b></span>
 		</div>
-		{#if activeRun.mode !== 'validator'}
+		{#if showProgress && activeRun.mode !== 'validator'}
 			<!-- Validator-Progress lebt im ModelStatusPanel (render once). -->
 			<Progress done={progressDone} total={progressTotal} unit={progressUnit} />
 		{/if}

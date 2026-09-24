@@ -15,9 +15,13 @@
 	// Block 6 ersetzt das durch echte ContextSidebar mit Mail-/Pipeline-/Heute-Varianten.
 	const isVaultRoute = $derived(page.url.pathname.startsWith('/vault'));
 
-	// Council-Mobile 1a (2026-05-30): Mobile-Routes laufen ohne AppShell-Chrome
-	// (ActivityBar, Sidebar, Header, ChatPanel). Eigene MobileTabBar im Mobile-Layout.
-	const isMobileRoute = $derived(page.url.pathname.startsWith('/council/mobile'));
+	// Mobile-Routes laufen ohne Desktop-Chrome (ActivityBar, Sidebar, Header, ChatPanel).
+	const isMobileRoute = $derived(
+		page.url.pathname.startsWith('/council/mobile') ||
+		page.url.pathname.startsWith('/sonar/mobile') ||
+		page.url.pathname.startsWith('/career/mobile') ||
+		page.url.pathname.startsWith('/mobile')
+	);
 
 	let { children } = $props();
 
@@ -75,6 +79,7 @@
 		{/if}
 
 		<div class="content">
+			<a class="mobile-return" href="/mobile">← Folio Übersicht</a>
 			{#if !focusMode}
 				<Header />
 			{/if}
@@ -118,6 +123,13 @@
 {/if}
 
 <style>
+	.mobile-return { display: none; }
+	@media (max-width: 640px) {
+		.shell > :global(.activity-bar), .shell > :global(.panel), .content > :global(header) { display: none; }
+		.mobile-return { display: block; min-height: 48px; padding: calc(14px + env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--color-border); color: var(--color-foreground); background: var(--color-background); text-decoration: none; font-size: 14px; }
+		.shell .main-area { padding: 0; }
+	}
+
 	.shell {
 		display: flex;
 		height: 100vh;

@@ -266,15 +266,6 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 	}
-	.title-fallback {
-		font-family: var(--font-mono);
-		font-size: 11.5px;
-		color: var(--wf-muted, hsl(215 16% 50%));
-		padding: 6px 10px;
-		background: var(--wf-fill, hsl(214 24% 94%));
-		border-radius: 4px;
-		line-height: 1.4;
-	}
 	.pillen-row {
 		padding: 0 14px;
 	}
@@ -297,20 +288,6 @@
 		font-family: var(--font-mono);
 		font-size: 11.5px;
 		opacity: 0.8;
-	}
-	.link-cta {
-		font-weight: 500;
-	}
-	.reasons-err {
-		font-size: 12px;
-		color: hsl(0 65% 38%);
-		padding: 4px 0;
-	}
-	.reasons-empty {
-		font-size: 12px;
-		color: var(--wf-muted, hsl(215 16% 50%));
-		font-style: italic;
-		padding: 4px 0;
 	}
 	.close {
 		background: transparent;

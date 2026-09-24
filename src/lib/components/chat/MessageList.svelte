@@ -3,6 +3,7 @@
 	import { tick } from 'svelte';
 	import { marked } from 'marked';
 	import { executionProfileLabel } from '$lib/types/execution-profile.js';
+	import CareerRejectionReview from './CareerRejectionReview.svelte';
 
 	marked.setOptions({ breaks: true });
 
@@ -61,6 +62,9 @@
 							🔧 {event.name}({formatArgs(event.args ?? {})})
 						</div>
 					{:else if event.type === 'tool_result'}
+						{#if event.name === 'positions.reconcile_rejections' && event.output}
+							<CareerRejectionReview output={event.output} />
+						{/if}
 						<details class="rounded-md border border-border bg-background/50 text-xs">
 							<summary class="cursor-pointer px-2 py-1 text-muted-foreground select-none">
 								📋 {event.name} — Ergebnis

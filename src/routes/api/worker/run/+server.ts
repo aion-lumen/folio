@@ -1,3 +1,4 @@
+import {accounts} from '$lib/server/mail-intake/accounts.js';
 // F.7 — POST /api/worker/run
 // Starts a new production_worker subprocess. Singleton enforcement: HTTP 409 if busy.
 
@@ -6,21 +7,23 @@ import { isBusy, getActiveRun, startRun } from '$lib/server/worker-runner/manage
 import type { RequestHandler } from './$types.js';
 
 interface PostBody {
-	account: 'yahoo' | 'gmail' | 'mirhamed';
+	account: string;
 	mode: 'learning' | 'silent';
 	tranche_size: number;
 }
 
-const VALID_ACCOUNTS = new Set(['yahoo', 'gmail', 'mirhamed']);
+
 const VALID_MODES = new Set(['learning', 'silent']);
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+	if (locals.user.role !== 'owner') throw error(403, 'Owner access required');
 	let body: PostBody;
 	try {
 		body = (await request.json()) as PostBody;
 	} catch {
 		throw error(400, 'invalid JSON body');
 	}
+	const VALID_ACCOUNTS=new Set(accounts().filter(a=>a.kind==='imap').map(a=>a.id));
 	if (!VALID_ACCOUNTS.has(body.account)) {
 		throw error(400, `account must be one of: ${[...VALID_ACCOUNTS].join(', ')}`);
 	}

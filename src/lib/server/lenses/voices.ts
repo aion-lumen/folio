@@ -33,7 +33,7 @@ export type LensReason = 'disabled' | 'swap_failed' | 'timeout' | 'error';
 export type Voice =
 	| {
 			kind: 'present';
-			label: string; // 'H' | 'L1' | 'L2' | 'L3'
+			label: string; // 'H' | 'L1' | 'L2' | 'L3' | 'R'
 			domain: LensDomain;
 			confidence?: number;
 			reasoning?: string; // panel-c werkstatt: für EvidenceVoices-Card
@@ -150,10 +150,11 @@ export interface RegelwerkVoiceMeta {
 }
 
 /**
- * Build the 4-Voice array per Direktiven-Reihenfolge:
+ * Build the four base voices plus an optional disagreement review:
  *   Slot 0 = Heuristik (immer Stimmenkontrakt-Slot, kind=present aus feedback-row,
  *            kind=missing nur falls feedback-row keine Domain hat)
- *   Slot 1..3 = LLM-Lenses in regelwerk-Reihenfolge (gemma, qwen3.6, qwen-thinking)
+ *   Slot 1..3 = LLM-Lenses in regelwerk-Reihenfolge (aktuell GLM, Qwen 3.6, Qwen 3.8)
+ *   Optional R = conditional_reviewer, only when an opinion actually exists
  *
  * Pro LLM-Lens:
  *  - opinion in validator_opinions → kind='present'
@@ -190,6 +191,7 @@ export function buildVotesForFeedback(
 	const llmVoices = regelwerkVoices.filter(
 		(v) => v.role === 'primary_llm' || v.role === 'control_llm'
 	);
+	const conditionalVoices = regelwerkVoices.filter((v) => v.role === 'conditional_reviewer');
 
 	// Build opinion-lookup by model for O(1) match. Opinions are pre-sorted
 	// DESC by evaluated_at (reader.ts ORDER BY) → first-seen = latest-wins.
@@ -225,6 +227,23 @@ export function buildVotesForFeedback(
 		voices.push({
 			kind: 'present',
 			label,
+			domain: toLensDomain(opinion.validator_domain),
+			confidence: opinion.validator_confidence ?? undefined,
+			reasoning: opinion.validator_reasoning ?? undefined,
+			modelId: opinion.validator_model,
+		});
+	}
+
+	// A conditional reviewer is intentionally absent on base-consensus cases.
+	// Missing review opinions are therefore not errors and must not create a
+	// permanent fifth empty slot in the queue.
+	for (const reviewerMeta of conditionalVoices) {
+		if (reviewerMeta.enabled === false || !reviewerMeta.lm_studio_model) continue;
+		const opinion = opinionByModel.get(reviewerMeta.lm_studio_model);
+		if (!opinion?.validator_domain) continue;
+		voices.push({
+			kind: 'present',
+			label: 'R',
 			domain: toLensDomain(opinion.validator_domain),
 			confidence: opinion.validator_confidence ?? undefined,
 			reasoning: opinion.validator_reasoning ?? undefined,

@@ -4,10 +4,12 @@ import { resolveTriageModel } from './preflight.js';
 export type LlmCallFn = (prompt: string, model: string) => Promise<string | null>;
 
 export interface LlmCallOptions {
+	signal?: AbortSignal;
 	responseFormat?: Record<string, unknown>;
-	reasoningEffort?: 'low' | 'medium' | 'high';
+	reasoningEffort?: 'none' | 'low' | 'medium' | 'high';
 	maxTokens?: number;
 	acceptReasoningAsContent?: boolean;
+	timeoutMs?: number;
 }
 
 const LLM_TIMEOUT_MS = 90_000;
@@ -21,8 +23,8 @@ export function setLlmOverride(fn: LlmCallFn | null): void {
 
 export function stripLlmResponse(text: string): string {
 	let t = text.trim();
-	// qwen-thinking models wrap JSON in redacted_thinking blocks
-	t = t.replace(/<think>[\s\S]*?<\/redacted_thinking>/g, '').trim();
+	// Local reasoning models may use either ordinary or redacted thinking tags.
+	t = t.replace(/<(?:think|redacted_thinking)>[\s\S]*?<\/(?:think|redacted_thinking)>/g, '').trim();
 	const fence = t.match(/^```(?:json)?\s*([\s\S]*?)```$/m);
 	if (fence) t = fence[1].trim();
 	return t;
@@ -53,7 +55,7 @@ export async function callLmStudio(
 				...(options?.reasoningEffort ? { reasoning_effort: options.reasoningEffort } : {}),
 				...(options?.maxTokens ? { max_tokens: options.maxTokens } : {})
 			}),
-			signal: AbortSignal.timeout(LLM_TIMEOUT_MS)
+			signal: options?.signal ? AbortSignal.any([options.signal, AbortSignal.timeout(options.timeoutMs ?? LLM_TIMEOUT_MS)]) : AbortSignal.timeout(options?.timeoutMs ?? LLM_TIMEOUT_MS)
 		});
 		if (!res.ok) return null;
 		const data = (await res.json()) as {
@@ -66,6 +68,7 @@ export async function callLmStudio(
 				? message?.reasoning_content ?? null
 				: null;
 	} catch {
+		options?.signal?.throwIfAborted();
 		return null;
 	}
 }

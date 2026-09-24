@@ -7,7 +7,7 @@ import { browser } from '$app/environment';
 import { goto, invalidateAll } from '$app/navigation';
 import { page } from '$app/state';
 import type { AccountId } from '$lib/util/mail-account.js';
-import { inferAccount } from '$lib/util/mail-account.js';
+import { inferAccount, normalizeAccountId } from '$lib/util/mail-account.js';
 import { inferTier, type Tier } from '$lib/util/mail-tier.js';
 import { workerRunStore } from './workerRun.svelte.js';
 import { tlog } from '$lib/util/debug-trace.js';
@@ -66,6 +66,7 @@ export interface UnifiedMailRow {
 	tier: Tier;
 	isMock: boolean;
 	correction?: RowCorrection | null; // F.5: present nur bei yahoo-rows mit folio.db-Korrektur
+	work?: import('$lib/util/mail-work-status.js').MailWorkStatus;
 	reviewed?: boolean; // F.7: review_state.feedback_id exists
 	validator_opinion?: RowValidatorOpinion | null; // F.7: latest opinion per feedback (legacy, kept for Detail-Panel)
 	// F.8 — 2-Achsen-Classification
@@ -384,18 +385,6 @@ export function filtersFromUrl(searchParams: URLSearchParams): Filters {
 	};
 }
 
-// F.6: Map accounts.toml-key (Worker schreibt 'mirhamed') → Folio AccountId-Union
-// ('mirhamed_ch'). Rename-Konvergenz wandert nach F.8 (Brand-Migration).
-// Defensive fallback auf 'yahoo' für legacy null/empty values vor Migration.
-function mapAccountIdFromDb(dbValue: string | null | undefined): AccountId {
-	if (dbValue === 'mirhamed') return 'mirhamed_ch';
-	// Demo-store structural masking: konto-a / konto-b are never real identifiers.
-	if (dbValue === 'konto-a' || dbValue === 'konto_a') return 'konto_a';
-	if (dbValue === 'konto-b' || dbValue === 'konto_b') return 'konto_b';
-	if (dbValue === 'gmail' || dbValue === 'yahoo' || dbValue === 'mirhamed_ch') return dbValue;
-	return 'yahoo';
-}
-
 // Helper: convert feedback.db FeedbackRow to UnifiedMailRow (server-side use).
 export function unifyFeedbackRow(r: {
 	id: number;
@@ -438,7 +427,7 @@ export function unifyFeedbackRow(r: {
 	return {
 		uid: String(r.id),
 		task_id: r.task_id,
-		account: r.account_id ? mapAccountIdFromDb(r.account_id) : inferAccount(from_addr),
+		account: r.account_id ? normalizeAccountId(r.account_id) : inferAccount(from_addr),
 		from_addr,
 		from_name,
 		subject: r.subject,

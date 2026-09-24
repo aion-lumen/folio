@@ -3,8 +3,9 @@
   (13.5px weight-500, bewusst gedämpft) + Close-Button.
 -->
 <script lang="ts">
+	import { page } from '$app/state';
 	import type { UnifiedMailRow } from '$lib/stores/mailQueue.svelte.js';
-	import { ACCOUNTS, ACCOUNT_CLASS } from '$lib/util/mail-account.js';
+	import { accountMeta, accountClass } from '$lib/util/mail-account.js';
 
 	let { row, onClose }: { row: UnifiedMailRow; onClose: () => void } = $props();
 
@@ -25,9 +26,9 @@
 
 <header class="panel-header">
 	<div class="identity">
-		<span class="dot {ACCOUNT_CLASS[row.account]?.dot ?? ''}"></span>
+		<span class="dot {accountClass(row.account)?.dot ?? ''}"></span>
 		<span class="meta">
-			{(ACCOUNTS[row.account]?.label ?? row.account).toUpperCase()} · {fmtDate(row.received_at)} · {row.from_addr}
+			{accountMeta(row.account,page.data.mailAccounts).label.toUpperCase()} · {fmtDate(row.received_at)} · {row.from_addr}
 		</span>
 		<button
 			type="button"

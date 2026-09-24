@@ -14,18 +14,18 @@
 	});
 </script>
 
-{#if badge !== null && badge !== undefined}
+{#if badge !== undefined}
 	<button
 		class="mail-badge"
 		onclick={() => (modalOpen = true)}
-		title="Mail-Pipeline · Status"
+		title={badge === null ? 'Mail-Integration öffnen' : 'Mail-Pipeline · Status'}
 		aria-label="Mail-Integration öffnen"
 	>
 		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
 			<rect x="3" y="5" width="18" height="14" rx="2" />
 			<path d="M3 7l9 6 9-6" />
 		</svg>
-		<span class="mdot {badge}"></span>
+		{#if badge}<span class="mdot {badge}"></span>{/if}
 	</button>
 {/if}
 

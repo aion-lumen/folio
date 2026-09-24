@@ -131,7 +131,7 @@ function workerRunToPipelineRow(r: WorkerRunRow): PipelineRunRow {
 // Joinet folio.db.worker_runs (+summary) mit council.db.council_runs
 // (+summary) cross-DB read. Ergebnis sortiert nach started_at DESC.
 // Per-Item summary ist null wenn Run noch laeuft (kein write_summary).
-export function listRecentPipelineRuns(limit = 30): PipelineRunRow[] {
+export function listRecentPipelineRuns(limit = 30, includeCouncil = true): PipelineRunRow[] {
 	const out: PipelineRunRow[] = [];
 
 	// mail-side — Kind-Runs (parent_run_uuid) unter Parent gruppieren
@@ -160,7 +160,7 @@ export function listRecentPipelineRuns(limit = 30): PipelineRunRow[] {
 	out.push(...mailRoots);
 
 	// council-side
-	const councilRuns = listRecentCouncilRuns(limit);
+	const councilRuns = includeCouncil ? listRecentCouncilRuns(limit) : [];
 	for (const r of councilRuns) {
 		out.push({
 			run_uuid: r.run_uuid,

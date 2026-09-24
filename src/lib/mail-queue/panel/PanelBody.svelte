@@ -4,7 +4,7 @@
   Links bleiben Links, sonst keine Dekoration.
 -->
 <script lang="ts">
-	let { body }: { body: string | null | undefined } = $props();
+	let { body, truncated = true }: { body: string | null | undefined; truncated?: boolean } = $props();
 
 	// auto-linkify simple http(s) URLs
 	function linkify(text: string): string {
@@ -20,14 +20,14 @@
 <section class="panel-body">
 	<header class="body-head">
 		<span class="head-label">Mail-Inhalt</span>
-		<span class="head-tag">lokaler Auszug</span>
+		<span class="head-tag">{truncated ? 'lokaler Auszug' : 'lokal gespeicherter Mailtext'}</span>
 	</header>
 	<div class="body-text">
 		{#if body}
 			<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 			{@html linkify(body)}
 		{:else}
-			<p class="muted">Kein Body-Excerpt verfügbar (pre-I2-Mail oder Worker-Skip).</p>
+			<p class="muted">Für diese Mail ist aktuell kein lokaler Text verfügbar. Die Bewertungen können sich auf Betreff und Metadaten stützen.</p>
 		{/if}
 	</div>
 </section>

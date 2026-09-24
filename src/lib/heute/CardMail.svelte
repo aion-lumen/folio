@@ -3,6 +3,8 @@
   Zeigt Mail-Audit-Status: ungelesene Mails pro Account.
 -->
 <script lang="ts">
+	import { accountMeta } from '$lib/util/mail-account.js';
+	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { Inbox, ArrowRight } from 'lucide-svelte';
 
@@ -40,7 +42,7 @@
 	</header>
 	{#if stats.total === 0}
 		<p class="primary muted">Noch keine Mails</p>
-		<p class="hint">Starte einen Worker-Run auf /pipeline um Yahoo-IMAP zu indexieren.</p>
+		<p class="hint">Richte eine Mailquelle ein und starte den Import.</p>
 	{:else}
 		<p class="primary">
 			<span class="counter">{stats.unreviewed}</span>
@@ -77,7 +79,7 @@
 			<ul class="account-list">
 				{#each accountEntries as [acct, count]}
 					<li>
-						<span class="acct-name">{acct === 'mirhamed_ch' ? 'mirhamed' : acct}</span>
+						<span class="acct-name">{accountMeta(acct, page.data.mailAccounts).label}</span>
 						<span class="acct-count">{count}</span>
 					</li>
 				{/each}
@@ -112,7 +114,7 @@
 		align-items: center;
 		gap: 8px;
 	}
-	.card-head .icon { color: var(--color-foreground); }
+	.card-head :global(.icon) { color: var(--color-foreground); }
 	.title {
 		font-size: 13px;
 		font-weight: 600;
@@ -121,8 +123,8 @@
 		color: var(--color-muted-foreground);
 		flex: 1;
 	}
-	.arrow { opacity: 0.4; color: var(--color-muted-foreground); transition: opacity 150ms, transform 150ms; }
-	.card:hover .arrow { opacity: 1; transform: translateX(2px); }
+	.card :global(.arrow) { opacity: 0.4; color: var(--color-muted-foreground); transition: opacity 150ms, transform 150ms; }
+	.card:hover :global(.arrow) { opacity: 1; transform: translateX(2px); }
 
 	.primary {
 		font-size: 14px;

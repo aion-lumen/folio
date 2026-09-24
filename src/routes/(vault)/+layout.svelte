@@ -4,16 +4,18 @@
   Ersetzt die vorherige campaign-Hydration im Root-Layout.
 -->
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
 	import { campaignStore } from '$lib/stores/campaign.svelte.js';
 	import { layoutStore } from '$lib/stores/layout.svelte.js';
 
 	let { data, children } = $props();
 
 	// Synchronous init — runs during SSR and initial client render.
-	campaignStore.campaign = data.campaign;
-	campaignStore.acts = data.acts;
-	campaignStore.chapters = data.chapters;
+	untrack(()=>{
+  campaignStore.campaign = data.campaign;
+  campaignStore.acts = data.acts;
+  campaignStore.chapters = data.chapters;
+ });
 
 	// Re-sync on SvelteKit navigation within (vault).
 	$effect(() => {

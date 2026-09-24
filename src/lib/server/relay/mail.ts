@@ -1,5 +1,5 @@
 import { compileMemoryContext } from '../memory/compiler.js';
-import { enforceRelayRetention, findRelayCaseBySource, stageRelayCase } from './store.js';
+import { enforceRelayRetention, findRelayCaseBySource, stageRelayCase, refreshStagedRelayBody } from './store.js';
 import type { RelayCaseView, SessionTarget } from './types.js';
 
 export class MailRelayError extends Error {}
@@ -81,13 +81,14 @@ export function stageCareerMailRelay(
 	const sourceRef = mailRelaySourceRef(input.account_id, input.imap_uid);
 	const existing = findRelayCaseBySource('mail', sourceRef, target.id);
 	if (existing && existing.status !== 'expired') {
-		return { case: existing, target, created: false, body_truncated: input.body_truncated };
+		return { case: refreshStagedRelayBody(existing.case_id, reviewedMailBody(input)), target, created: false, body_truncated: input.body_truncated };
 	}
 
 	const body = reviewedMailBody(input);
 	const dataClasses = ['mail_metadata', 'mail_body'];
 	const memoryContext = target.allowed_data_classes.includes('memory_context') && target.memory_max_sensitivity
 		? compileMemoryContext({
+			consumer_id: 'relay-career',
 			domain: 'career',
 			query: `${input.subject}\n${body}`,
 			max_sensitivity: target.memory_max_sensitivity

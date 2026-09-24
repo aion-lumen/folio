@@ -4,6 +4,7 @@
   via localStorage persistiert.
 -->
 <script lang="ts">
+	import { page } from '$app/state';
 	import { onMount } from 'svelte';
 	import { workerRunStore } from '$lib/stores/workerRun.svelte.js';
 	import { estimateEtaSeconds, formatElapsed, formatEta } from '$lib/util/run-eta.js';
@@ -11,7 +12,9 @@
 
 	let { runs = [] }: { runs?: WorkerRunRow[] } = $props();
 
-	const TRANCHE_LS_KEY = 'pipeline.lastTrancheSize';
+	const configuredAccounts=$derived(page.data.accounts ?? []);
+ $effect(()=>{if(!configuredAccounts.some((a:{id:string})=>a.id===workerRunStore.account))workerRunStore.account=configuredAccounts[0]?.id??'';});
+ const TRANCHE_LS_KEY = 'pipeline.lastTrancheSize';
 
 	onMount(() => {
 		workerRunStore.fetchStatus();
@@ -98,9 +101,7 @@
 						bind:value={workerRunStore.account}
 						class="w-full rounded-md border border-input bg-background px-2 py-1 text-xs"
 					>
-						<option value="yahoo">yahoo</option>
-						<option value="gmail">gmail</option>
-						<option value="mirhamed">mirhamed</option>
+						{#each configuredAccounts as account}<option value={account.id}>{account.label}</option>{/each}
 					</select>
 				</label>
 				<label class="space-y-1">

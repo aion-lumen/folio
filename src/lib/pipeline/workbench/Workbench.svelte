@@ -12,7 +12,6 @@
 		WorkerRunLogRow,
 		CouncilRunLogRow
 	} from '$lib/server/folio-db/types.js';
-	import Progress from '../live/Progress.svelte';
 	import LiveLog from '../live/LiveLog.svelte';
 
 	let { runs }: { runs: PipelineRunRow[] } = $props();
@@ -48,32 +47,12 @@
 			});
 	});
 
-	// Voice-Cards: 3 LLM-Voices fuer validator-runs, aus logs abgeleitet.
-	type VoiceState = { id: string; label: string; status: 'fertig' | 'laeuft' | 'wartet'; count: number };
-	const voices = $derived.by<VoiceState[]>(() => {
-		if (!detail?.logs) return [];
-		const counts = new Map<string, number>();
-		for (const l of detail.logs) {
-			if (l.event_type === 'validated') {
-				counts.set(l.voice, (counts.get(l.voice) ?? 0) + 1);
-			}
-		}
-		const order = [
-			{ id: 'gemma', label: 'gemma · control' },
-			{ id: 'qwen', label: 'qwen · plugin-lens' },
-			{ id: 'qwen-thinking', label: 'qwen · thinking' }
-		];
-		const total = detail.row?.source === 'mail'
-			? (detail.row?.n_processed ?? 0)
-			: 0;
-		return order.map((v) => {
-			const c = counts.get(v.id) ?? 0;
-			let status: VoiceState['status'] = 'wartet';
-			if (c === total && total > 0) status = 'fertig';
-			else if (c > 0) status = 'laeuft';
-			return { ...v, status, count: c };
-		});
-	});
+	// Historical evidence only. Completed log rows do not identify an active model.
+ const voices = $derived.by(()=>{
+  const counts = new Map<string,number>();
+  for(const row of detail?.logs ?? []) if(row.event_type==='validated') counts.set(row.voice,(counts.get(row.voice)??0)+1);
+  return [...counts].map(([id,count])=>({id,label:id,count}));
+ });
 
 	const isMailValidator = $derived(
 		detail?.row?.source === 'mail' && detail?.row?.run_type === 'validator'
@@ -125,11 +104,11 @@
 			{#if isMailValidator}
 				<div class="voices">
 					{#each voices as v}
-						<div class="voice" class:v-fertig={v.status === 'fertig'} class:v-laeuft={v.status === 'laeuft'} class:v-wartet={v.status === 'wartet'}>
+						<div class="voice">
 							<div class="v-label">{v.label}</div>
 							<div class="v-status">
 								<span class="v-dot" aria-hidden="true"></span>
-								{v.status === 'fertig' ? 'FERTIG' : v.status === 'laeuft' ? 'LÄUFT' : 'WARTET'}
+								PROTOKOLLIERT
 							</div>
 							<div class="v-count">{v.count} Stimmen</div>
 						</div>
@@ -137,13 +116,7 @@
 				</div>
 			{/if}
 
-			<div class="dp-progress">
-				<Progress
-					done={detail.row.n_processed ?? 0}
-					total={detail.row.source === 'mail' ? Math.max(detail.row.n_processed, 30) : detail.row.n_processed}
-					unit={isMailValidator ? 'Mails' : detail.row.source === 'council' ? 'Objekte' : 'Mails'}
-				/>
-			</div>
+			<p class="dp-status">Protokollauszug · {detail.row.n_processed ?? 0} verarbeitete Mails gemeldet. Den aktuellen Gesamtlauf zeigt die Betriebsanzeige oben.</p>
 
 			<div class="dp-log-head">Letzte 5 Log-Zeilen</div>
 			<LiveLog lines={recentLogs} />
@@ -286,18 +259,7 @@
 		border-radius: 999px;
 		background: hsl(215 16% 60%);
 	}
-	.voice.v-fertig .v-status { color: hsl(142 64% 32%); }
-	.voice.v-fertig .v-dot { background: hsl(142 64% 42%); }
-	.voice.v-laeuft .v-status { color: hsl(217 80% 32%); }
-	.voice.v-laeuft .v-dot {
-		background: hsl(217 80% 52%);
-		animation: pulse 1.6s ease-in-out infinite;
-	}
-	.voice.v-wartet .v-status { color: hsl(215 16% 55%); }
-	@keyframes pulse {
-		0%, 100% { opacity: 1; }
-		50% { opacity: 0.5; }
-	}
+
 	.v-count {
 		font-variant-numeric: tabular-nums;
 		font-size: 13px;

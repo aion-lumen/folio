@@ -32,14 +32,11 @@
 </script>
 
 <div
-	class="sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background px-4 py-2"
+	class="mail-toolbar sticky top-0 z-20 flex items-center gap-3 border-b border-border bg-background px-4 py-2"
 >
 	<!-- Scope-Layer -->
-	{#if triage}
-		<ScopeDropdown {countsByAccount} {allRowsCount} />
-	{:else}
-		<ScopePills {countsByAccount} {allRowsCount} />
-	{/if}
+	<div class:desktop-only={!triage}><ScopeDropdown {countsByAccount} {allRowsCount} /></div>
+	{#if !triage}<div class="scope-pills"><ScopePills {countsByAccount} {allRowsCount} /></div>{/if}
 
 	<!-- Konsequenz-Layer (Stats) -->
 	<InlineStats />
@@ -54,3 +51,5 @@
 	<FilterDisclosure compact={triage} />
 	<SortDisclosure compact={triage} />
 </div>
+
+<style>.desktop-only{display:none}@media(max-width:900px){.desktop-only{display:block}.scope-pills{display:none}.mail-toolbar{flex-wrap:wrap;gap:8px;padding:10px;max-width:100%}.mail-toolbar :global(button){min-height:40px}.mail-toolbar :global(input){min-width:0;max-width:100%}}</style>

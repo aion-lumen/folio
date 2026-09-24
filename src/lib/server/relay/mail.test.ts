@@ -43,11 +43,20 @@ describe('mail to Session Relay', () => {
 		};
 	}
 
+	it('refreshes a staged excerpt without reusing its old request hash or overwriting its evidence file', async()=>{
+ const {mail,relay}=await setup();const input={feedback_id:17,account_id:'gmail',imap_uid:42,sender:'test',subject:'Job',domain:'job',body:'Short excerpt',body_truncated:true};
+ const first=mail.stageCareerMailRelay(input,[target]);const updated=mail.stageCareerMailRelay({...input,body:'Complete decoded mail',body_truncated:false},[target]);
+ expect(updated.case.case_id).toBe(first.case.case_id);expect(updated.case.request_hash).not.toBe(first.case.request_hash);
+ expect(relay.getRelayPayloadForReview(first.case.case_id).body).toContain('Complete decoded mail');
+ expect(relay.getRelayPayloadForReview(first.case.case_id).body).not.toContain('Vollständigkeit ist nicht belegt');
+ relay.approveRelayEgress(first.case.case_id,'owner');
+ expect(()=>mail.stageCareerMailRelay({...input,body:'changed again'},[target])).toThrow();
+ });
 	it('stages one reviewable career case per source and target', async () => {
 		const { mail, relay } = await setup();
 		const input = {
 			feedback_id: 17,
-			account_id: 'mirhamed',
+			account_id: 'work',
 			imap_uid: 4217,
 			sender: 'Recruiting <jobs@example.org>',
 			to_addr: 'candidate@example.net',
@@ -61,7 +70,7 @@ describe('mail to Session Relay', () => {
 		expect(first.created).toBe(true);
 		expect(first.case.status).toBe('staged');
 		const payload = relay.getRelayPayloadForReview(first.case.case_id);
-		expect(payload.source_ref).toBe('mail:mirhamed:4217');
+		expect(payload.source_ref).toBe('mail:work:4217');
 		expect(payload.body).toContain('Von: Recruiting <jobs@example.org>');
 		expect(payload.body).toContain('Vollständigkeit ist nicht belegt');
 		expect(payload.data_classes).toContain('memory_context');
@@ -75,7 +84,7 @@ describe('mail to Session Relay', () => {
 		const { mail, relay } = await setup();
 		const input = {
 			feedback_id: 19,
-			account_id: 'mirhamed',
+			account_id: 'work',
 			imap_uid: 4219,
 			sender: 'Recruiting <jobs@example.org>',
 			to_addr: 'candidate@example.net',

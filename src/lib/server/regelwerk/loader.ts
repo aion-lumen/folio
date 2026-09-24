@@ -75,7 +75,7 @@ const DEFAULT_REGELWERK: Regelwerk = {
 	},
 	priority_relevance: {},
 	voice_consensus: {
-		// Reihenfolge per Direktive 2026-05-26 §2.3: Lens 1=gemma, 2=qwen3.6, 3=qwen-thinking.
+		// 2026-08-23 real-mail evaluation: GLM + Qwen 3.6 + Qwen 3.8.
 		// `enabled` default true (in DEFAULT; backward-compat-fallback wenn yaml es weglässt).
 		voices: [
 			{
@@ -86,24 +86,31 @@ const DEFAULT_REGELWERK: Regelwerk = {
 				enabled: true
 			},
 			{
-				id: 'gemma-control',
+				id: 'glm-router',
 				role: 'control_llm',
-				lm_studio_model: 'gemma-4-26b-a4b-it-mlx',
+				lm_studio_model: 'zai-org/glm-4.7-flash',
 				response_strip: 'code_fence',
 				enabled: true
 			},
 			{
-				id: 'qwen35b-lens',
+				id: 'qwen36-control',
 				role: 'control_llm',
 				lm_studio_model: 'qwen3.6-35b-a3b-ud-mlx',
 				response_strip: 'code_fence',
 				enabled: true
 			},
 			{
-				id: 'qwen-validator',
+				id: 'qwen38-primary',
 				role: 'primary_llm',
-				lm_studio_model: 'qwen3-30b-a3b-thinking-2507',
-				response_strip: 'think',
+				lm_studio_model: 'qwen3.8-27b-mlx',
+				response_strip: 'code_fence',
+				enabled: true
+			},
+			{
+				id: 'gemma-disagreement-reviewer',
+				role: 'conditional_reviewer',
+				lm_studio_model: 'google/gemma-4-31b-qat',
+				response_strip: 'code_fence',
 				enabled: true
 			}
 		],

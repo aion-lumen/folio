@@ -1,30 +1,21 @@
-<!--
-  F.9 BUG-K2 — Search-Slot: Visual-Stub. Search-Backend kommt in v0.2.
-  Klick zeigt nur einen Toast, damit der Slot konsistent mit dem Design-Mockup
-  steht aber kein halbes Feature implementiert wird.
--->
 <script lang="ts">
-	import { toastStore } from '$lib/stores/toast.svelte.js';
-
+	import { page } from '$app/state';
 	let { compact = false }: { compact?: boolean } = $props();
-
-	function onClick(): void {
-		toastStore.show('Mail-Suche kommt in v0.2', 2200);
-	}
+	let query = $state(page.url.searchParams.get('q') ?? '');
 </script>
 
-<button
-	type="button"
-	class="inline-flex items-center gap-2 rounded-md border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
-	onclick={onClick}
-	title="Mail-Suche (kommt in v0.2)"
->
-	<svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-		<circle cx="7" cy="7" r="5" />
-		<path d="M11 11 l3 3" stroke-linecap="round" />
-	</svg>
-	{#if !compact}
-		<span>Mail suchen</span>
-		<span class="font-mono text-[10px] opacity-60 border border-border rounded px-1 py-0.5">⌘ K</span>
-	{/if}
-</button>
+<form method="GET" action="/mail-queue" class="search" class:compact aria-label="Importierte Mails durchsuchen">
+	<input name="q" bind:value={query} maxlength="200" placeholder="Mail suchen …" aria-label="Suchbegriff" />
+	<button type="submit" title="Importierte Mails durchsuchen" aria-label="Suchen">
+		<svg class="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+			<circle cx="7" cy="7" r="5" />
+			<path d="M11 11 l3 3" stroke-linecap="round" />
+		</svg>
+		{#if !compact}<span>Suchen</span>{/if}
+	</button>
+	{#if page.url.searchParams.get('q')}<a href="/mail-queue" aria-label="Suche löschen">×</a>{/if}
+</form>
+
+<style>
+	.search{display:flex;align-items:center;gap:5px}.search input{width:190px;min-height:32px;padding:5px 8px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-card);color:var(--color-foreground);font:inherit;font-size:12px}.search.compact input{width:130px}.search button{display:flex;align-items:center;gap:6px;min-height:32px;padding:5px 8px;border:1px solid var(--color-border);border-radius:6px;background:var(--color-card);color:var(--color-muted-foreground);cursor:pointer}.search a{padding:4px;color:var(--color-muted-foreground);text-decoration:none}@media(max-width:640px){.search input,.search.compact input{width:120px}}
+</style>

@@ -3,9 +3,10 @@
 import type { WorkerRunMode } from '../folio-db/types.js';
 
 export interface StartRunInput {
-	account: 'yahoo' | 'gmail' | 'mirhamed';
+	account: string;
 	mode: WorkerRunMode;
 	trancheSize: number;
+	intake?: { activatedAt: string; history?:boolean; unreadFirst?:boolean };
 }
 
 export interface ActiveRunInfo {

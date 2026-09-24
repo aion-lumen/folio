@@ -1,4 +1,5 @@
-import { readFile } from 'fs/promises';
+import { readStatementAssistantContext } from '../modules/ledger-books/reconciliation.js';
+import { paymentIntent,PAYMENT_HELP,runPaymentAgent,renderPaymentResult } from '../modules/ledger-books/payment-agent.js';
 import { homedir } from 'os';
 import { join } from 'path';
 import { createHash } from 'node:crypto';
@@ -6,7 +7,6 @@ import Database from 'better-sqlite3';
 import {
 	getHermesApiUrl,
 	getHermesApiKey,
-	getHermesHomePath,
 	getVaultPath,
 	isDemoVaultActive
 } from '../env.js';
@@ -18,6 +18,15 @@ import {
 	renderManifestText,
 	type HermesContextManifest
 } from './context-manifest.js';
+import { buildStrategyBrief, renderStrategyBriefForHermes } from '../strategy/brief.js';
+import { buildDomainCoverage, renderCoverageForHermes } from '../strategy/coverage.js';
+import { listMemoryFacts } from '../memory/store.js';
+import { mayUseLocalFinanceContext, readFinanceAssistantContext } from '../modules/ledger-books/intake.js';
+import { acquireModelActivity, releaseModelActivity, renewModelActivity, type ModelActivity } from '../mail-intake/state.js';
+import { careerMessage, careerRejectionMode, localCareerToolIntent, runLocalCareerTool } from './career-tools.js';
+import { applyInstructionBudget, planConversationBudget } from './conversation-budget.js';
+import { runLocalLedgerTool } from './ledger-tool.js';
+import { looksLikeLedgerQuestion } from './ledger-query.js';
 
 // Per-vault conversation identity. The gateway keys stored history by this name;
 // deriving it from the ACTIVE vault root means the demo vault and a private vault
@@ -27,11 +36,11 @@ function vaultFingerprint(): string {
 	return createHash('sha256').update(getVaultPath()).digest('hex').slice(0, 12);
 }
 
-function vaultConversationName(sessionId?: string): string {
+function vaultConversationName(sessionId?: string, segment=0): string {
 	const vault = vaultFingerprint();
 	if (!sessionId) return `folio-vault-${vault}`;
 	const session = createHash('sha256').update(sessionId).digest('hex').slice(0, 12);
-	return `folio-vault-${vault}-${session}`;
+	return `folio-vault-${vault}-${session}${segment?`-s${segment}`:''}`;
 }
 import { loadCampaign, loadActiveChapter, loadAllChapters } from '../vault/reader.js';
 import { getLeuchtfeuer } from '../vault/leuchtfeuer.js';
@@ -51,25 +60,17 @@ export interface HermesEvent {
 	profile?: ExecutionProfile;
 }
 
-async function loadMemory(): Promise<string> {
-	const dir = join(getHermesHomePath(), 'memories');
-	try {
-		const [user, memory] = await Promise.all([
-			readFile(join(dir, 'USER.md'), 'utf-8').catch(() => ''),
-			readFile(join(dir, 'MEMORY.md'), 'utf-8').catch(() => '')
-		]);
-		const parts: string[] = [];
-		if (user.trim()) parts.push(`## Über Afschin\n${user.trim()}`);
-		if (memory.trim()) parts.push(`## System-Memory\n${memory.trim()}`);
-		return parts.join('\n\n');
-	} catch {
-		return '';
-	}
+function loadMemory(): string {
+	return renderStrategyBriefForHermes(buildStrategyBrief({
+		max_sensitivity: 'sensitive',
+		per_domain_limit: 6
+	}));
 }
 
 async function buildSystemPrompt(
 	context: ChatContext,
-	manifest: HermesContextManifest
+	manifest: HermesContextManifest,
+	executionProfile: ExecutionProfile
 ): Promise<string> {
 	// Active vault root (demo or the user's own) — NEVER hardcode a private path
 	// here. The gateway scopes the file tools to exactly this root (see the
@@ -79,7 +80,7 @@ async function buildSystemPrompt(
 	const needsCampaign = manifest.sources.campaign || manifest.sources.leuchtfeuer;
 	const [campaign, memory, leuchtfeuer] = await Promise.all([
 		needsCampaign ? loadCampaign() : Promise.resolve(null),
-		manifest.sources.memory && !isDemoVaultActive() ? loadMemory() : Promise.resolve(''),
+		manifest.sources.memory && !isDemoVaultActive() ? Promise.resolve(loadMemory()) : Promise.resolve(''),
 		manifest.sources.leuchtfeuer
 			? getLeuchtfeuer().catch(() => ({ ids: [], week: 0, year: 0 }))
 			: Promise.resolve(null)
@@ -155,6 +156,29 @@ Akt ${campaign.current_act}, Kapitel ${campaign.current_chapter}${activeChapter 
 		sections.push(`## Objectives in Bearbeitung (${inProgress.split('\n').filter(Boolean).length})
 ${inProgress || '(keine in_progress)'}`);
 		sections.push(`## Nächste offene Objectives\n${todo || '(keine)'}`);
+	}
+
+	// Finance details cross this boundary only when the configured model is both
+	// local and matched to an installed LM Studio artifact. A localhost gateway
+	// alone is insufficient because it may still route to a cloud provider.
+	if (mayUseLocalFinanceContext(
+		manifest.sources.financeObservations,
+		isDemoVaultActive(),
+		executionProfile
+	)) {
+		const financeContext = [readFinanceAssistantContext(), readStatementAssistantContext()].filter(Boolean).join('\n\n');
+		if (financeContext) sections.push(financeContext);
+	}
+
+	if (context.view === 'strategy') {
+		if (!memory) {
+			const strategyBrief = buildStrategyBrief({
+				max_sensitivity: 'sensitive',
+				per_domain_limit: 6
+			});
+			sections.push(renderStrategyBriefForHermes(strategyBrief));
+		}
+		sections.push(renderCoverageForHermes(buildDomainCoverage(listMemoryFacts({ status: 'confirmed', limit: 500 }))));
 	}
 
 	if (manifest.sources.vaultGuidance) {
@@ -374,7 +398,7 @@ export async function* sendMessage(
 	context: ChatContext,
 	// history is tracked server-side via the named conversation (+ store), so it
 	// is not sent in the body; kept in the signature for call-site compatibility.
-	_history: HistoryMessage[] = [],
+	history: HistoryMessage[] = [],
 	selectedObjectiveIds: string[] = [],
 	correlation?: HermesCorrelation,
 	signal?: AbortSignal
@@ -384,19 +408,42 @@ export async function* sendMessage(
 		version: manifest.promptVersion,
 		fingerprint: manifest.fingerprint
 	});
-	const conversation = vaultConversationName(correlation?.sessionId);
+	if (context.view === 'strategy') {
+		if (executionProfile.endpoint !== 'local') {
+			throw new Error('Der Domänenkompass darf nur mit einem nachgewiesen lokalen Hermes-Modell laufen.');
+		}
+		if (!/qwen[\s._/-]*3[\s._/-]*8|qwen3\.8/iu.test(executionProfile.modelId)) {
+			throw new Error(`Für den Domänenkompass ist Qwen 3.8 vorgesehen; aktiv ist ${executionProfile.modelId}.`);
+		}
+	}
+	let modelActivity:ModelActivity|null=null;
+	let modelHeartbeat:ReturnType<typeof setInterval>|null=null;
+	const payment = paymentIntent(message);
+	const careerRequest=careerMessage(message,history);
+	const careerIntent=localCareerToolIntent(careerRequest);
+	const ledgerQuestion=!payment&&!careerIntent&&looksLikeLedgerQuestion(message,history);
+	if(executionProfile.endpoint==='local' && !payment && !ledgerQuestion && (!careerIntent || careerIntent==='reconcile')){
+		modelActivity=acquireModelActivity(`hermes-stream:${correlation?.turnId??'anonymous'}`,'shared');
+		if(!modelActivity)throw new Error('Das lokale Modell beendet gerade einen bereits laufenden Schritt. Hermes startet danach ohne erzwungenes Entladen erneut.');
+		modelHeartbeat=setInterval(()=>{try{if(modelActivity)renewModelActivity(modelActivity);}catch(error){console.error('[hermes/client] local model activity lost',error);}},30_000);
+	}
+	const budget=planConversationBudget(history);
+	const auditConversation=vaultConversationName(correlation?.sessionId);
+	const conversation=vaultConversationName(correlation?.sessionId,budget.segment);
 	let turnStarted = false;
 	let turnFinished = false;
 	if (correlation) {
-		startHermesTurn({
-			session_id: correlation.sessionId,
-			turn_id: correlation.turnId,
-			conversation_id: conversation,
-			vault_fingerprint: vaultFingerprint(),
-			objective_ids: selectedObjectiveIds,
-			execution_profile: executionProfile
-		});
-		turnStarted = true;
+		try{
+			startHermesTurn({
+				session_id: correlation.sessionId,
+				turn_id: correlation.turnId,
+				conversation_id: auditConversation,
+				vault_fingerprint: vaultFingerprint(),
+				objective_ids: selectedObjectiveIds,
+				execution_profile: executionProfile
+			});
+			turnStarted = true;
+		}catch(error){if(modelHeartbeat)clearInterval(modelHeartbeat);if(modelActivity)releaseModelActivity(modelActivity.token);throw error;}
 	}
 
 	// Stamp every assistant turn with the exact safe execution profile observed at
@@ -406,12 +453,57 @@ export async function* sendMessage(
 			type: 'execution_profile',
 			profile: executionProfile
 		};
+		if(budget.rotated)yield {type:'system_notice',content:'Modellkontext wurde kontrolliert erneuert; der jüngste Dialogausschnitt wurde übernommen, die vollständige Historie bleibt lokal erhalten.'};
+		const ledger=ledgerQuestion?await runLocalLedgerTool(message,history,executionProfile,manifest.sources.financeObservations,new Date(),signal):null;
+		if(ledger){
+			if(ledger.result){
+				yield {type:'tool_call',name:ledger.name,args:ledger.args};
+				yield {type:'tool_result',name:ledger.name,output:JSON.stringify(ledger.result)};
+			}
+			yield {type:'text',content:ledger.text};
+			if(turnStarted && correlation){finishHermesTurn(correlation.turnId,'completed');turnFinished=true;}
+			return;
+		}
+		if(payment){
+			if(payment==='help')yield {type:'text',content:PAYMENT_HELP};
+			else {
+				yield {type:'tool_call',name:'ledger.reconcile_payments',args:{scope:'supported_invoices',local_review:true}};
+				const notices:string[]=[];let wake:(()=>void)|undefined;let settled=false;
+				const job=runPaymentAgent(signal,(message)=>{notices.push(message);wake?.();}).then(result=>({result,error:null}),(error:unknown)=>({result:null,error})).finally(()=>{settled=true;wake?.();});
+				while(!settled || notices.length){
+					if(notices.length)yield {type:'system_notice',content:notices.shift()!};
+					else await new Promise<void>(resolve=>{wake=resolve;if(settled)resolve();});
+				}
+				const outcome=await job;if(outcome.error)throw outcome.error;
+				if(!outcome.result)throw new Error('payment_agent_missing_result');
+				yield {type:'tool_result',name:'ledger.reconcile_payments',output:JSON.stringify(outcome.result)};
+				yield {type:'text',content:renderPaymentResult(outcome.result)};
+			}
+			if(turnStarted && correlation){finishHermesTurn(correlation.turnId,'completed');turnFinished=true;}
+			return;
+		}
+		if (careerIntent) {
+            yield {type:'tool_call',name:careerIntent==='reconcile'?'positions.reconcile_rejections':careerIntent==='get'?'positions.get':'positions.search',args:{mode:careerIntent==='reconcile'?careerRejectionMode(careerRequest):'read_only'}};
+            const notices:string[]=[];let wake:(()=>void)|undefined;let settled=false;
+            const job=runLocalCareerTool(careerRequest,executionProfile,new Date(),signal,text=>{notices.push(text);wake?.();}).then(result=>({result,error:null}),(error:unknown)=>({result:null,error})).finally(()=>{settled=true;wake?.();});
+            while(!settled||notices.length){
+                if(notices.length)yield {type:'system_notice',content:notices.shift()!};
+                else await new Promise<void>(resolve=>{wake=resolve;if(settled)resolve();});
+            }
+            const outcome=await job;if(outcome.error)throw outcome.error;
+            const career=outcome.result;
+            if(career?.result)yield {type:'tool_result',name:career.name,output:JSON.stringify(career.result)};
+            yield {type:'text',content:career?.text??'Die Tracker-Abfrage konnte nicht aufgelöst werden.'};
+            if(turnStarted&&correlation){finishHermesTurn(correlation.turnId,'completed');turnFinished=true;}
+            return;
+        }
 
 		const [instructions, selectedContext] = await Promise.all([
-			buildSystemPrompt(context, manifest),
+			buildSystemPrompt(context, manifest, executionProfile),
 			buildSelectedContext(selectedObjectiveIds, manifest)
 		]);
-		const fullInstructions = selectedContext ? `${instructions}${selectedContext}` : instructions;
+		let fullInstructions = selectedContext ? `${instructions}${selectedContext}` : instructions;
+		fullInstructions=applyInstructionBudget(fullInstructions,budget.carryForward);
 
 		const body = {
 			model: 'default',
@@ -463,7 +555,7 @@ export async function* sendMessage(
 		if (turnStarted && correlation) {
 			finishHermesTurn(
 				correlation.turnId,
-				e instanceof StreamAbortedError ? 'aborted' : 'failed',
+				signal?.aborted || e instanceof StreamAbortedError ? 'aborted' : 'failed',
 				e instanceof Error ? e.message : String(e)
 			);
 			turnFinished = true;
@@ -475,6 +567,8 @@ export async function* sendMessage(
 		if (turnStarted && !turnFinished && correlation) {
 			finishHermesTurn(correlation.turnId, 'aborted', 'stream interrupted');
 		}
+		if(modelHeartbeat)clearInterval(modelHeartbeat);
+		if(modelActivity)releaseModelActivity(modelActivity.token);
 	}
 }
 
