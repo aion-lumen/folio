@@ -40,7 +40,7 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 **Platforms:** Linux / macOS / WSL2
 
 See the [public releases](https://github.com/aion-lumen/folio/releases) and [changelog](CHANGELOG.md).
-The new calendar, career and Ledger features are described [below](#new-in-06-preview); the mail workflow remains central.
+The new calendar, recurring-cost and Ledger features are described [below](#new-in-06-preview); the mail workflow remains central.
 
 ## Stack
 
@@ -229,7 +229,7 @@ Set `AION_LUMEN_PATH` if the repo is not at `~/Projects/aion-lumen/multi-agent`.
 - Module foundation — deny-by-default capabilities, route/database guards and kill switches
 - Folio-owned memory — confirmed facts with provenance, temporal history and domain-scoped context
 - Session Relay — provider-neutral handoffs with exact cloud approval and reviewed return paths
-- Career-mail workflow — a Mail Queue case can return as an editable draft, context question,
+- Mail Relay workflow — a Mail Queue case can return as an editable draft, context question,
   Objective proposal or explicit no-action conclusion; Folio never sends it automatically
 - Sonar preview — local review of X archive and following imports with append-only human decisions
 - Leuchtfeuer — privacy-preserving, visually attributed site and repository resonance from server
@@ -241,7 +241,6 @@ Set `AION_LUMEN_PATH` if the repo is not at `~/Projects/aion-lumen/multi-agent`.
 The new modules extend the mail workflow:
 
 - **Calendar:** a calendar overview and mail-linked proposals, with approval before creating an event.
-- **Applications:** open applications, contacts and responses together; clear rejection matches can update the tracker, ambiguous matches need review.
 - **Ledger and recurring costs:** imported income and expenses, contracts and subscriptions, with categories leading to individual transactions and statements. Confirmed own-account transfers are kept out of household income and spending; estimates remain marked.
 - **Mail operation:** distinguish decisions from completed automation and pending technical work. An optional local comparison bench supports mail-model evaluation with a separately configured runtime and test cohort.
 
@@ -257,7 +256,7 @@ Ledger is a preview for imported evidence; projections are estimates. It does no
 
 ## What is being built next
 
-- **Operational learning** — use the career Relay in daily work before expanding its adapters or
+- **Operational learning** — use the mail Relay in daily work before expanding its adapters or
   turning the optional Redaction Gate into a default workflow
 - **Memory evaluation** — compare disposable graph/RAG projections against Folio's small canonical
   facts-and-FTS baseline, using questions produced by real Relay cases

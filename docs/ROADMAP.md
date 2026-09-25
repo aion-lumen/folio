@@ -10,7 +10,7 @@ ship every adjacent idea together.
 
 - Household income, expenses and cash flow, expandable down to a transaction and statement.
 - Confirmed own-account transfers separated from household income and spending; estimates and missing evidence remain visible.
-- Calendar proposals, application tracking and subscription lifecycle evidence, with explicit boundaries for uncertain matches and external actions.
+- Calendar proposals and subscription lifecycle evidence, with explicit boundaries for uncertain matches and external actions.
 - Optional local model comparison bench for mail triage; its companion runtime and test cohort must be configured separately.
 - Daily-use validation of the new modules comes before a stable release. Trading remains a separate future stage; no real-money execution is included.
 
@@ -91,7 +91,7 @@ third-party package loading remains deliberately outside this foundation and is 
 Sonar is the first non-mail consumer: its initial read/review surface keeps imported external notes
 immutable, records human decisions append-only, and has no external publishing capability.
 
-## Shipped in v0.5.0 — Session Relay and career pilot
+## Shipped in v0.5.0 — Session Relay and mail pilot
 
 - A provider-neutral filesystem contract hands a reviewed case to its responsible session and
   accepts a reply draft, context request, Objective proposal, or explicit no-action conclusion in
@@ -103,13 +103,13 @@ immutable, records human decisions append-only, and has no external publishing c
   supersession, tombstones, and a rebuildable SQLite FTS projection.
 - Small context bundles are compiled from confirmed facts only, filtered by domain and the target's
   explicit sensitivity ceiling, and show the exact bundle before approval.
-- The first real career workflow was completed from incoming mail through session response to a
+- The first real mail workflow was completed from incoming mail through session response to a
   reviewed Folio result. Cloud targets remain opt-in and absent from a fresh installation.
 - The existing Redaction Gate remains an optional `redact-then-share` step where a case needs it;
   do not make its more complex T2 workflow the default path.
 - The public privacy promise was updated with the release.
 
-## After the career learning gate
+## After the mail learning gate
 
 - Evaluate Hindsight and OpenViking as disposable shadow projections against questions produced by
   real Relay usage; Folio's SQLite/FTS baseline remains the control.
@@ -120,7 +120,7 @@ immutable, records human decisions append-only, and has no external publishing c
 
 ## Local routines — exploration
 
-- Move search-only daily routines, such as job and repository watches, from hosted agent runs to
+- Move search-only daily routines, such as repository watches, from hosted agent runs to
   Folio and local models.
 - Use the existing authenticated ntfy channel for payload-minimal completion, failure, and
   decision-waiting notifications.
