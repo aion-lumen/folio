@@ -43,7 +43,10 @@
 				<span class="tile-label">{shortLabel(v.label)}</span>
 			</span>
 			{#if v.kind === 'present'}
-				<span class="reason" title={v.reasoning}>{clipReason(v.reasoning)}</span>
+				<span class="assessment">
+					<span class="reason" title={v.reasoning}>{clipReason(v.reasoning)}</span>
+					<small class="model-id">{v.label === 'H' ? 'Feste Regeln · kein Sprachmodell' : (v.modelId || 'Modell nicht gespeichert')}</small>
+				</span>
 				<span class="verdict">
 					{v.domain}{v.confidence != null ? ` · ${Math.round(v.confidence * 100)}%` : ''}
 				</span>
@@ -65,7 +68,7 @@
 	}
 	.voice-row {
 		display: grid;
-		grid-template-columns: 28px 1fr auto;
+		grid-template-columns: 28px minmax(0, 1fr) auto;
 		align-items: center;
 		gap: 10px;
 		font-size: 11.5px;
@@ -100,6 +103,8 @@
 	.voice-missing { background: hsl(210 8% 85%); }
 	.voice-missing .tile-label { color: hsl(210 8% 45%); text-shadow: none; }
 
+	.assessment { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+	.model-id { font-family: var(--font-mono); font-size: 9.5px; line-height: 1.45; color: var(--color-muted-foreground); overflow-wrap: anywhere; }
 	.reason {
 		color: var(--color-foreground);
 		overflow: hidden;
@@ -116,5 +121,9 @@
 		font-size: 10.5px;
 		color: var(--color-muted-foreground);
 		flex-shrink: 0;
+	}
+	@media (max-width: 480px) {
+		.voice-row { grid-template-columns: 22px minmax(0, 1fr); gap: 6px 8px; }
+		.verdict { grid-column: 2; }
 	}
 </style>

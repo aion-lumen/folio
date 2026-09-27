@@ -35,7 +35,7 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 
 ## Status
 
-**Status:** v0.6.0-preview.1 public preview<br>
+**Status:** v0.6.0-preview.2 public preview<br>
 **License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
 
@@ -252,7 +252,7 @@ The new modules extend the mail workflow:
 Mail processing and model assessment remain local; optionally configured connections such as Google Calendar communicate with the respective provider.
 
 Ledger is a preview for imported evidence; projections are estimates. It does not execute bank transactions.
-[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.1)
+[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.2)
 
 ## What is being built next
 

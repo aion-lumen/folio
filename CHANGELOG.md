@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-preview.2] - 2026-09-27
+
+### Fixed
+
+- Show each assessment's stored model name directly beneath its reason in the mail detail panel. Fixed rules are labelled separately; older assessments without a stored model identity remain explicitly unknown.
+- Keep assessment rows readable on narrow screens, including long model identifiers.
+
+This display-only update leaves mail classification, routing, imports and stored data unchanged. No migration is required.
+
 ## [0.6.0-preview.1] - 2026-09-25
 
 Public preview: Ledger, calendar, career and contract workflows are source-backed early features. Optional companion runtimes are configured separately; this is not a turnkey bank connection or trading platform.
