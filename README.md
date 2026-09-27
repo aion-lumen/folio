@@ -35,7 +35,7 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 
 ## Status
 
-**Status:** v0.6.0-preview.2 public preview<br>
+**Status:** v0.6.0-preview.3 public preview<br>
 **License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
 
@@ -242,6 +242,7 @@ The new modules extend the mail workflow:
 
 - **Calendar:** a calendar overview and mail-linked proposals, with approval before creating an event.
 - **Ledger and recurring costs:** imported income and expenses, contracts and subscriptions, with categories leading to individual transactions and statements. Confirmed own-account transfers are kept out of household income and spending; estimates remain marked.
+- **Memory graph:** explore confirmed knowledge and its source links in 2D or 3D, with search, domain filters and source details. Available to the owner under **Gedächtnis**; this is a read-only projection, not automatic confirmation of new facts. [View the graph with synthetic data](docs/screenshots/v0.6.0-preview.3/memory-graph.png).
 - **Mail operation:** distinguish decisions from completed automation and pending technical work. An optional local comparison bench supports mail-model evaluation with a separately configured runtime and test cohort.
 
 <p align="center">
@@ -252,7 +253,7 @@ The new modules extend the mail workflow:
 Mail processing and model assessment remain local; optionally configured connections such as Google Calendar communicate with the respective provider.
 
 Ledger is a preview for imported evidence; projections are estimates. It does not execute bank transactions.
-[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.2)
+[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.3)
 
 ## What is being built next
 

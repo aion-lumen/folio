@@ -31,3 +31,10 @@ Ledger works with imported sources and supported format profiles. It is not audi
 The release adds an optional local model comparison bench for mail triage. An explicit test cohort and a separate local multi-agent runtime are required.
 
 The [complete Ledger screenshot](screenshots/v0.6.0-preview.1/ledger-dashboard-complete.jpg) uses synthetic data. Diagnostic screenshots of unavailable sources in the [release image index](screenshots/v0.6.0-preview.1/README.md) document setup states; they are not a tour of the mail workflow. For that, see the [mail gallery](screenshots/mail/README.md).
+
+
+## Memory graph (preview.3)
+
+Open **Gedächtnis** in the workspace navigation, or `/memory/graph`. The graph is owner-only and reads the existing Memory database. It supports 2D/3D navigation, search, domain filters and source details. Filtered links are labelled as hidden rather than missing. Source candidates are not confirmed facts; the spatial layout does not establish new relationships.
+
+This update needs no new schema migration. It does not invoke a model or change stored facts. A WebGL-capable browser is required for the graph renderer, including its 2D mode.

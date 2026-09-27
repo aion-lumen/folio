@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-preview.3] - 2026-09-28
+
+### Added
+
+- Publish the local Memory graph interface: 2D/3D navigation, search, domain and connection filters, and source-linked node details. The existing Memory navigation entry opens the graph.
+- Restrict the graph data loader to the owner, including direct requests for page data.
+
+### Fixed
+
+- Render graph tooltip labels as literal text, including HTML-like source titles.
+- Distinguish filtered connections from genuinely isolated nodes and clear details when their node is filtered out.
+
+The graph is a read-only, rebuildable projection of existing Memory data. Source candidates remain distinct from confirmed facts. No new database migration or model call is required.
+
 ## [0.6.0-preview.2] - 2026-09-27
 
 ### Fixed
