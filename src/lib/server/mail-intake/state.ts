@@ -74,6 +74,25 @@ function purgeDeadModelActivities():void {
  const rows=db().prepare('SELECT token,pid FROM local_model_activity').all() as {token:string;pid:number}[];
  for(const row of rows)if(!pidAlive(row.pid))db().prepare('DELETE FROM local_model_activity WHERE token=?').run(row.token);
 }
+/** Recover a crashed runtime only after both its owner and all subprocesses are gone. */
+export function recoverInterruptedIntake():boolean {
+ const ended=(pid:number|null):boolean=>{if(!pid || pid<1)return false;try{process.kill(pid,0);return false;}catch(error){return (error as NodeJS.ErrnoException).code==='ESRCH';}};
+ return db().transaction(()=>{
+  const lease=db().prepare('SELECT token,expires FROM mail_intake_lease WHERE id=1').get() as {token:string;expires:number}|undefined;
+  if(!lease || lease.expires>Date.now())return false;
+  const activities=db().prepare('SELECT pid FROM local_model_activity').all() as {pid:number}[];
+  if(activities.some(row=>!ended(row.pid)))return false;
+  const workers=db().prepare("SELECT run_uuid,pid FROM worker_runs WHERE status='running'").all() as {run_uuid:string;pid:number|null}[];
+  if(workers.some(row=>!ended(row.pid)))return false;
+  const at=new Date().toISOString();
+  for(const worker of workers)db().prepare("UPDATE worker_runs SET status='failed',ended_at=?,error_summary='interrupted_subprocess' WHERE run_uuid=? AND status='running'").run(at,worker.run_uuid);
+  // Keep intake checkpoints and imported IDs: execute() resumes the existing run.
+  purgeDeadModelActivities();
+  db().prepare('DELETE FROM mail_intake_lease WHERE token=?').run(lease.token);
+  db().prepare('INSERT INTO mail_intake_events VALUES (?,?,?,?,?)').run(randomUUID(),at,'system','mail-intake/recovery',JSON.stringify({event:'interrupted_runtime_recovered',workers:workers.map(row=>row.run_uuid)}));
+  return true;
+ })();
+}
 function nextGeneration():number {
  const current=(db().prepare('SELECT generation FROM local_model_gate WHERE id=1').get() as {generation:number}).generation+1;
  db().prepare('UPDATE local_model_gate SET generation=? WHERE id=1').run(current);return current;

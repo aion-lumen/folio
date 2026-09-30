@@ -14,6 +14,10 @@
 > A campaign as structure.<br>
 > A hearth at the center.
 
+## Memory review · preview.4
+
+Memory separates your decisions from waiting and completed work. Related evidence stays together; each result links to its sources. The knowledge graph remains available from the Memory workspace. [Setup and update notes](docs/memory-review.md).
+
 ## Why Folio exists
 
 Folio began with a simple need: a second brain that would not disappear at the end of an AI
@@ -35,7 +39,7 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 
 ## Status
 
-**Status:** v0.6.0-preview.3 public preview<br>
+**Status:** v0.6.0-preview.4 public preview<br>
 **License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
 
@@ -253,7 +257,7 @@ The new modules extend the mail workflow:
 Mail processing and model assessment remain local; optionally configured connections such as Google Calendar communicate with the respective provider.
 
 Ledger is a preview for imported evidence; projections are estimates. It does not execute bank transactions.
-[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.3)
+[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.4)
 
 ## What is being built next
 

@@ -84,3 +84,23 @@ describe('separate career identifiers and chronology',()=>{
   expect(reconcileEvidence(history,[{...candidate(1),mailDate:'2026-10-01'}],[event(1,'Acme AG','Business Analyst (80-100%)')])[0].status).toBe('UNCLEAR');
  });
 });
+
+describe('source-backed employer departments',()=>{
+ const tracker=()=>parseCartaTrackerSource(`const DATA=[{"title":"Business Analyst/-in, 80-100% [FEST] - BEWORBEN 23.08","company":"Kanton Beispiel, Baudirektion / Generalsekretariat","url":"https://jobs.example/1","status":"applied","action":"wait","submitted_at":"2026-08-23"}];const REJECTED=[];`);
+ const mail=()=>({...candidate(77),subject:'Bewerbung Business Analyst/-in 80-100%',body:'Vielen Dank für deine Bewerbung bei der Baudirektion.\nLeider müssen wir dir mitteilen, dass wir dich im weiteren Auswahlprozess nicht berücksichtigen können.\nKanton Beispiel\nBaudirektion\nHuman Resources'});
+ const rejection=()=>event(77,'Baudirektion','Business Analyst/-in 80-100%');
+ it('matches the short department with its parent evidenced in the same mail',()=>{
+  expect(reconcileEvidence(tracker(),[mail()],[rejection()])[0].status).toBe('EXACT_PROPOSAL');
+ });
+ it('keeps other cantons, missing parent evidence and conflicting roles in review',()=>{
+  expect(reconcileEvidence(tracker(),[{...mail(),body:'Baudirektion Kanton Anders'}],[rejection()])[0].status).toBe('UNCLEAR');
+  expect(reconcileEvidence(tracker(),[{...mail(),body:'Baudirektion'}],[rejection()])[0].status).toBe('UNCLEAR');
+  expect(reconcileEvidence(tracker(),[mail()],[{...rejection(),role:'Project Manager'}])[0].status).toBe('UNCLEAR');
+ });
+ it('keeps two matching applications ambiguous and a later application untouched',()=>{
+  const t=tracker();t.positions.push({...t.positions[0],identity:'second'});
+  expect(reconcileEvidence(t,[mail()],[rejection()])[0].reasonCode).toBe('multiple_position_matches');
+  t.positions.pop();t.positions[0].submitted_at='2026-09-15';
+  expect(reconcileEvidence(t,[mail()],[rejection()])[0].reasonCode).toBe('application_date_conflict');
+ });
+});

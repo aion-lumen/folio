@@ -1,9 +1,10 @@
 import { building } from '$app/environment';
+import { startMemoryWorkRuntime } from '$lib/server/memory/work-runtime.js';
 import { startIntakeRuntime } from '$lib/server/mail-intake/runner.js';
 import { isLedgerDemo, ledgerDemoRoot, ledgerDemoRequestAllowed, validateLedgerDemoTree } from '$lib/server/ledger-demo.js';
 if (!building) {
  if (isLedgerDemo()) validateLedgerDemoTree();
- else startIntakeRuntime();
+ else { startIntakeRuntime(); startMemoryWorkRuntime(); }
 }
 // Direktive 6 (council-iteration-1.5): Auth-Layer via Tailscale-Header.
 //

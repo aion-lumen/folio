@@ -35,6 +35,10 @@ The [complete Ledger screenshot](screenshots/v0.6.0-preview.1/ledger-dashboard-c
 
 ## Memory graph (preview.3)
 
-Open **Gedächtnis** in the workspace navigation, or `/memory/graph`. The graph is owner-only and reads the existing Memory database. It supports 2D/3D navigation, search, domain filters and source details. Filtered links are labelled as hidden rather than missing. Source candidates are not confirmed facts; the spatial layout does not establish new relationships.
+Open **Gedächtnis** in the workspace navigation and select **Graph**, or go to `/memory/graph`. The graph is owner-only and reads the existing Memory database. It supports 2D/3D navigation, search, domain filters and source details. Filtered links are labelled as hidden rather than missing. Source candidates are not confirmed facts; the spatial layout does not establish new relationships.
 
 This update needs no new schema migration. It does not invoke a model or change stored facts. A WebGL-capable browser is required for the graph renderer, including its 2D mode.
+
+## Memory review (preview.4)
+
+The Memory entry now opens the review workspace. The update adds `memory_retention` alongside existing tables; stored facts and source references are preserved. See [Memory review](memory-review.md) for the views, optional automation and backup/rollback procedure.

@@ -1,11 +1,11 @@
 import { afterEach,beforeEach,describe,it,expect,vi } from 'vitest';
 import { mkdtempSync,rmSync } from 'node:fs';import { tmpdir } from 'node:os';import { join } from 'node:path';
 import { resetFolioDbForTests } from '../folio-db/init.js';
-import { acquire,release,configure,save,runs,getIntakeRun,assertAuthorization,db,acquireModelActivity,releaseModelActivity,modelActivities,renewModelActivity,type IntakeRun } from './state.js';
+import { recoverInterruptedIntake,acquire,release,configure,save,runs,getIntakeRun,assertAuthorization,db,acquireModelActivity,releaseModelActivity,modelActivities,renewModelActivity,type IntakeRun } from './state.js';
 import {prepareIntakeRetry} from './retry.js';
 import { memoryMailBody, localMailSource } from './source.js';
 import type { FeedbackRow } from '../feedback/types.js';
-let dir='';beforeEach(()=>{dir=mkdtempSync(join(tmpdir(),'folio-intake-test-'));vi.stubEnv('FOLIO_DB_PATH',join(dir,'folio.db'));});afterEach(()=>{resetFolioDbForTests();vi.unstubAllEnvs();rmSync(dir,{recursive:true,force:true});});
+let dir='';beforeEach(()=>{dir=mkdtempSync(join(tmpdir(),'folio-intake-test-'));vi.stubEnv('FOLIO_DB_PATH',join(dir,'folio.db'));});afterEach(()=>{resetFolioDbForTests();vi.restoreAllMocks();vi.unstubAllEnvs();rmSync(dir,{recursive:true,force:true});});
 describe('durable intake authority',()=>{
  it('retains account priorities and existing scopes across pause and reactivation',()=>{
   const first=configure(true,'owner:1','priority',10,{unread_first:true,deferred_accounts:['yahoo'],career_rejections:true,history_paused:true});
@@ -35,4 +35,22 @@ describe('durable intake authority',()=>{
 	 it('never treats lease expiry alone as proof that inference stopped',()=>{const token=acquire()!;db().prepare('UPDATE mail_intake_lease SET expires=0 WHERE token=?').run(token);expect(acquire()).toBeNull();release(token);});
  it('scopes standing authority to exact pending feedback and revokes on pause',()=>{const c=configure(true,'owner:1','test');save({id:'run',account:'gmail',state:'running',phase:'memory',items:[{id:7,stage:'review'}],attempts:0,started_at:new Date().toISOString()});expect(()=>assertAuthorization(c.authorization_id,'run',7,'owner:1')).not.toThrow();expect(()=>assertAuthorization(c.authorization_id,'run',8,'owner:1')).toThrow();configure(false,'owner:1','pause');expect(()=>assertAuthorization(c.authorization_id,'run',7,'owner:1')).toThrow();expect(db().prepare('SELECT count(*) AS n FROM mail_intake_events').get()).toMatchObject({n:2});});
  it('prefers full bound text and refuses truncated or mismatched evidence',()=>{db().prepare('INSERT INTO mail_intake_sources VALUES (7,?,?,?,?,?)').run('gmail',42,900,'Complete synthetic body',0);const row={id:7,account_id:'gmail',imap_uid:42} as FeedbackRow;expect(memoryMailBody(row)).toBe('Complete synthetic body');expect(memoryMailBody({...row,account_id:'yahoo'})).toBeNull();db().prepare('UPDATE mail_intake_sources SET truncated=1').run();expect(memoryMailBody(row)).toBeNull();});
+});
+
+describe('interrupted runtime recovery',()=>{
+ const orphan=()=>{const token=acquire()!;db().prepare('UPDATE mail_intake_lease SET expires=0').run();db().prepare('DELETE FROM local_model_activity').run();return token;};
+ const worker=(pid:number|null)=>db().prepare("INSERT INTO worker_runs (run_uuid,account,board,mode,tranche_size,pid,status,started_at) VALUES ('old-worker','test','test','silent',10,?,'running','2026-09-29')").run(pid);
+ it('recovers a dead worker while preserving imported IDs and memory checkpoints',()=>{
+  orphan();worker(99999999);vi.spyOn(process,'kill').mockImplementation(()=>{throw Object.assign(Error('gone'),{code:'ESRCH'});});
+  const run:IntakeRun={id:'old',account:'test',state:'running',phase:'memory',items:[{id:7,stage:'review',proposal_id:'p',grant_id:'g'}],attempts:0,started_at:'2026-09-29'};save(run);
+  expect(recoverInterruptedIntake()).toBe(true);expect(getIntakeRun('old')).toEqual(run);
+  expect(db().prepare("SELECT status,error_summary,ended_at FROM worker_runs").get()).toMatchObject({status:'failed',error_summary:'interrupted_subprocess',ended_at:expect.any(String)});
+  expect(db().prepare('SELECT actor_kind FROM mail_intake_events').get()).toEqual({actor_kind:'system'});
+  expect(recoverInterruptedIntake()).toBe(false);expect(acquire()).not.toBeNull();
+ });
+ it('keeps a live owner even after lease expiry',()=>{acquire();db().prepare('UPDATE mail_intake_lease SET expires=0').run();expect(recoverInterruptedIntake()).toBe(false);});
+ it('keeps a lease while an orphan worker is still alive',()=>{orphan();worker(process.pid);expect(recoverInterruptedIntake()).toBe(false);});
+ it('keeps a lease when the worker PID is unknown',()=>{orphan();worker(null);expect(recoverInterruptedIntake()).toBe(false);});
+ it('keeps a lease on permission or unexpected process-check failures',()=>{orphan();worker(99999999);vi.spyOn(process,'kill').mockImplementation(()=>{throw Object.assign(Error('unknown'),{code:'EPERM'});});expect(recoverInterruptedIntake()).toBe(false);});
+ it('recovers an owner lost before a worker was spawned, only after expiry',()=>{const token=acquire()!;db().prepare('DELETE FROM local_model_activity').run();expect(recoverInterruptedIntake()).toBe(false);db().prepare('UPDATE mail_intake_lease SET expires=0 WHERE token=?').run(token);expect(recoverInterruptedIntake()).toBe(true);});
 });

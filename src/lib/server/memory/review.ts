@@ -1,5 +1,5 @@
-import { getFolioDb } from '../folio-db/init.js';
-import { getFeedbackBriefsByIds } from '../feedback/reader.js';
+import { db as mailIntakeDb } from '../mail-intake/state.js';
+import { getFeedbackBriefsByIds, getFeedbackRowsByMailRef } from '../feedback/reader.js';
 import { isHistoricalAppointment, zurichToday } from '../../memory/temporal.js';
 import { sourceDateSpan } from '../../calendar/source-dates.js';
 import { getMemoryProposalBundle } from './store.js';
@@ -18,7 +18,7 @@ export function splitTemporalReview(bundle: MemoryProposalBundle, today = zurich
  * Classification happens BEFORE pagination, including on existing imports.
  */
 export function listMemoryReviewQueue(covered = new Set<string>(), now = new Date(), coveredEpisodes = new Set<string>()) {
-	const db = getFolioDb();
+	const db = mailIntakeDb();
 	const today = zurichToday(now);
 	const ids = db.prepare("SELECT proposal_id FROM memory_proposals WHERE status = 'candidate' ORDER BY created_at DESC").all() as Array<{ proposal_id: string }>;
 	const bundles = ids.map(({ proposal_id }) => {
@@ -44,7 +44,13 @@ export function listMemoryReviewQueue(covered = new Set<string>(), now = new Dat
 			}
 		}
 	} catch { /* Source date unavailable; history classification remains evidence-based. */ }
-	for (const bundle of bundles) bundle.source_date = dates.get(bundle.proposal.source_ref) ?? null;
+	for (const bundle of bundles) {
+  bundle.source_date = dates.get(bundle.proposal.source_ref) ?? null;
+  if(!bundle.source_date&&bundle.proposal.source_kind==='mail')try{
+   const matches=getFeedbackRowsByMailRef(bundle.proposal.source_ref);
+   if(matches.length===1&&matches[0].mail_date&&Number.isFinite(Date.parse(matches[0].mail_date)))bundle.source_date=matches[0].mail_date;
+  }catch{/* Missing metadata remains unknown. */}
+ }
 	const nextDate = (bundle: typeof bundles[number]) => bundle.facts
 		.filter(fact => fact.status === 'candidate' && fact.predicate === 'scheduled_for')
 		.map(fact => sourceDateSpan({ value_text: fact.value_text, valid_from: fact.valid_from })?.start)

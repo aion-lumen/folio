@@ -57,6 +57,17 @@ async function vaultExists(): Promise<boolean> {
 }
 
 export const load: PageServerLoad = async ({locals}) => {
+	// Check before reading private sources or running inbox maintenance.
+	if (locals.user?.role !== 'owner') return {
+		focus: {items:[],warning:''},
+		calendarAttention: {items:[],syncedAt:null,unavailable:true},
+		calendarSources: [], vaultPresent:false, inboxPending:0,
+		inboxTriage: {awaiting_review:0,auto_committed:0},
+		leads: [] as FristnaherLead[],
+		mail: {total:0,unreviewed:0,unreviewedByAccount:{} as Record<string,number>,triageTodayByDomain:{} as Record<string,number>,triageTodayActionable:[]},
+		lastRun:null,
+		leuchtfeuer: {generatedFrom:null,stale:true,sites:[],verifiedThrough:null,github:null}
+	};
 	const vaultPresent = await vaultExists();
 
 	// Mail-Counts (alle Accounts) — robustes Fallback bei feedback.db-Fehler.

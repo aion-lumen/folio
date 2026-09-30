@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-preview.4] - 2026-09-30
+
+### Added
+
+- Memory workspace with separate decision, waiting, automatic, history and knowledge views; the graph remains one click away.
+- Group related profile evidence before pagination, with source details and an atomic, revision-checked group confirmation.
+- Optional evidence-based reconciliation and reversible relevance routing, recorded separately from human confirmations.
+- Monthly payment review waits for complete account-statement coverage and reconciliation before presenting remaining unmatched receipts.
+
+### Fixed
+
+- Keep restored Memory proposals in owner review across later model reviews and source updates.
+- Show automatically retired duplicate imports with their retained source under completed work.
+- Keep manual mail extraction separate from automatic relevance routing.
+- Restrict root-layout rule configuration, local vault paths and private home data to the owner.
+- Ask for a decision when a recorded rejection cannot be reconciled automatically.
+- Preserve the selected Memory view and filters after confirming a bundle.
+- Match source-backed organization variants while retaining ambiguous identities for review.
+- Recover interrupted mail intake only after its lease expires and every associated process is proven absent.
+- Keep desktop navigation available on compact pages and avoid interrupting navigation with pipeline refreshes.
+
+### Upgrade
+
+- Adds the `memory_retention` table. Back up the database and operator configuration before upgrading. Automated Memory work requires explicit setup; see [Memory setup](docs/memory-review.md).
+
 ## [0.6.0-preview.3] - 2026-09-28
 
 ### Added

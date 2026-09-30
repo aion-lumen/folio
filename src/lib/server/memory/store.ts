@@ -648,6 +648,10 @@ export function hasMemorySourceDomainConflict(domain: string, sourceRef: string)
 		|| db.prepare(`SELECT 1 FROM memory_facts WHERE source_ref = ? AND domain <> ? AND status IN ('candidate','confirmed') LIMIT 1`).get(sourceRef, domain));
 }
 
+function ownerRestoredMemory(proposalId: string): boolean {
+	return Boolean(getFolioDb().prepare('SELECT 1 FROM memory_retention WHERE proposal_id = ? AND owner_override = 1').get(proposalId));
+}
+
 function confirmBundle(proposalId: string, actorId: string, actorKind: 'human' | 'system', detail: Record<string, unknown> = {}, reviewToday?: string): MemoryProposalBundle {
 	const db = getFolioDb();
 	db.transaction(() => {
@@ -655,6 +659,8 @@ function confirmBundle(proposalId: string, actorId: string, actorKind: 'human' |
 		if (bundle.proposal.status !== 'candidate') {
 			throw new MemoryStoreError(`only candidate proposals can be confirmed: ${bundle.proposal.status}`);
 		}
+		// A restored proposal requires a human decision, regardless of the automatic policy.
+		if (actorKind === 'system' && ownerRestoredMemory(proposalId)) throw new MemoryStoreError('Restored proposal requires owner confirmation.');
 		const historical = new Set(bundle.facts.filter(fact => fact.status === 'candidate' && reviewToday && isHistoricalAppointment(fact, reviewToday)).map(fact => fact.fact_id));
 		const factsToConfirm = bundle.facts.filter(fact => fact.status === 'candidate' && !historical.has(fact.fact_id));
 		if (historical.size && !factsToConfirm.length && !bundle.relations.some(item => item.status === 'candidate')) {
@@ -722,6 +728,15 @@ function confirmBundle(proposalId: string, actorId: string, actorKind: 'human' |
 
 export function confirmMemoryProposalBundle(proposalId: string, actorId: string): MemoryProposalBundle {
 	return confirmBundle(proposalId, actorId, 'human');
+}
+
+/** Internal evidence policies must bind every object; never attribute their result to a human. */
+export function confirmMemoryBySystemEvidence(proposalId: string, expectedDigest: string, policy: string, proof: Record<string, unknown>): MemoryProposalBundle {
+	return getFolioDb().transaction(() => {
+		if (!['exact-career-rejection/v1','career-tracker-reconciliation/v2','application-document-mail/v1'].includes(policy) || proof.policy !== policy || !proof.authorization_ref
+			|| memorySnapshotDigest(getMemoryReviewSnapshot(proposalId)) !== expectedDigest) throw new MemoryStoreError('System evidence changed.');
+		return confirmBundle(proposalId, policy, 'system', proof);
+	})();
 }
 
 /** Human daily review excludes historical appointments even from stale forms. */
@@ -827,7 +842,7 @@ export function isMemoryDelegationRevoked(grantId: string): boolean {
 		AND json_extract(detail_json, '$.grant_id') = ? LIMIT 1`).get(grantId));
 }
 
-export function finishDelegatedMemoryReview(grantId: string, sourceDigest: string, model: string, verdict: 'accept' | 'reject', reasonCodes: string[], diagnostic?: {stage:'source_quote_check'|'semantic_review';checked_object_ids:string[];unsupported_object_ids:string[]}): Record<string, unknown> {
+export function finishDelegatedMemoryReview(grantId: string, sourceDigest: string, model: string, verdict: 'accept' | 'reject', reasonCodes: string[], diagnostic?: {stage:'source_quote_check'|'semantic_review'|'relevance_routing';checked_object_ids:string[];unsupported_object_ids:string[]}): Record<string, unknown> {
 	return getFolioDb().transaction(() => {
 		const previous = getMemoryDelegationResult(grantId);
 		if (previous) return previous;
@@ -845,12 +860,13 @@ export function finishDelegatedMemoryReview(grantId: string, sourceDigest: strin
 		}
 		if(diagnostic){
 			const ids=[...bundle.facts.map(x=>x.fact_id),...bundle.entities.map(x=>x.entity_id),...bundle.relations.map(x=>x.relation_id),...bundle.episodes.map(x=>x.episode_id)];
-			if(!['source_quote_check','semantic_review'].includes(diagnostic.stage)||diagnostic.checked_object_ids.length!==ids.length||new Set(diagnostic.checked_object_ids).size!==ids.length||!ids.every(id=>diagnostic.checked_object_ids.includes(id))||diagnostic.unsupported_object_ids.some(id=>!ids.includes(id))||(verdict==='accept'&&diagnostic.unsupported_object_ids.length))throw new MemoryStoreError('Invalid review diagnostic.');
+			if(diagnostic.stage==='relevance_routing'&&(verdict!=='reject'||reasonCodes.length!==1||reasonCodes[0]!=='transient_or_low_value'))throw new MemoryStoreError('Invalid relevance routing.');
+			if(!['source_quote_check','semantic_review','relevance_routing'].includes(diagnostic.stage)||diagnostic.checked_object_ids.length!==ids.length||new Set(diagnostic.checked_object_ids).size!==ids.length||!ids.every(id=>diagnostic.checked_object_ids.includes(id))||diagnostic.unsupported_object_ids.some(id=>!ids.includes(id))||(verdict==='accept'&&diagnostic.unsupported_object_ids.length))throw new MemoryStoreError('Invalid review diagnostic.');
 		}
-		const detail = { ...grant, review_kind: 'delegated_local_model', verdict, reason_codes: reasonCodes, ...(diagnostic?{diagnostic}:{}) };
-		const actor = `local-memory-reviewer:${model}`;
+		const detail = { ...grant, review_kind: diagnostic?.stage==='relevance_routing'?'deterministic_relevance':'delegated_local_model', verdict, reason_codes: reasonCodes, ...(diagnostic?{diagnostic}:{}) };
+		const actor = diagnostic?.stage==='relevance_routing'?'memory-relevance/v1':`local-memory-reviewer:${model}`;
 		appendLedger(grant.proposal_id, 'proposal', grant.proposal_id, 'delegated_reviewed', 'system', actor, detail);
-		if (verdict === 'accept') confirmBundle(grant.proposal_id, actor, 'system', detail);
+		if (verdict === 'accept' && !ownerRestoredMemory(grant.proposal_id)) confirmBundle(grant.proposal_id, actor, 'system', detail);
 		return detail;
 	})();
 }

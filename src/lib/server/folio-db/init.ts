@@ -417,6 +417,18 @@ CREATE TABLE IF NOT EXISTS memory_proposals (
     reviewed_at            TEXT,
     reviewed_by            TEXT
 );
+-- Reversible relevance decisions; original claims and mail sources stay intact.
+CREATE TABLE IF NOT EXISTS memory_retention (
+ proposal_id TEXT PRIMARY KEY REFERENCES memory_proposals(proposal_id),
+ input_digest TEXT NOT NULL,
+ evidence_digest TEXT NOT NULL,
+ decision_json TEXT NOT NULL,
+ source_date TEXT,
+ reviewed_at TEXT NOT NULL,
+ actor_id TEXT NOT NULL,
+ owner_override INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_memory_proposals_source
     ON memory_proposals(domain, source_ref, status, created_at DESC);
 
