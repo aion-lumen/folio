@@ -70,6 +70,12 @@ export function getFeedbackRows(filter: FeedbackFilter = {}): FeedbackRow[] {
 	return stmt.all(...params, limit, offset) as FeedbackRow[];
 }
 
+/** Exact source lookup; ambiguous account/UID identities remain unresolved. */
+export function getFeedbackRowsByMailRef(sourceRef: string): FeedbackRow[] {
+ const match = /^mail:([^:]+):(\d+)$/.exec(sourceRef);
+ return match ? getConn().prepare('SELECT * FROM feedback WHERE account_id=? AND imap_uid=?').all(match[1], Number(match[2])) as FeedbackRow[] : [];
+}
+
 export function getFeedbackRowById(id: number): FeedbackRow | null {
 	const row = getConn().prepare('SELECT * FROM feedback WHERE id = ?').get(id) as FeedbackRow | undefined;
 	return row ?? null;

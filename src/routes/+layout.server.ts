@@ -7,7 +7,7 @@ import { getVaultPath } from '$lib/server/env.js';
 import { loadRegelwerkValidated } from '$lib/server/regelwerk/loader.js';
 import type { LayoutServerLoad } from './$types.js';
 
-export const load: LayoutServerLoad = async () => {
+export const load: LayoutServerLoad = async ({ locals }) => {
 	if (isLedgerDemo()) return { vaultName: 'Ledger Demo', vaultPath: '', regelwerk: null, ledgerDemo: true };
 	let vaultName = 'vault';
 	let vaultPath = '';
@@ -17,6 +17,8 @@ export const load: LayoutServerLoad = async () => {
 	} catch {
 		// VAULT_PATH nicht gesetzt — Default-Name reicht, Folio läuft auch ohne Vault.
 	}
+
+	if (locals.user?.role !== 'owner') return { vaultName, vaultPath: '', regelwerk: null, ledgerDemo: false };
 
 	// Direktive 2026-05-26 Regelwerk-Zentralisierung: action_definitions +
 	// priority_relevance + voice_consensus aus zentraler Quelle. Cross-Reference

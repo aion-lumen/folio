@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -74,6 +74,18 @@ describe('mail-derived memory candidates', () => {
 		expect(result.bundle?.episodes).toHaveLength(1);
 		expect(result.bundle?.episodes[0]).toMatchObject({title:'Ereignis aus einer E-Mail', occurred_at:'2026-09-16', status:'candidate'});
 	});
+
+ it.each([false,true])('routes a past appointment only for an opted-in intake call (%s)',async routeRetention=>{
+  const {llm,extractor}=await setup();
+  mkdirSync(join(dir,'memory-work'));
+  writeFileSync(join(dir,'memory-work/config.json'),JSON.stringify({enabled:true,retention:'owner:test'}));
+  llm.setLlmOverride(async()=>JSON.stringify({schema:'folio/memory-candidate-proposals/v1',application:null,facts:[{data_class:'appointment',subject:'Termin',predicate:'scheduled_for',value:'2020-01-01',sensitivity:'private',evidence_quote:'2020-01-01',valid_from:'2020-01-01'}]}));
+  const mail={...input,body:'Termin am 2020-01-01',mail_domain:'kontakt'};
+  const result=routeRetention?await extractor.proposeMemoryFromMail(mail,{routeRetention:true}):await extractor.proposeMemoryFromMail(mail);
+  expect(result.created).toBe(true);expect(result.facts[0].status).toBe('candidate');
+  const {memoryRetentionState}=await import('./retention.js');
+  expect(memoryRetentionState().hidden.has(result.bundle!.proposal.proposal_id)).toBe(routeRetention);
+ });
 
 	it('stores only externally derived candidates with an exact source quote', async () => {
 		const { llm, memory, extractor } = await setup();
@@ -343,7 +355,7 @@ describe('mail-derived memory candidates', () => {
 		expect(result.domain).toBe('career');
 		expect(result.facts).toHaveLength(4);
 		expect(result.facts.map((fact) => fact.predicate)).toEqual([
-			'has_role', 'has_application_status', 'received_at', 'has_contact_address'
+			'has_role', 'has_application_status', 'mail_received_at', 'has_contact_address'
 		]);
 		expect(result.bundle?.entities.map((entity) => entity.entity_type)).toEqual(['application', 'organization', 'person']);
 		expect(result.bundle?.relations.map((relation) => relation.relation_type)).toEqual(['application_at', 'contact_for']);

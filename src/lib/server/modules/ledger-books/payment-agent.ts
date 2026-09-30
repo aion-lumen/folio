@@ -1,3 +1,4 @@
+import { coveredStatementMonths } from './monthly-policy.js';
 import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -58,7 +59,7 @@ export async function runPaymentAgent(signal?:AbortSignal,progress?:(message:str
   if(batch.schema!=='ledger/manual-statement-batch/v0'||batch.bookkeeping?.ledger_db_touched!==false||batch.batch_sha256!==canonicalHash({sources:batch.sources,entries:batch.entries,issues:batch.issues}))throw new Error('invalid_statement_batch');
   const accounts=cfg.roots.flatMap(r=>r.accounts).filter(a=>a.profiles.includes('sparkasse-pdf-v1'));
   if(accounts.length!==1)throw new Error('payment_account_ambiguous');
-  const coveredMonths=new Set<string>(batch.sources.filter((s:PaymentCandidate)=>s.account_ref===accounts[0].ref && s.control_result?.complete).map((s:PaymentCandidate)=>s.declared_period?.to?.slice(0,7)));
+  const coveredMonths=coveredStatementMonths(batch.sources,accounts[0].ref);
   const discovery=discoverPaymentSources(coveredMonths,6,exclude,onlyFactIds);
   const report:PaymentAgentResult={run_id:randomUUID(),attempted_fact_ids:discovery.selected.map(s=>s.fact.fact_id),reviewed:0,prepared:0,recorded:0,bank_confirmed:0,cases:[],skipped:{...discovery.skipped,preparation_failed:0},models:[],ledger_db_touched:false,money_moved:false};
   privateDirectory(paymentWorkRoot());

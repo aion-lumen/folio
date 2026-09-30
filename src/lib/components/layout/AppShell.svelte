@@ -15,7 +15,7 @@
 	// Block 6 ersetzt das durch echte ContextSidebar mit Mail-/Pipeline-/Heute-Varianten.
 	const isVaultRoute = $derived(page.url.pathname.startsWith('/vault'));
 
-	// Mobile-Routes laufen ohne Desktop-Chrome (ActivityBar, Sidebar, Header, ChatPanel).
+	// Compact pages remain reachable on desktop without losing workspace navigation.
 	const isMobileRoute = $derived(
 		page.url.pathname.startsWith('/council/mobile') ||
 		page.url.pathname.startsWith('/sonar/mobile') ||
@@ -66,8 +66,13 @@
 <svelte:window onmousemove={onMouseMove} onmouseup={onMouseUp} onkeydown={onKeydown} />
 
 {#if isMobileRoute}
-	<!-- Council-Mobile 1a: kein AppShell-Chrome — Layout-Wrapper kommt aus mobile/+layout.svelte -->
-	{@render children()}
+	<div class="mobile-route-shell">
+		<div class="mobile-desktop-nav"><ActivityBar /></div>
+		<div class="mobile-route-content">
+			<a class="desktop-return" href="/">← Desktopansicht</a>
+			{@render children()}
+		</div>
+	</div>
 {:else}
 	<div class="shell" class:resizing={isResizing} class:focus-mode={focusMode}>
 		<!-- F.9 Block-1: ActivityBar bleibt auch in focus-mode sichtbar (Workspace-Navigation
@@ -123,8 +128,16 @@
 {/if}
 
 <style>
+	.mobile-route-shell { display: flex; min-height: 100dvh; }
+	.mobile-route-content { flex: 1; min-width: 0; }
+	.mobile-desktop-nav { display: none; }
+	.desktop-return { display: block; position: sticky; top: 0; z-index: 60; padding: 12px 18px; min-height: 44px; box-sizing: border-box; background: var(--color-background); color: var(--color-foreground); border-bottom: 1px solid var(--color-border); font-size: 14px; text-decoration: none; }
+	.desktop-return:focus-visible { outline: 2px solid var(--color-lumen); outline-offset: -3px; }
+	@media (min-width: 641px), (pointer: fine) {
+		.mobile-desktop-nav { display: block; position: sticky; top: 0; height: 100dvh; flex-shrink: 0; }
+	}
 	.mobile-return { display: none; }
-	@media (max-width: 640px) {
+	@media (max-width: 640px) and (pointer: coarse) {
 		.shell > :global(.activity-bar), .shell > :global(.panel), .content > :global(header) { display: none; }
 		.mobile-return { display: block; min-height: 48px; padding: calc(14px + env(safe-area-inset-top)) 18px 14px; border-bottom: 1px solid var(--color-border); color: var(--color-foreground); background: var(--color-background); text-decoration: none; font-size: 14px; }
 		.shell .main-area { padding: 0; }

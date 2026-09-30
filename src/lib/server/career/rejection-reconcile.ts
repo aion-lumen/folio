@@ -95,8 +95,21 @@ export function strictCompany(value: string): string {
 	return normalized(value.replace(/\([^)]*\)/g,'').replace(/&amp;/g,'&').replace(/ä/gi,'ae').replace(/ö/gi,'oe').replace(/ü/gi,'ue')).replace(/\b(?:ag|sa|gmbh|ltd|llc|inc|group|holding|schweiz|switzerland)\b/gu, '').replace(/\s+/g, '').trim();
 }
 
+/** A named department may be shortened when the mail also names its parent. */
+export function evidencedEmployerMatch(employer:string,company:string,evidence=''):boolean {
+ if(strictCompany(employer)===strictCompany(company))return true;
+ const parts=company.split(/\s*[,/|·]\s*/u).filter(Boolean);
+ const index=parts.findIndex(part=>strictCompany(part)===strictCompany(employer));
+ if(index<0 || parts.length<2)return false;
+ // A department alias needs its parent; a leading brand needs the full qualifier.
+ const context=index>0?parts.slice(0,index):parts.slice(1);
+ const text=` ${normalized(evidence)} `;
+ return context.every(part=>text.includes(` ${normalized(part)} `))
+  && text.includes(` ${normalized(employer)} `);
+}
+
 export function careerRoleKey(value: string): string {
- return normalized(roleReference(value).title.replace(/&amp;/g,'&').replace(/\b(?:m\/w\/d|f::m::d|w\/m\/d)\b/gi,'').replace(/\b\d{2,3}\s*%?\s*[-–]\s*\d{2,3}\s*%/g,'').replace(/\[(?:FEST|FREELANCE|TEMP|PERM)[^\]]*\]/giu, '').replace(/\s*[-–—]\s*KARRIERE-WACHT-FUND\s+\d{2}\.\d{2}(?:\.\d{4})?\.?\s*$/iu, '').replace(/\s*[-–—]\s*(?:ABSAGE|BEWORBEN|GESCHLOSSEN|VERWORFEN).*$/iu, ''));
+ return normalized(roleReference(value).title.replace(/\/-in\b/gi,'').replace(/&amp;/g,'&').replace(/\b(?:m\/w\/d|f::m::d|w\/m\/d)\b/gi,'').replace(/\b\d{2,3}\s*%?\s*[-–]\s*\d{2,3}\s*%/g,'').replace(/\[(?:FEST|FREELANCE|TEMP|PERM)[^\]]*\]/giu, '').replace(/\s*[-–—]\s*KARRIERE-WACHT-FUND\s+\d{2}\.\d{2}(?:\.\d{4})?\.?\s*$/iu, '').replace(/\s*[-–—]\s*(?:ABSAGE|BEWORBEN|GESCHLOSSEN|VERWORFEN).*$/iu, ''));
 }
 
 /** References are metadata, not arbitrary numbers in a role (e.g. SAP S/4HANA). */
@@ -105,9 +118,9 @@ export function roleReference(value: string): {title:string;reference:string|nul
  const match=plain.match(/(?:\s*[-–—]\s*(\d{5,})|\s*[(,]?\s*(?:Job[ -]?ID|Referenz|Stellen(?:nummer|referenz)|Req(?:uisition)?(?: ID)?)\s*[:#-]?\s*(\d{4,})\)?)\s*$/iu);
  return {title:match?plain.slice(0,match.index):plain,reference:match?(match[1]??match[2]):null};
 }
-function exactEmployerRole(event: RejectionEvidence, company: string, title: string): boolean {
+function exactEmployerRole(event: RejectionEvidence, company: string, title: string, evidence=''): boolean {
  const a=roleReference(event.role??''),b=roleReference(title);
- return Boolean(event.employer && event.role) && strictCompany(event.employer!)===strictCompany(company)
+ return Boolean(event.employer && event.role) && evidencedEmployerMatch(event.employer!,company,evidence)
   && !(a.reference&&b.reference&&a.reference!==b.reference) && careerRoleKey(a.title)===careerRoleKey(b.title);
 }
 function day(value:unknown):string|null {
@@ -243,18 +256,19 @@ export async function classifyRejectionCandidates(candidates: LocalCandidate[], 
 
 function bestMatch(snapshot: CartaTrackerSnapshot, event: RejectionEvidence, candidate: LocalCandidate): { kind: 'position'; row: CartaPosition & {identity:string;rawHash:string} } | { kind: 'rejected'; row: CartaTrackerSnapshot['rejected'][number] } | null | 'ambiguous' | 'probable' {
  if(!event.employer)return null;
+ const evidence=`${candidate.subject}\n${candidate.body}`;
  const mailDay=candidate.mailDate.slice(0,10),appliedDay=evidencedApplicationDay(candidate);
- const sameEmployer=snapshot.positions.filter(row=>strictCompany(row.company)===strictCompany(event.employer!));
+ const sameEmployer=snapshot.positions.filter(row=>evidencedEmployerMatch(event.employer!,row.company,evidence));
  const dateMatches=appliedDay?sameEmployer.filter(row=>applicationDay(row)===appliedDay&&row.status==='applied'):[];
  if(appliedDay&&dateMatches.length){
   if(dateMatches.length>1)return 'ambiguous';
   // A supplied role or job reference must never contradict the dated application.
-  if(event.role&&!exactEmployerRole(event,dateMatches[0].company,dateMatches[0].title))return 'probable';
+  if(event.role&&!exactEmployerRole(event,dateMatches[0].company,dateMatches[0].title,evidence))return 'probable';
   return {kind:'position',row:dateMatches[0]};
  }
  if(!event.role)return null;
- const positionExact=sameEmployer.filter(row=>exactEmployerRole(event,row.company,row.title));
- const rejectedExact=snapshot.rejected.filter(row=>exactEmployerRole(event,row.employer,row.title));
+ const positionExact=sameEmployer.filter(row=>exactEmployerRole(event,row.company,row.title,evidence));
+ const rejectedExact=snapshot.rejected.filter(row=>exactEmployerRole(event,row.employer,row.title,evidence));
  // An old rejection cannot swallow a later reapplication to the same role.
  const history=rejectedExact.filter(row=>{
   const rejectedDay=day(row.date);
@@ -265,7 +279,7 @@ function bestMatch(snapshot: CartaTrackerSnapshot, event: RejectionEvidence, can
  if(positionExact.length===1)return {kind:'position',row:positionExact[0]};
  if(positionExact.length>1)return 'ambiguous';
  // A shorter role can identify an ALREADY recorded same-day event, never a write.
- const recorded=snapshot.rejected.filter(row=>strictCompany(row.employer)===strictCompany(event.employer!)&&day(row.date)===mailDay
+ const recorded=snapshot.rejected.filter(row=>evidencedEmployerMatch(event.employer!,row.employer,evidence)&&day(row.date)===mailDay
   && careerRoleKey(row.title.split(/\s+[/–—]\s+/u)[0])===careerRoleKey(event.role!)
   && !(roleReference(row.title).reference&&roleReference(event.role!).reference&&roleReference(row.title).reference!==roleReference(event.role!).reference));
  if(recorded.length===1&&!sameEmployer.some(row=>row.status==='applied'&&row.action!=='rejected'&&careerRoleKey(row.title).startsWith(careerRoleKey(event.role!))))return {kind:'rejected',row:recorded[0]};

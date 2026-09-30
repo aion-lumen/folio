@@ -10,7 +10,7 @@ import { getFeedbackRowById } from '../feedback/reader.js';
 import { resolveMailMemoryDomain, hasCompleteMailModelOpinions } from '../memory/mail-domain.js';
 import { proposeMemoryFromMail, memoryDomainForMail, MailMemoryError } from '../memory/mail-candidates.js';
 import { authorizeMailMemoryReview, reviewDelegatedMailMemory } from '../memory/delegated-review.js';
-import { getMemoryDelegation, getMemoryDelegationResult } from '../memory/store.js';
+import { getMemoryDelegation, getMemoryDelegationResult, getMemoryProposalBundle } from '../memory/store.js';
 import { loadRegelwerk } from '../regelwerk/loader.js';
 import { readModelEvalRunStatus } from '../model-eval/runner.js';
 import { readMemoryEvalRunStatus } from '../memory/eval-runner.js';
@@ -18,7 +18,7 @@ import { readMailSelectionRunStatus } from '../memory/selection-runner.js';
 import { memoryMailBody } from './source.js';
 import { processMailAttachments } from './attachments.js';
 import { automaticMemorySourceEligibility } from './mailbox-source.js';
-import { POLICY, config, runs, save, acquire, renew, release, recordEvent, type IntakeRun, type Config, db } from './state.js';
+import { POLICY, config, runs, save, acquire, renew, release, recordEvent, recoverInterruptedIntake, type IntakeRun, type Config, db } from './state.js';
 import { accounts, historyAccounts } from './accounts.js';
 import {financeWorkerActive} from '../modules/ledger-books/finance-run-state.js';
 import {syncIntakeRejections} from '../career/mail-sync.js';
@@ -160,7 +160,7 @@ async function execute(run: IntakeRun, c: Config, fenceToken:string) {
    if(!body) {item.stage='done';item.outcome='source_incomplete';save(run);continue;}
    try {
     run.activity={model:primary,task:`Memory-Extraktion · Mail #${item.id}`};save(run);
-    const result=await proposeMemoryFromMail({feedback_id:row.id,account_id:row.account_id,imap_uid:row.imap_uid,sender:row.sender,subject:row.subject,body,mail_domain:decision.domain,received_at:row.mail_date});
+    const result=await proposeMemoryFromMail({feedback_id:row.id,account_id:row.account_id,imap_uid:row.imap_uid,sender:row.sender,subject:row.subject,body,mail_domain:decision.domain,received_at:row.mail_date},{routeRetention:true});
     if(result.bundle?.proposal.status==='candidate') {item.proposal_id=result.bundle.proposal.proposal_id;item.stage='review';}
     else {item.stage='done';item.outcome=result.facts.length?'already_present':'no_durable_fact';}
    } catch(e) {
@@ -179,8 +179,8 @@ async function execute(run: IntakeRun, c: Config, fenceToken:string) {
    if(item.grant_id && !getMemoryDelegationResult(item.grant_id) && Date.parse(getMemoryDelegation(item.grant_id).expires_at)<=Date.now()) item.grant_id=undefined;
    if(!item.grant_id) {item.grant_id=authorizeMailMemoryReview(item.id,item.proposal_id!,c.owner,c.authorization_ref,{id:c.authorization_id,run_id:run.id,feedback_id:item.id}).grant_id;save(run);}
    run.activity={model:reviewer,task:`Unabhängige Memory-Prüfung · Mail #${item.id}`};save(run);
-   const result=await reviewDelegatedMailMemory(item.id,item.grant_id);
-   item.outcome=result.verdict==='accept'?'confirmed':'candidate';item.stage='done';run.activity=undefined;save(run);
+   await reviewDelegatedMailMemory(item.id,item.grant_id);
+   item.outcome=getMemoryProposalBundle(item.proposal_id!).proposal.status;item.stage='done';run.activity=undefined;save(run);
   }
  } finally { if(run.items.length) {run.activity={model:primary,task:'Primärmodell wiederherstellen'};save(run);await prepareIntakeModel(primary,MAIL_INTAKE_CONTEXT_LENGTH,fenceToken);} run.activity=undefined; }
  if(c.career_rejections&&!run.history){
@@ -193,6 +193,7 @@ async function execute(run: IntakeRun, c: Config, fenceToken:string) {
  run.state='completed';run.error=undefined;run.ended_at=new Date().toISOString();save(run);
 }
 export async function tick() {
+ if(!running && !isDemoVaultActive())recoverInterruptedIntake();
  if(running || isBusy() || !modelsIdle() || isDemoVaultActive()) return;
  const c=config(); if(!c?.enabled || c.policy!==POLICY) return;
  const token=acquire();if(!token)return;

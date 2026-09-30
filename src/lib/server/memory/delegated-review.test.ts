@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, rmSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ body: 'Prefers Tuesday.', endpoint: 'http://127.0.0.1:1234', llm: vi.fn() }));
@@ -44,6 +44,24 @@ describe('local delegated review boundary', () => {
   mocks.llm.mockImplementation(async()=>{state.configure(false,'owner:1','pause');return accept;});
   await expect(review.reviewDelegatedMailMemory(7,auto.grant_id)).rejects.toThrow();
   expect(store.getMemoryProposalBundle(bundle.proposal.proposal_id).proposal.status).toBe('candidate');
+ });
+	it.each([true,false])('checks receipt metadata against the stored mail date (valid=%s)', async valid => {
+  const {store,review}=await setup();
+  const bundle=store.proposeMemoryBundle({domain:'personal',source_kind:'mail',source_ref:'mail:test:42',extractor_id:'extractor',actor_id:'extractor',facts:[{data_class:'context',sensitivity:'private',subject:'Message',predicate:'mail_received_at',value:valid?'2026-09-05':'2026-09-06',source_excerpt:'2026-09-05',valid_from:null}]});
+  const grant=review.authorizeMailMemoryReview(7,bundle.proposal.proposal_id,'owner:1','test-authorization');
+  mocks.llm.mockResolvedValue({verdict:'accept',reason_codes:['fully_supported'],checked_object_ids:[bundle.facts[0].fact_id],unsupported_object_ids:[]});
+  const result=await review.reviewDelegatedMailMemory(7,grant.grant_id);expect(result.verdict).toBe(valid?'accept':'reject');expect(mocks.llm).toHaveBeenCalledTimes(valid?1:0);
+ });
+
+ it('keeps an old arrangement in history instead of promoting it through the model',async()=>{
+  const {store,review}=await setup();mocks.body='2020-01-01';
+  mkdirSync(join(dir,'memory-work'));writeFileSync(join(dir,'memory-work/config.json'),JSON.stringify({enabled:true,retention:'owner request'}));
+  const bundle=store.proposeMemoryBundle({domain:'personal',source_kind:'mail',source_ref:'mail:test:42',extractor_id:'extractor',actor_id:'test',facts:[{data_class:'appointment',sensitivity:'private',subject:'Meeting',predicate:'scheduled_for',value:'2020-01-01',source_excerpt:'2020-01-01'}]});
+  const grant=review.authorizeMailMemoryReview(7,bundle.proposal.proposal_id,'owner:1','test');
+  const result=await review.reviewDelegatedMailMemory(7,grant.grant_id);
+  expect(result.verdict).toBe('reject');expect(mocks.llm).not.toHaveBeenCalled();
+  expect(store.getMemoryProposalBundle(bundle.proposal.proposal_id).proposal.status).toBe('candidate');
+  const retention=await import('./retention.js');expect(retention.memoryRetentionState().counts.history).toBe(1);
  });
 	it('uses the server source and records the actual local reviewer', async () => {
 		const { store, review, bundle, grant, accept } = await setup(); mocks.llm.mockResolvedValue(accept);

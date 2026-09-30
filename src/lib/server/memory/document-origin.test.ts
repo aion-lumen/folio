@@ -1,0 +1,11 @@
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { readReorgPilotResult } from './document-origin.js';
+let root:string;
+const result = {schema:'folio/reorg-pilot-result/v2',run_id:'run-1',documents:[{document_id:'d',source_ref:'file:hash',sha256:'hash',review_extract:{text:'Source',truncated:false}}],reviewers:[],control:{assessments:[]}};
+beforeEach(()=>{root=mkdtempSync(join(tmpdir(),'folio-origin-'));mkdirSync(join(root,'results'));vi.stubEnv('FOLIO_REORG_STATE_ROOT',root);writeFileSync(join(root,'results','run-1.json'),JSON.stringify(result));});
+afterEach(()=>{vi.unstubAllEnvs();rmSync(root,{recursive:true,force:true});});
+it('reads only the configured, matching immutable source result',()=>{expect(readReorgPilotResult('run-1')?.documents[0].review_extract?.text).toBe('Source');expect(readReorgPilotResult('../run-1')).toBeNull();expect(readReorgPilotResult('absent')).toBeNull();vi.stubEnv('FOLIO_REORG_STATE_ROOT','');expect(readReorgPilotResult('run-1')).toBeNull();});
+it('rejects mismatched, malformed and symlinked results',()=>{writeFileSync(join(root,'results','run-1.json'),JSON.stringify({...result,run_id:'other'}));expect(readReorgPilotResult('run-1')).toBeNull();writeFileSync(join(root,'results','run-1.json'),JSON.stringify({...result,documents:[null]}));expect(readReorgPilotResult('run-1')).toBeNull();symlinkSync(join(root,'results','run-1.json'),join(root,'results','linked.json'));expect(readReorgPilotResult('linked')).toBeNull();});

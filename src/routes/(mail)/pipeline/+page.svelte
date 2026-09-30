@@ -8,6 +8,7 @@
  import type { PipelineView } from '$lib/pipeline/types.js';
  import { browser } from '$app/environment';
  import { invalidateAll } from '$app/navigation';
+ import { navigating } from '$app/state';
 
  let {data}:{data:PageData} = $props();
  let account = $state('');
@@ -24,8 +25,8 @@
  $effect(()=>{
   if(!browser) return;
   let fetching=false;
-  const id=setInterval(async()=>{if(fetching || document.hidden)return;fetching=true;try{await invalidateAll();}finally{fetching=false;}},3000);
-  const refresh=()=>{if(!document.hidden)void invalidateAll();};
+  const id=setInterval(async()=>{if(fetching || document.hidden || navigating.to)return;fetching=true;try{await invalidateAll();}finally{fetching=false;}},3000);
+  const refresh=()=>{if(!document.hidden && !navigating.to && !fetching)void invalidateAll();};
   document.addEventListener('visibilitychange',refresh);
   return ()=>{clearInterval(id);document.removeEventListener('visibilitychange',refresh);};
  });

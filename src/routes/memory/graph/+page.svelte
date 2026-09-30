@@ -73,7 +73,7 @@
 
 <div class="graph-page">
 	<header class="hero">
-		<a href="/"><ArrowLeft size={17} /> Übersicht</a>
+		<a href="/memory"><ArrowLeft size={17} /> Übersicht</a>
 		<div class="title-row">
 			<div>
 				<span><Network size={16} /> GEDÄCHTNISGRAPH</span>
