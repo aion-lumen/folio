@@ -1,6 +1,12 @@
 <script lang="ts">
+ import {onMount} from 'svelte';
+ import {invalidateAll} from '$app/navigation';
+ import {enhance} from '$app/forms';
+ import type {statementJob} from '$lib/server/modules/ledger-books/statement-jobs.js';
+ import type {memoryWorkStatus,monthlyPaymentAutomation} from '$lib/server/memory/work-runtime.js';
 	import type { readManualStatementImport } from '$lib/server/modules/ledger-books/manual-import.js';
-	let { status }: { status: ReturnType<typeof readManualStatementImport> } = $props();
+	let { status,job=null,monthly,automation=null,statements={},inventoryError=null }: { status: ReturnType<typeof readManualStatementImport>;statements?:ReturnType<typeof memoryWorkStatus>['statements'];inventoryError?:string|null;job?:ReturnType<typeof statementJob>;monthly?:ReturnType<typeof memoryWorkStatus>['monthly']|null;automation?:ReturnType<typeof monthlyPaymentAutomation>|null } = $props();
+ onMount(()=>{const t=setInterval(()=>{if(job&&['queued','running'].includes(job.status)||automation?.enabled)void invalidateAll();},10000);return()=>clearInterval(t);});
 	function money(amount: string, currency: string) { return new Intl.NumberFormat('de-CH', { style: 'currency', currency }).format(Number(amount)); }
 	let selection = $state('');
 	let account = $state('');
@@ -12,17 +18,36 @@
 </script>
 
 <section class="manual-import" aria-label="Kontoauszug manuell prüfen">
-	<header><div><span>KONTOAUSZÜGE · LOKAL</span><h2>Export prüfen</h2></div><small>{status.files.length} Dateien · {status.scanner.ready ? 'Scanner vorbereitet' : 'Sicherheitscheck nicht bereit'}</small></header>
-	<p>Aus dem Finanz-Eingang, ohne Verschieben. Ledger liefert Vorschau und Abdeckung; keine Buchung.</p>
+	<header><div><span>KONTOAUSZÜGE · LOKAL</span><h2>Export prüfen</h2></div><small>{status.files.length} Dateien · {status.scanner.ready ? 'Scanner vorbereitet' : 'Sicherheitscheck beim Import'}</small></header>
+	<p>Aus dem Finanz-Eingang, ohne Verschieben. Saldenprüfung und Monatsabgleich laufen im Hintergrund.</p>
+ {#if automation}
+ <form method="POST" action="?/monthlyAutomation" use:enhance>
+  <input type="hidden" name="enabled" value={String(!automation.enabled)}/>
+  <button disabled={!status.configured||automation.paused}>{automation.enabled?'Monatsabgleich deaktivieren':'Monatsabgleich aktivieren'}</button>
+  <small>Alle Monatsauszüge einlesen → Zahlungen zuordnen → offene Fragen vorlegen.</small>
+ </form>
+ {#if automation.paused}<p><a href="/memory?view=processing">Memory-Nacharbeit fortsetzen</a></p>{:else if !automation.ready}<p>Startet, sobald Folio im Dauerbetrieb läuft.</p>{/if}
+ {/if}
+	{#if job}<p role="status">{job.message}</p>{/if}
+ {#if monthly}<p role="status">Monatsabgleich · {automation?.deactivated||monthly.status==='deactivated'?'deaktiviert':monthly.status==='completed'?'abgeschlossen':monthly.status==='paused'?'pausiert':monthly.attempts>=3?'angehalten':monthly.status==='retry'?'wird erneut versucht':monthly.status==='running'?'läuft':'vorbereitet'} · {monthly.attempted.length} Belege geprüft · {monthly.recorded} neu abgeglichen</p>{#if monthly.status==='running'&&monthly.message}<p>{monthly.message}</p>{/if}{/if}
+ {#if inventoryError}<p role="alert">{inventoryError}</p>{/if}
+ {#each Object.entries(statements??{}).filter(([,item])=>['retry','blocked'].includes(item.status)) as [id,item]}
+ <p role="status">{status.files.find(f=>f.id===id)?.name??'Kontoauszug'} · {item.status==='retry'?'Erneuter Import vorgesehen':'Import angehalten'} · {['scanner_or_signatures_unavailable','scan_incomplete_or_error','scanner_version_unverified'].includes(item.reason??'')?'Sicherheitsprüfung nicht verfügbar':item.reason==='account_or_format_ambiguous'?'Konto oder Format zuordnen':item.reason==='malware_detected'?'Sicherheitsprüfung hat die Datei gesperrt':'Datei konnte nicht vollständig geprüft werden'} ({item.attempts??0} Versuche)</p>
+ {/each}
+ {#if monthly?.error}<p role="alert">{monthly.error==='ledger_companion_update_required'?'Ledger-Begleiter aktualisieren.':monthly.error.startsWith('payment_match_')?'Der Bankabgleich konnte technisch nicht abgeschlossen werden.':'Lokale Prüfung konnte nicht abgeschlossen werden.'}</p>{/if}
+ {#if inventoryError||monthly?.error||Object.values(statements??{}).some(item=>['retry','blocked'].includes(item.status))}
+ <form method="POST" action="?/retryMonthly" use:enhance><button>Erneut prüfen</button></form>
+ {/if}
+
 	{#if status.error}<p role="alert">{status.error}</p>{/if}
 	{#if !status.configured}<p class="notice">Kontozuordnung und Formatprofil müssen einmalig eingerichtet werden. Bank-PDFs benötigen zuerst einen geprüften Referenzauszug.</p>{/if}
 	{#if status.files.length}
-		<form method="POST" action="?/previewStatement">
+		<form method="POST" action="?/previewStatement" use:enhance>
 			<label>Datei<select name="selection" aria-label="Datei" bind:value={selection} onchange={() => { account = ''; profile = ''; }}><option value="">Auswählen …</option>{#each status.files as file}<option value={file.id}>{file.label} · {file.name}</option>{/each}</select></label>
 			<input type="hidden" name="sha256" value={selected?.sha256 ?? ''} />
 			<label>Konto<select name="account" aria-label="Konto" bind:value={account} onchange={() => { profile = ''; }}><option value="">Zugeordnetes Konto …</option>{#each selected?.accounts ?? [] as a}<option value={a.ref}>{a.label} · {a.version}</option>{/each}</select></label>
 			<label>Format<select name="profile" aria-label="Format" bind:value={profile}><option value="">Geprüftes Profil …</option>{#each registered?.profiles ?? [] as p}<option value={p}>{p === 'sparkasse-pdf-v1' ? 'Sparkasse · PDF' : p === 'postfinance-pdf-v1' ? 'PostFinance · PDF' : p === 'camt.053-v1' ? 'Kontoexport · CAMT' : 'Kontoexport · CSV'}</option>{/each}</select></label>
-			<button type="submit" disabled={!status.scanner.ready || !selected || !registered || !profile}>Prüfen</button>
+			<button type="submit" disabled={!status.scanner.configured || !!(job&&['queued','running'].includes(job.status)) || !selected || !registered || !profile}>Prüfen</button>
 		</form>
 		{#if selected?.kind === 'pdf' && !registered?.profiles.some(p => p.endsWith('-pdf-v1'))}<p class="notice">Für dieses Konto ist noch kein geprüftes PDF-Profil eingerichtet.</p>{/if}
 	{:else}<small>Noch kein neuer Export im Finanz-Eingang.</small>{/if}

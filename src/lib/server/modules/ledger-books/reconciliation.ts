@@ -17,12 +17,27 @@ export interface Result {
 }
 export function validateReconciliation(result: Result, candidateBytes: Buffer, batchHash: string): boolean {
  const c = JSON.parse(candidateBytes.toString('utf8'));
- if (result.schema !== 'ledger/reconciliation-result/v0' || !statuses.includes(result.status) || result.rule?.id !== 'claim-transaction-match' || !['v1','v2'].includes(result.rule.version) || result.candidate?.hash_method !== 'raw-bytes' || result.candidate.sha256 !== sha256(candidateBytes) || result.input?.statement_batch_sha256 !== batchHash) return false;
+ if (result.schema !== 'ledger/reconciliation-result/v0' || !statuses.includes(result.status) || result.rule?.id !== 'claim-transaction-match' || !['v1','v2','v3','v4','v5'].includes(result.rule.version) || result.candidate?.hash_method !== 'raw-bytes' || result.candidate.sha256 !== sha256(candidateBytes) || result.input?.statement_batch_sha256 !== batchHash) return false;
  if (!c.case || result.subject_ref !== c.case.subject_ref || result.subject_ref_version !== c.case.subject_ref_version || result.identity_rule_version !== c.case.identity_rule_version || result.identity_sha256 !== c.case.identity_sha256) return false;
  if (result.policy?.may_execute !== false || result.policy.local_only !== true || result.policy.observations_are_not_bookings !== true || result.system_confirmation?.is_user_confirmation !== false || !Array.isArray(result.matches) || !Array.isArray(result.exceptions)) return false;
  if (result.result_id !== 'recon_' + canonicalHash(Object.fromEntries(Object.entries(result).filter(([key]) => !['generated_at','result_id'].includes(key)))).slice(0,24)) return false;
  if (result.status === 'matched') return result.exceptions.length === 0 && result.coverage?.complete_for_target === true && result.coverage.gaps.length === 0 && result.coverage.evidence.length > 0 && result.coverage.required_window !== null && result.reconciliation_target === c.match_request?.target && result.system_confirmation.claim === result.reconciliation_target && result.system_confirmation.confirmed === true && result.matches.length === 1 && result.matches[0].evidence.length > 0 && result.matches[0].evidence.every(e => typeof e.ref === 'string' && /^[a-f0-9]{64}$/.test(e.sha256));
  return result.system_confirmation.confirmed === false;
+}
+/** Keep complete original sources for control validation, but unrelated account
+ * months cannot invalidate an existing result. Corrections/reversals in scope do. */
+export function reconciliationScope(batch:any,candidate:any){
+ const request=candidate.match_request;if(!request?.window||!Array.isArray(request.account_refs))return batch;
+ if(batch.issues?.length)return batch;
+ let sources=batch.sources.filter((s:any)=>request.account_refs.includes(s.account_ref)&&s.currency===request.currency&&s.declared_period?.from<=request.window.to&&s.declared_period?.to>=request.window.from);
+ const hashes=new Set(sources.map((s:any)=>s.source_sha256));
+ let previous=-1;while(previous!==hashes.size){previous=hashes.size;for(const e of batch.entries)if(e.evidence?.some((v:any)=>hashes.has(v.sha256)))for(const v of e.evidence)hashes.add(v.sha256);}
+ sources=batch.sources.filter((s:any)=>hashes.has(s.source_sha256));
+ const entries=batch.entries.filter((e:any)=>e.evidence?.some((v:any)=>hashes.has(v.sha256)));
+ const ids=new Set(entries.map((e:any)=>e.observation_id));
+ const observations=batch.observation_batch?.observations.filter((o:any)=>ids.has(o.observation_id));
+ const observation_batch=observations?{...batch.observation_batch,observations,batch_id:'batch_'+canonicalHash(observations.map((o:any)=>o.observation_id)).slice(0,24)}:batch.observation_batch;
+ const material={sources,entries,issues:batch.issues};return {...batch,...material,observation_batch,batch_sha256:canonicalHash(material)};
 }
 /** Only locally normalized candidates; no LLM-generated tools, no Memory status mutation. */
 export async function reconcileAvailableCases(ledgerRoot: string, python: string): Promise<void> {
@@ -35,14 +50,17 @@ export async function reconcileAvailableCases(ledgerRoot: string, python: string
   try {
    const candidateBytes = documentBytes(candidatePath, 512 * 1024), candidate = JSON.parse(candidateBytes.toString('utf8'));
    if (candidate.schema !== 'folio/ledger-reconciliation-candidate/v0') continue;
+   const scoped=reconciliationScope(batch,candidate);
+   const previousPath=join(root,'results',`${id}.json`);
+   if(existsSync(previousPath))try{const old=JSON.parse(documentBytes(previousPath,512*1024).toString());if(old.schema==='folio/ledger-result-projection/v2'&&validateReconciliation(old.result,candidateBytes,scoped.batch_sha256))continue;}catch{}
    privateDirectory(join(root, 'results')); work = mkdtempSync(join(root, 'reconcile-')); chmodSync(work, 0o700);
    const cp = join(work, 'candidate.json'), bp = join(work, 'batch.json'), op = join(work, 'result.json');
-   writeFileSync(cp, candidateBytes, { mode: 0o600 }); writeFileSync(bp, batchBytes, { mode: 0o600 });
+   writeFileSync(cp, candidateBytes, { mode: 0o600 }); writeFileSync(bp, JSON.stringify(scoped), { mode: 0o600 });
    const run = await isolatedProcess(python, ['-I', join(ledgerRoot, 'scripts/reconcile_finance_case.py'), '--candidate', cp, '--statement-batch', bp, '--output', op], work, [ledgerRoot, dirname(dirname(python))], 30_000, 65536);
    if (run.code !== 0) throw new Error('reconciliation_rejected');
    const result = JSON.parse(documentBytes(op, 512 * 1024).toString('utf8')) as Result;
-   if (!validateReconciliation(result, candidateBytes, batch.batch_sha256)) throw new Error('reconciliation_binding_invalid');
-   atomicPrivateJson(join(root, 'results', `${id}.json`), { schema: 'folio/ledger-result-projection/v1', candidate_name: name, result });
+   if (!validateReconciliation(result, candidateBytes, scoped.batch_sha256)) throw new Error('reconciliation_binding_invalid');
+   atomicPrivateJson(join(root, 'results', `${id}.json`), { schema: 'folio/ledger-result-projection/v2', candidate_name: name, result });
   } catch {
    atomicPrivateJson(join(root, 'results', `${id}.error.json`), { schema: 'folio/ledger-reconciliation-error/v1', created_at: new Date().toISOString(), reason: 'case_reconciliation_failed' });
   } finally { if (work) rmSync(work, { recursive: true, force: true }); }
@@ -63,18 +81,19 @@ export function readReconciliationEvidence() {
   return readdirSync(dir).filter(n => n.endsWith('.json') && !n.endsWith('.error.json')).sort().flatMap(name => {
    try {
     const envelope = JSON.parse(documentBytes(join(dir, name), 512 * 1024).toString('utf8'));
-    if (envelope.schema !== 'folio/ledger-result-projection/v1' || typeof envelope.candidate_name !== 'string' || envelope.candidate_name !== envelope.candidate_name.split(/[\\/]/).pop()) return [];
+    if (!['folio/ledger-result-projection/v1','folio/ledger-result-projection/v2'].includes(envelope.schema) || typeof envelope.candidate_name !== 'string' || envelope.candidate_name !== envelope.candidate_name.split(/[\\/]/).pop()) return [];
     const result = envelope.result as Result, cp = join(candidates(), envelope.candidate_name);
     const bytes = existsSync(cp) ? documentBytes(cp, 512 * 1024) : null;
-    const stale = !bytes || !validateReconciliation(result, bytes, batch.batch_sha256);
     const candidate = bytes ? JSON.parse(bytes.toString('utf8')) : null;
-    return [{ result, candidate, batch, stale }];
+    const scoped=envelope.schema==='folio/ledger-result-projection/v2'&&candidate?reconciliationScope(batch,candidate):batch;
+    const stale = !bytes || !validateReconciliation(result, bytes, scoped.batch_sha256) || candidate?.normalized_invoice?.profile==='source-payment/v1'||(candidate?.normalized_invoice?.profile==='source-payment/v2'&&(result.rule.version!=='v5'||candidate.preparation_policy!=='payment-agent/v4'));
+    return [{ result, candidate, batch:scoped, stale }];
    } catch { return []; }
   });
  } catch { return []; }
 }
-export function readReconciliationViews(): ReconciliationView[] {
- return readReconciliationEvidence().map(({result: r, candidate, stale}) => ({ subject: candidate?.display_title ?? r.subject_ref, status: stale ? 'stale' : r.status, confirmed: !stale && r.system_confirmation.confirmed, stale, exceptions: stale ? ['result_outdated'] : r.exceptions, evidenceCount: stale ? 0 : r.matches.reduce((n, m) => n + m.evidence.length, 0), generatedAt: r.generated_at }));
+export function readReconciliationViews(confirmed:ReadonlySet<string>=new Set()): ReconciliationView[] {
+ return readReconciliationEvidence().map(({result:r,candidate,stale})=>({subject:candidate?.display_title??r.subject_ref,status:stale?'stale':r.status,confirmed:!stale&&(candidate?.memory_binding?confirmed.has(candidate.memory_binding.fact_id):r.system_confirmation.confirmed),stale,exceptions:stale?['result_outdated']:r.exceptions,evidenceCount:stale?0:r.matches.reduce((n,m)=>n+m.evidence.length,0),generatedAt:r.generated_at}));
 }
 /** Called only inside the existing verified-local Finance context gate. */
 export function statementMonthInventory(entries:{booking_date:string}[]):string {

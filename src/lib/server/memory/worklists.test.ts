@@ -1,5 +1,5 @@
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
-import { mkdtempSync,rmSync } from 'node:fs';
+import { mkdtempSync,rmSync,mkdirSync,writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resetFolioDbForTests } from '../folio-db/init.js';
@@ -37,4 +37,21 @@ it('replaces an old generic repair question with the actual tracker-link questio
  const work=memoryWorkProjection([b],new Map([['case',{reason_codes:['overinterpretation']}]]),[],new Set(['case']),new Map([['case',question]]));
  expect(work.items[0].work).toEqual(question);
  expect(work.counts).toEqual({decision:1,processing:0});
+});
+
+it('keeps covered decisions under processing while a monthly batch has not finished',()=>{
+ const fact=proposeMemoryFact({domain:'finance',data_class:'transaction',subject:'Synthetic invoice',predicate:'paid',value:'60 EUR',sensitivity:'private',source_kind:'mail',source_ref:'mail:demo:1',actor_kind:'system',actor_id:'test'});
+ const e:any={candidate:{memory_binding:{fact_id:fact.fact_id,fact_sha256:canonicalHash(fact)},normalized_invoice:{due_date:'2026-09-15'},match_request:{account_refs:['A']}},result:{status:'not_found_with_complete_coverage',coverage:{complete_for_target:true}},batch:{sources:[{account_ref:'A',declared_period:{from:'2026-09-01',to:'2026-09-30'},control_result:{complete:true}}]},stale:false};
+ mkdirSync(join(dir,'memory-work'));writeFileSync(join(dir,'memory-work','config.json'),JSON.stringify({statement_scope:'configured',monthly_payments:true}));
+ expect(paymentReviewStates([e])[0]).toMatchObject({state:'waiting',reason:'Monatsabgleich läuft oder wartet auf Fortsetzung'});
+});
+it('keeps contract context and broker trades out of the bank payment lane',()=>{
+ expect(classifyMemoryWork(bundle(['paid']),{},[{factId:'0',state:'decision',route:'context',reason:'Vertragsinformation'}])).toMatchObject({kind:'keep',question:'Vertragsinformation'});
+ expect(classifyMemoryWork(bundle(['paid']),{},[{factId:'0',state:'waiting',route:'broker',reason:'Brokerauszug'}])).toMatchObject({kind:'broker',lane:'processing'});
+});
+it('groups exact invoice copies without grouping unrelated same-price bills',()=>{
+ const make=(id:string)=>({...bundle(['paid']),facts:[{fact_id:id,predicate:'paid',status:'candidate'}],proposal:{proposal_id:id,source_kind:'mail',domain:'finance'},entities:[]}) as unknown as ReviewBundle;
+ const review=(id:string,bundleKey?:string)=>({factId:id,state:'decision' as const,reason:'Prüfen',bundleKey});
+ const result=memoryWorkProjection([make('a'),make('b'),make('c')],new Map(),[review('a','exact-source'),review('b','exact-source'),review('c')]);
+ expect(result.counts.decision).toBe(2);
 });

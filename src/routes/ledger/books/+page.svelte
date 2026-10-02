@@ -54,7 +54,7 @@
 	</header>
 	<PaymentConfirmations payments={data.paymentConfirmed}/>
 	<FinanceRun run={data.financeRun}/>
-	<ManualStatementImport status={data.manualImport} />
+	<ManualStatementImport status={data.manualImport} job={data.statementJob} monthly={data.monthlyWork} automation={data.monthlyAutomation} statements={data.statementWork} inventoryError={data.statementInventoryError} />
 
 	<section class="memory-exchange">
 		<div class="exchange-copy">

@@ -2,17 +2,20 @@
  import { CheckCircle2, FileCheck2 } from 'lucide-svelte';
  import type { PaymentConfirmedMemory } from '$lib/server/memory/payment-confirmation.js';
  let { payments }: { payments: PaymentConfirmedMemory[] } = $props();
+ const groups=$derived([...new Map(payments.map(p=>[`${p.bank_sha256}:${p.bank_locator}`,payments.filter(other=>other.bank_sha256===p.bank_sha256&&other.bank_locator===p.bank_locator)])).values()].sort((a,b)=>b[0].paid_at.localeCompare(a[0].paid_at)));
  const date = (value: string) => new Date(value + 'T12:00:00').toLocaleDateString('de-CH');
 </script>
 
 {#if payments.length}
  <section class="payments" aria-label="Bankbestätigte Zahlungen">
-  <header><CheckCircle2 size={19}/><h2>Automatisch abgeglichen</h2><span>{payments.length}</span></header>
-  {#each payments as payment}
+  <header><CheckCircle2 size={19}/><h2>Automatisch abgeglichen</h2><span>{groups.length}</span></header>
+  {#each groups as group}
+   {@const payment=group[0]}
    <article id={`payment-${payment.fact_id}`}>
-    <div class="main"><div><strong>{payment.title}</strong><p>Bezahlt am {date(payment.paid_at)} · Lastschrift</p></div><b>{new Intl.NumberFormat('de-CH',{style:'currency',currency:payment.currency}).format(Number(payment.amount))}</b></div>
-    <p class="done"><FileCheck2 size={16}/> Memory-Prüffrage automatisch erledigt</p>
-    <details><summary>Nachweis ansehen</summary><p>{payment.value}</p><p>Rechnung und Kontoauszug stimmen in Betrag, Rechnungsnummer, Mandatsreferenz und Gläubiger-ID überein. Systembestätigung durch Ledger.</p><dl><dt>Mail</dt><dd>{payment.fact.source_ref}</dd><dt>Rechnungsbeleg</dt><dd>{payment.invoice_sha256}</dd><dt>Kontoauszug</dt><dd>{payment.bank_sha256} · {payment.bank_locator}</dd><dt>Abgleich</dt><dd>{payment.result_id}</dd></dl></details>
+    {#each group.slice(1) as source}<span id={`payment-${source.fact_id}`}></span>{/each}
+    <div class="main"><div><strong>{payment.title}</strong><p>{payment.direction==='credit'?'Eingegangen':'Bezahlt'} am {date(payment.paid_at)}</p></div><b>{new Intl.NumberFormat('de-CH',{style:'currency',currency:payment.currency}).format(Number(payment.amount))}</b></div>
+    <p class="done"><FileCheck2 size={16}/> {group.length===1?'Memory-Prüffrage automatisch erledigt':`${group.length} Belege gemeinsam abgeglichen`}</p>
+    <details><summary>Nachweis ansehen</summary><p>{payment.value}</p><p>Beleg und Kontobewegung wurden zusammen geprüft.</p><dl><dt>{group.length===1?'Quelle':'Quellen'}</dt><dd>{group.map(p=>p.fact.source_ref).join(' · ')}</dd><dt>Rechnungsbeleg</dt><dd>{payment.invoice_sha256}</dd><dt>Kontoauszug</dt><dd>{payment.bank_sha256} · {payment.bank_locator}</dd><dt>Abgleich</dt><dd>{payment.result_id}</dd></dl></details>
    </article>
   {/each}
  </section>

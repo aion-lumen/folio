@@ -4,7 +4,7 @@ import { canonicalHash } from '../modules/ledger-books/reconciliation.js';
 import { sha256 } from '../file-intake/document-security.js';
 import { listPaymentConfirmedMemory, recordPaymentConfirmations } from './payment-confirmation.js';
 const state=vi.hoisted(()=>({db:null as any,evidence:[] as any[],files:new Map<string,Buffer>(),receipt:{} as any,disabled:false,subject:'Invoice subject'}));
-vi.mock('../feedback/reader.js',()=>({getFeedbackRowById:()=>({subject:state.subject})}));
+vi.mock('../feedback/reader.js',()=>({getFeedbackRowById:()=>({subject:state.subject,account_id:'test',imap_uid:1})}));
 vi.mock('../folio-db/init.js',()=>({getFolioDb:()=>state.db}));
 vi.mock('./store.js',()=>({getMemoryFact:(id:string)=>state.db.prepare('SELECT * FROM memory_facts WHERE fact_id=?').get(id)}));
 vi.mock('../env.js',()=>({areModulesDisabled:()=>state.disabled,getDisabledModuleIds:()=>new Set(),getFolioDbPath:()=>'/synthetic/db',getSessionExchangePath:()=>'/synthetic/exchange',isDemoVaultActive:()=>false}));
@@ -77,4 +77,85 @@ describe('Bank evidence to Memory',()=>{
  });
  it('records one system receipt, closes only bound work, preserves original and is idempotent',()=>{expect(listPaymentConfirmedMemory()).toEqual([]);expect(recordPaymentConfirmations()).toEqual({recorded:1,active:1});expect(recordPaymentConfirmations()).toEqual({recorded:0,active:1});const claims=listPaymentConfirmedMemory();expect(claims[0].value).toContain('am 2026-09-25');expect(claims[0].bank_locator).toBe('text-line:12');expect(claims[0].episode_ids).toEqual(['e']);expect(state.db.prepare('SELECT status,confirmed_by FROM memory_facts').get()).toEqual({status:'candidate',confirmed_by:null});const event=state.db.prepare('SELECT actor_kind,detail_json FROM memory_ledger').get();expect(event.actor_kind).toBe('system');expect(JSON.parse(event.detail_json).is_user_confirmation).toBe(false);});
  it.each(['stale','rejected-fact','changed-episode','changed-mail','truncated','uid-epoch','disabled','unbound-bank','invoice-tampered','bank-missing'])('revokes %s without deleting the audit receipt',(kind)=>{recordPaymentConfirmations();const c=state.evidence[0].candidate;if(kind==='stale')state.evidence[0].stale=true;if(kind==='rejected-fact')state.db.exec("UPDATE memory_facts SET status='rejected'");if(kind==='changed-episode')state.db.exec("UPDATE memory_episodes SET title='Another claim'");if(kind==='changed-mail')state.db.exec("UPDATE mail_intake_sources SET body='changed'");if(kind==='truncated')state.db.exec('UPDATE mail_intake_sources SET truncated=1');if(kind==='uid-epoch')state.db.exec('UPDATE mail_intake_sources SET uidvalidity=6');if(kind==='disabled')state.disabled=true;if(kind==='unbound-bank')state.evidence[0].batch.sources[0].source_ref+='wrong';if(kind==='invoice-tampered')state.files.set(`/synthetic/quarantine/${c.invoice_document.original_sha256}/original`,Buffer.from('changed'));if(kind==='bank-missing')state.files.delete(`/synthetic/quarantine/${state.evidence[0].batch.sources[0].source_sha256}/original`);expect(listPaymentConfirmedMemory()).toEqual([]);expect(recordPaymentConfirmations().recorded).toBe(0);expect(state.db.prepare('SELECT count(*) n FROM memory_ledger').get().n).toBe(1);});
+});
+
+vi.mock('../modules/ledger-books/manual-import.js',()=>({manualImportRoot:()=>'/synthetic/statements',statementImportConfig:()=>({roots:[{accounts:[{ref:'account-A'}]}]})}));
+import {normalizePaymentClaim} from '../modules/ledger-books/payment-claim-policy.js';
+function genericFixture(){
+ state.db.exec("ALTER TABLE memory_facts ADD COLUMN source_excerpt TEXT DEFAULT 'Total EUR 11.90'; ALTER TABLE memory_facts ADD COLUMN valid_from TEXT DEFAULT '2026-09-13';");
+ const mail='Supplier Ltd. Total EUR 11.90. Invoice date 13.09.2026.\nAbonnement: ExampleCloud Standard\n';
+ state.db.prepare('UPDATE mail_intake_sources SET body=?').run(mail);
+ const empty={value:'',quote:''},draft={kind:'invoice',amount:{value:'11.90',quote:'Total EUR 11.90'},currency:{value:'EUR',quote:'EUR'},counterparty:{value:'Supplier Ltd',quote:'Supplier Ltd'},date:{value:'2026-09-13',quote:'13.09.2026'},due_date:empty,reference:empty};
+ const text=`Subject: ${state.subject}\n\n${mail}`,c=state.evidence[0].candidate;
+ c.source_claim=draft;c.normalized_invoice=normalizePaymentClaim(draft,text,'2026-09-13',['account-A']);c.match_request=c.normalized_invoice.match_request;
+ c.preparation_policy='payment-agent/v4';c.invoice_document={kind:'bound-mail',original_sha256:sha256(text),text_sha256:sha256(text)};
+ c.memory_binding.fact_sha256=canonicalHash(state.db.prepare('SELECT * FROM memory_facts').get());c.memory_binding.source.body_sha256=sha256(mail);c.memory_binding.source.subject_sha256=sha256(state.subject);
+ state.evidence[0].result.rule.version='v5';
+ state.evidence[0].batch.entries[0].booking_date='2026-09-17';
+ const {booking_date,amount,currency,direction,status,counterparty,purpose}=state.evidence[0].batch.entries[0];
+ const input={id:'f',invoice:c.normalized_invoice,invoice_text:text,mail_excerpt:'Total EUR 11.90',bank_entries:[{booking_date,amount,currency,direction,status,counterparty,purpose}],coverage_complete:true,today:'2026-10-01'};
+ const vote={input_sha256:canonicalHash(input),fields_supported:true,payment_evidence:'paid'};c.local_review={input,votes:[{...vote,model:'first'},{...vote,model:'second'}]};
+ state.files.set('/synthetic/statements/statement-batch.json',Buffer.from(JSON.stringify({sources:[{account_ref:'account-A',currency:'EUR'}]})));
+ return c;
+}
+it('confirms arbitrary source-bound suppliers and revokes changed source fields or model votes',()=>{
+ const c=genericFixture();expect(recordPaymentConfirmations().recorded).toBe(1);expect(listPaymentConfirmedMemory()[0].title).toContain('Supplier Ltd');
+ c.source_claim.amount.value='19.00';expect(listPaymentConfirmedMemory()).toEqual([]);c.source_claim.amount.value='11.90';
+ c.local_review.votes[1].payment_evidence='conflict';expect(listPaymentConfirmedMemory()).toEqual([]);
+});
+it('cannot use one movement for two unrelated claims',()=>{
+ genericFixture();const other=structuredClone(state.evidence[0]);other.candidate.memory_binding.fact_id='other';state.evidence.push(other);expect(recordPaymentConfirmations().recorded).toBe(0);
+});
+it('closes an invoice, announcement and receipt as one payment only when every source passes review',()=>{
+ genericFixture();
+ for(const [id,kind] of [['a','announcement'],['r','receipt']]){
+  state.db.prepare('INSERT INTO memory_facts SELECT ?,proposal_id,domain,predicate,source_kind,source_ref,status,supersedes_fact_id,confirmed_by,value_text,source_excerpt,valid_from FROM memory_facts WHERE fact_id=?').run(id,'f');
+  const other=structuredClone(state.evidence[0]),c=other.candidate;
+  c.memory_binding.fact_id=id;c.memory_binding.fact_sha256=canonicalHash(state.db.prepare('SELECT * FROM memory_facts WHERE fact_id=?').get(id));
+  c.source_claim.kind=kind;c.normalized_invoice=normalizePaymentClaim(c.source_claim,c.local_review.input.invoice_text,'2026-09-13',['account-A']);c.match_request=c.normalized_invoice.match_request;
+  c.local_review.input={...c.local_review.input,id,invoice:c.normalized_invoice};c.local_review.votes.forEach((v:any)=>v.input_sha256=canonicalHash(c.local_review.input));state.evidence.push(other);
+ }
+ expect(recordPaymentConfirmations().recorded).toBe(3);
+ expect(new Set(listPaymentConfirmedMemory().map(c=>c.bank_source_ref)).size).toBe(1);
+ expect(recordPaymentConfirmations().recorded).toBe(0);
+ state.evidence[2].candidate.local_review.votes[1].fields_supported=false;
+ expect(listPaymentConfirmedMemory()).toEqual([]);
+});
+
+it('requires new source-payment policy and reviews; old receipts remain audit only',()=>{
+ const c=genericFixture();expect(recordPaymentConfirmations().recorded).toBe(1);
+ c.normalized_invoice.profile='source-payment/v1';c.preparation_policy='payment-agent/v2';state.evidence[0].result.rule.version='v3';
+ expect(listPaymentConfirmedMemory()).toEqual([]);
+ expect(state.db.prepare('SELECT count(*) n FROM memory_ledger').get().n).toBe(1);
+});
+it('rejects a bank movement outside the current settlement window even with matching review hashes',()=>{
+ const c=genericFixture();state.evidence[0].batch.entries[0].booking_date='2026-10-01';
+ c.local_review.input.bank_entries[0].booking_date='2026-10-01';
+ c.local_review.votes.forEach((v:any)=>v.input_sha256=canonicalHash(c.local_review.input));
+ expect(recordPaymentConfirmations().recorded).toBe(0);
+});
+
+it('requires an actual bank reference for undated claims even if both models say paid',()=>{
+ const c=genericFixture(),empty={value:'',quote:''};
+ c.source_claim.date=empty;c.source_claim.reference={value:'INV123456',quote:'INV123456'};
+ const mail='Supplier Ltd. Total EUR 11.90. Reference INV123456';
+ state.db.prepare('UPDATE mail_intake_sources SET body=?').run(mail);
+ const text=`Subject: ${state.subject}\n\n${mail}`;
+ c.memory_binding.source.body_sha256=sha256(mail);c.invoice_document={kind:'bound-mail',original_sha256:sha256(text),text_sha256:sha256(text)};
+ c.normalized_invoice=normalizePaymentClaim(c.source_claim,text,'2026-09-13',['account-A']);c.match_request=c.normalized_invoice.match_request;
+ c.local_review.input={...c.local_review.input,invoice:c.normalized_invoice,invoice_text:text};
+ c.local_review.votes.forEach((v:any)=>v.input_sha256=canonicalHash(c.local_review.input));
+ expect(c.match_request.require_reference).toBe(true);
+ expect(recordPaymentConfirmations().recorded).toBe(0);
+ state.evidence[0].batch.entries[0].references=['INV123456'];
+ expect(recordPaymentConfirmations().recorded).toBe(1);
+ state.evidence[0].batch.entries[0].references=['INV1234567'];
+ expect(listPaymentConfirmedMemory()).toEqual([]);
+ expect(state.db.prepare('SELECT count(*) n FROM memory_ledger').get().n).toBe(1);
+});
+it('invalidates previously reviewed v4 matcher output without deleting its audit',()=>{
+ const c=genericFixture();recordPaymentConfirmations();
+ state.evidence[0].result.rule.version='v4';c.preparation_policy='payment-agent/v3';
+ expect(listPaymentConfirmedMemory()).toEqual([]);
+ expect(state.db.prepare('SELECT count(*) n FROM memory_ledger').get().n).toBe(1);
 });

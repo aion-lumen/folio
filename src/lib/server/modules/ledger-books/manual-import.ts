@@ -78,11 +78,11 @@ function coverageView(c: ImportConfig | null): StatementCoverageView[] {
 		return { entries: source.entries.slice(0, 500).map(e => ({ date: e.booking_date, amount: e.amount, currency: e.currency, direction: e.direction, counterparty: (e.counterparty ?? '').slice(0, 200), purpose: e.purpose.slice(0, 1200), locator: e.locator })), account: account?.label ?? 'Unbekannte Kontozuordnung', currency: source.currency, from: source.declared_period?.from ?? null, to: source.declared_period?.to ?? null, count: source.entries.length, complete: source.control_result.complete, issues: source.control_result.issues };
 	}).sort((a: StatementCoverageView, b: StatementCoverageView) => a.account.localeCompare(b.account) || (a.from ?? '').localeCompare(b.from ?? ''));
 }
-export function readManualStatementImport() {
+export function readManualStatementImport(confirmedFacts:ReadonlySet<string>=new Set()) {
 	try {
 		const c = config(); const items = inventory(c); const latest = join(manualImportRoot(), 'latest.json');
 		const attempt = existsSync(latest) ? JSON.parse(documentBytes(latest, 65536).toString('utf8')) as ImportRecord : null;
-		return { ...items, reconciliations: readReconciliationViews(), coverage: coverageView(c), configured: c !== null, scanner: securityStatus(), attempt, error: null as string | null };
+		return { ...items, reconciliations: readReconciliationViews(confirmedFacts), coverage: coverageView(c), configured: c !== null, scanner: securityStatus(), attempt, error: null as string | null };
 	} catch { return { reconciliations: [], coverage: [] as StatementCoverageView[], files: [] as StatementSelection[], warnings: [], configured: false, scanner: securityStatus(), attempt: null as ImportRecord | null, error: 'Importkonfiguration oder lokaler Prüfstatus ungültig.' }; }
 }
 let queue: Promise<unknown> = Promise.resolve();

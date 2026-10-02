@@ -1,3 +1,5 @@
+import {appendRelatedReceipt} from '../modules/ledger-books/payment-related.js';
+import {paymentSourceRoute} from '../modules/ledger-books/payment-extraction.js';
 /** Bank evidence is a revocable read model; original facts never become human-confirmed. */
 import { areModulesDisabled, getDisabledModuleIds } from '../env.js';
 import { join } from 'node:path';
@@ -8,12 +10,15 @@ import { documentBytes, securityRoot, sha256, storedSecurityReceipt } from '../f
 import { canonicalHash, readReconciliationEvidence } from '../modules/ledger-books/reconciliation.js';
 import { reviewsAgree } from '../modules/ledger-books/payment-review-policy.js';
 import { getFeedbackRowById } from '../feedback/reader.js';
+import { normalizePaymentClaim,normalizeSource,samePaymentBundle,bankReferenceMatches,PAYMENT_PROFILE } from '../modules/ledger-books/payment-claim-policy.js';
+import { manualImportRoot,statementImportConfig } from '../modules/ledger-books/manual-import.js';
+import { clearedInvoiceText } from '../modules/ledger-books/payment-document.js';
 
 const POLICY = 'ledger-payment-memory/v1';
 export interface PaymentConfirmedMemory {
  fact: MemoryFactRow; fact_id: string; proposal_id: string | null; episode_ids: string[];
  title: string; value: string; invoice_number: string; amount: string; currency: string;
- paid_at: string; bank_source_ref: string; bank_sha256: string; bank_locator: string;
+ direction?:'debit'|'credit'; paid_at: string; bank_source_ref: string; bank_sha256: string; bank_locator: string;
  invoice_sha256: string; result_id: string; receipt_id: string; recorded_at: string;
 }
 function inspect(requireReceipt: boolean): PaymentConfirmedMemory[] {
@@ -21,11 +26,14 @@ function inspect(requireReceipt: boolean): PaymentConfirmedMemory[] {
  const evidence = readReconciliationEvidence();
  if (!evidence.length) return [];
  const db = getFolioDb();
- return evidence.flatMap(({candidate: c, result: r, batch, stale}) => {
+ let accountSources:{account_ref:string;currency:string}[]|null=null;
+ const originals=new Map<string,{kind:string;invoice_date:string;match_request:{not_before:string;not_after:string}}>();
+ const claims:PaymentConfirmedMemory[]=evidence.flatMap(({candidate: c, result: r, batch, stale}) => {
   try {
-   if (stale || !r.system_confirmation.confirmed || r.status !== 'matched' || r.rule.version !== 'v2' || r.reconciliation_target !== 'participant_payment_to_provider') return [];
+   if (stale || !r.system_confirmation.confirmed || r.status !== 'matched' || !['v2','v5'].includes(r.rule.version)) return [];
    const m = c.memory_binding, invoice = c.normalized_invoice, proof = c.invoice_document;
-   const supportedInvoice=invoice && ((invoice.profile==='vodafone-cable/v1' && invoice.counterparty==='Vodafone West GmbH' && c.match_request.reference_profile==='vodafone-rgn/v1') || (invoice.profile==='vodafone-bw-cable/v1' && invoice.counterparty==='Vodafone BW GmbH' && c.match_request.reference_profile==='vodafone-bw-rgn/v1'));
+   const generic=invoice?.profile===PAYMENT_PROFILE&&r.rule.version==='v5'&&c.preparation_policy==='payment-agent/v4';
+   const supportedInvoice=invoice && (generic || (r.reconciliation_target==='participant_payment_to_provider'&&((invoice.profile==='vodafone-cable/v1' && invoice.counterparty==='Vodafone West GmbH' && c.match_request.reference_profile==='vodafone-rgn/v1') || (invoice.profile==='vodafone-bw-cable/v1' && invoice.counterparty==='Vodafone BW GmbH' && c.match_request.reference_profile==='vodafone-bw-rgn/v1'))));
    if (!m || m.schema !== 'folio/payment-memory-binding/v1' || !supportedInvoice || canonicalHash(invoice.match_request) !== canonicalHash(c.match_request)) return [];
    const original = getMemoryFact(m.fact_id);
    if (!['candidate','confirmed'].includes(original.status) || original.domain !== 'finance' || original.predicate !== 'paid' || original.source_kind !== 'mail' || original.supersedes_fact_id || canonicalHash(original) !== m.fact_sha256 || original.source_ref !== m.source.ref || original.proposal_id !== m.proposal_id) return [];
@@ -36,6 +44,23 @@ function inspect(requireReceipt: boolean): PaymentConfirmedMemory[] {
    if(m.source.subject_sha256){const metadata=getFeedbackRowById(m.source.feedback_id);if(!metadata||sha256(metadata.subject)!==m.source.subject_sha256)return [];}
    const source = db.prepare('SELECT status FROM memory_sources WHERE source_ref = ?').get(original.source_ref) as {status:string}|undefined;
    if (source && ['rejected','tombstoned'].includes(source.status)) return [];
+   if(generic){
+    const metadata=getFeedbackRowById(m.source.feedback_id);
+    if(!metadata||metadata.account_id!==mail.account||Number(metadata.imap_uid)!==mail.uid||sha256(metadata.subject)!==m.source.subject_sha256)return [];
+    const mailText=`Subject: ${metadata.subject}\n\n${mail.body}`;
+    if(paymentSourceRoute(mailText,original.source_excerpt??''))return [];
+    if(!['bound-mail','bound-mail-pdf'].includes(proof.kind))return [];
+    const baseText=proof.kind==='bound-mail-pdf'?mailText+'\n\nAttached invoice:\n'+clearedInvoiceText(proof.attachment):mailText;
+    const related=appendRelatedReceipt(baseText,proof.related_receipt,original.valid_from??'');
+    const text=related.text;
+    if(related.originalInvoice)originals.set(m.fact_id,related.originalInvoice);
+    if(sha256(text)!==proof.text_sha256||proof.original_sha256!==proof.text_sha256||!original.source_excerpt||!normalizeSource(mailText).includes(normalizeSource(original.source_excerpt)))return [];
+    accountSources??=JSON.parse(documentBytes(join(manualImportRoot(),'statement-batch.json'),64*1024*1024).toString()).sources;
+    const configured=new Set(statementImportConfig()?.roots.flatMap(root=>root.accounts.map(a=>a.ref))??[]);
+    if([...configured].some(a=>!accountSources!.some(s=>s.account_ref===a)))return [];
+    const accounts=[...new Set<string>(accountSources!.filter(s=>configured.has(s.account_ref)&&s.currency===invoice.currency).map(s=>s.account_ref))];
+    if(canonicalHash(normalizePaymentClaim(c.source_claim,text,original.valid_from??'',accounts))!==canonicalHash(invoice))return [];
+   }else{
    // Fixed vault paths derived from validated IDs, never a candidate-supplied filesystem path.
    const receipt = storedSecurityReceipt(proof.receipt_id);
    if (receipt.status !== 'clean' || receipt.original_sha256 !== proof.original_sha256 || sha256(documentBytes(join(securityRoot(),'receipts',`${receipt.receipt_id}.json`))) !== proof.security_sha256 || sha256(documentBytes(join(securityRoot(),'quarantine',receipt.original_sha256,'original'))) !== receipt.original_sha256) return [];
@@ -43,14 +68,18 @@ function inspect(requireReceipt: boolean): PaymentConfirmedMemory[] {
    const extractionRoot = join(securityRoot(),'extractions',receipt.receipt_id,'pdf',proof.extraction_id);
    const extractionBytes = documentBytes(join(extractionRoot,'receipt.json'),16384), extraction = JSON.parse(extractionBytes.toString('utf8'));
    if (sha256(extractionBytes) !== proof.extraction_sha256 || extraction.status !== 'extracted' || extraction.original_sha256 !== proof.original_sha256 || extraction.security_receipt_sha256 !== proof.security_sha256 || extraction.text_sha256 !== proof.text_sha256 || sha256(documentBytes(join(extractionRoot,'text.txt'),512*1024)) !== proof.text_sha256) return [];
-   if(c.preparation_policy==='payment-agent/v1'){
+   }
+   if(c.preparation_policy==='payment-agent/v1'||generic){
     const review=c.local_review, {masked_account:_masked,...reviewedInvoice}=invoice;
     if(!review || !reviewsAgree(review.votes,review.input) || !review.votes.every((v:{payment_evidence:string})=>v.payment_evidence==='paid') || review.input.coverage_complete!==true || review.input.id!==m.fact_id || canonicalHash(review.input.invoice)!==canonicalHash(reviewedInvoice) || sha256(review.input.invoice_text)!==proof.text_sha256 || review.input.mail_excerpt!==original.source_excerpt) return [];
    }else if(c.preparation_policy)return [];
    const matched = batch.entries.filter((entry: {observation_id:string}) => entry.observation_id === r.matches[0].observation_id);
-   if (matched.length !== 1 || matched[0].currency !== invoice.currency || matched[0].direction !== 'debit' || Math.abs(Number(matched[0].amount)) !== Number(invoice.amount)) return [];
-   const entry = matched[0];
-   if(c.preparation_policy==='payment-agent/v1'){
+   if (matched.length !== 1 || matched[0].currency !== invoice.currency || matched[0].direction !== (generic?invoice.match_request.direction:'debit') || Math.abs(Number(matched[0].amount)) !== Number(invoice.amount)) return [];
+   const entry = matched[0],originalInvoice=originals.get(m.fact_id);
+   if(originalInvoice&&(entry.booking_date<originalInvoice.match_request.not_before||entry.booking_date>originalInvoice.match_request.not_after))return [];
+   if(generic&&invoice.match_request.require_reference&&!bankReferenceMatches(invoice.match_request.references,entry))return [];
+   if(generic&&(entry.booking_date<invoice.match_request.not_before||entry.booking_date>invoice.match_request.not_after))return [];
+   if(c.preparation_policy==='payment-agent/v1'||generic){
     const {booking_date,amount,currency,direction,status,counterparty,purpose}=entry;
     if(canonicalHash(c.local_review.input.bank_entries)!==canonicalHash([{booking_date,amount,currency,direction,status,counterparty,purpose}]))return [];
    }
@@ -64,10 +93,16 @@ function inspect(requireReceipt: boolean): PaymentConfirmedMemory[] {
    }
    const receiptId = `payment:${canonicalHash([POLICY,r.result_id,m.fact_sha256,proof.original_sha256])}`;
    if (requireReceipt && !db.prepare("SELECT 1 FROM memory_ledger WHERE event_id=? AND actor_kind='system' AND event_type='payment_confirmed'").get(receiptId)) return [];
-   const title = `${invoice.counterparty} · Rechnung ${invoice.invoice_number}`;
-   const value = `${invoice.amount} ${invoice.currency} am ${entry.booking_date} per Lastschrift bezahlt; Rechnung ${invoice.invoice_number} vom ${invoice.invoice_date}. Bankbelegt bis ${c.match_request.window.to}.`;
-   return [{ fact:{...original,subject:title,value_text:value,valid_from:entry.booking_date}, fact_id:original.fact_id, proposal_id:original.proposal_id, episode_ids:episodes, title, value, invoice_number:invoice.invoice_number, amount:invoice.amount, currency:invoice.currency, paid_at:entry.booking_date, bank_source_ref:entry.evidence[0].ref, bank_sha256:entry.evidence[0].sha256, bank_locator:entry.evidence[0].ref.split(':').slice(1).join(':'), invoice_sha256:proof.original_sha256, result_id:r.result_id, receipt_id:receiptId, recorded_at:r.generated_at }];
+   const title = `${invoice.counterparty} · ${invoice.invoice_number ? `Beleg ${invoice.invoice_number}` : `${invoice.amount} ${invoice.currency}`}`;
+   const value = `${invoice.amount} ${invoice.currency} am ${entry.booking_date} ${entry.direction==='credit'?'eingegangen':'bezahlt'}. Bankbelegt bis ${c.match_request.window.to}.`;
+   return [{ fact:{...original,subject:title,value_text:value,valid_from:entry.booking_date}, fact_id:original.fact_id, proposal_id:original.proposal_id, episode_ids:episodes, title, value, invoice_number:invoice.invoice_number, amount:invoice.amount, currency:invoice.currency, direction:entry.direction, paid_at:entry.booking_date, bank_source_ref:entry.evidence[0].ref, bank_sha256:entry.evidence[0].sha256, bank_locator:entry.evidence[0].ref.split(':').slice(1).join(':'), invoice_sha256:proof.original_sha256, result_id:r.result_id, receipt_id:receiptId, recorded_at:r.generated_at }];
   } catch { return []; }
+ });
+ return claims.filter(claim=>{
+  const own=evidence.find(e=>e.candidate?.memory_binding?.fact_id===claim.fact_id);
+  if(!own||own.candidate.normalized_invoice?.profile!==PAYMENT_PROFILE)return true;
+  const group=evidence.filter(e=>!e.stale&&e.result.status==='matched'&&e.result.matches[0]?.observation_id===own.result.matches[0]?.observation_id);
+  return group.every(e=>claims.some(c=>c.fact_id===e.candidate?.memory_binding?.fact_id))&&samePaymentBundle(group.map(e=>({...e.candidate.normalized_invoice,original_document:originals.get(e.candidate.memory_binding.fact_id)})));
  });
 }
 export const listPaymentConfirmedMemory = () => inspect(true);
