@@ -22,6 +22,10 @@ describe('Explicit bounded payment capability',()=>{
  it('does not let mock responses authorize a payment review',()=>{vi.stubEnv('FOLIO_AGENT_MOCK_RESPONSE','{}');expect(()=>localReviewEndpoint()).toThrow();});
  it('keeps future debit language separate from actual bank confirmation',()=>{
   const text=renderPaymentResult({run_id:'test',reviewed:4,prepared:0,recorded:0,bank_confirmed:3,cases:[{title:'September',status:'unknown_due_to_missing_coverage',due_date:'2026-09-24',paid_at:null,review:'agreed'}],skipped:{},models:['qwen','gemma'],ledger_db_touched:false,money_moved:false});
-  expect(text).toContain('Zahlung nicht belegt');expect(text).toContain('2026-09-24');expect(text).not.toMatch(/unbezahlt|überfällig/);
+  expect(text).toContain('wartet auf den vollständigen Kontoauszug');expect(text).not.toMatch(/unbezahlt|überfällig|angekündigter Einzug/);
+ });
+ it('does not report an unconfirmed bank match as paid or an invoice date as a scheduled debit',()=>{
+  const text=renderPaymentResult({run_id:'test',reviewed:1,prepared:1,recorded:0,bank_confirmed:0,cases:[{title:'Invoice',status:'matched',due_date:'2026-09-01',paid_at:null,review:'agreed'}],skipped:{},models:['first','second'],ledger_db_touched:false,money_moved:false});
+  expect(text).toContain('Zahlungszuordnung bleibt offen');expect(text).not.toMatch(/bezahlt am|Zahlung am|angekündigter Einzug/);
  });
 });

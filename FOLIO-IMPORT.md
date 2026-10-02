@@ -98,13 +98,13 @@ folio_import: v1
 type: directive
 target: obj-02-07
 id: therapist-pilot-followup-2026-07
-source: cv-session-fable
+source: engineer-session
 created: 2026-07-07
-title: Therapist pilot follow-up checklist
+title: Pilot follow-up checklist checklist
 tags: [pilot, p6]
 ---
 
-# Follow-up after CV session
+# Follow-up after setup session
 
 - Confirm August start only with assisted setup call
 - Send PILOT.md link before first run
@@ -117,16 +117,16 @@ tags: [pilot, p6]
 folio_import: v1
 type: field-note
 target: chapter-2
-id: fieldnote-mirhamed-first-tranche-2026-07-07
+id: fieldnote-first-tranche-first-tranche-2026-07-07
 source: engineer-session
 created: 2026-07-07T18:00:00+02:00
-title: mirhamed.ch first tranche ingested
+title: First production tranche completed
 tags: [dogfooding, mail]
 ---
 
 ## Observation
 
-First production tranche from `mirhamed` account completed successfully.
+First production tranche from configured mail account completed successfully.
 Heute hub shows today's triage counters.
 ```
 

@@ -15,3 +15,17 @@ describe('Ledger projection guards',()=>{
  it.each(['no-evidence','human','unknown-positive','gap','wrong-claim','exception','duplicate'])('refuses %s even with a recomputed result hash',(kind)=>{const r=fixture();if(kind==='no-evidence')r.matches=[];if(kind==='human')r.system_confirmation.is_user_confirmation=true;if(kind==='unknown-positive')r.status='unknown_due_to_missing_coverage';if(kind==='gap')r.coverage.gaps=['missing'];if(kind==='wrong-claim')r.system_confirmation.claim='refund';if(kind==='exception')r.exceptions=['reversal'];if(kind==='duplicate')r.matches.push(r.matches[0]);expect(validateReconciliation(seal(r),bytes,'b'.repeat(64))).toBe(false);});
  it('rejects tampering with a saved result',()=>{const r=fixture();r.generated_at='2026-09-18T00:00:00Z';expect(validateReconciliation(r,bytes,'b'.repeat(64))).toBe(true);r.coverage.required_window!.to='2027-01-01';expect(validateReconciliation(r,bytes,'b'.repeat(64))).toBe(false);});
 });
+
+import {reconciliationScope} from './reconciliation.js';
+it('keeps unrelated months out of a receipt but includes changed and overlapping evidence',()=>{
+ const source=(hash:string,month:string)=>({source_sha256:hash,account_ref:'A',currency:'EUR',declared_period:{from:month+'-01',to:month+'-30'}});
+ const entry=(id:string,hashes:string[])=>({observation_id:id,evidence:hashes.map(sha256=>({sha256}))});
+ const b={sources:[source('one','2026-09')],entries:[entry('obs1',['one'])],issues:[],observation_batch:{observations:[{observation_id:'obs1'}]}};
+ const c={match_request:{account_refs:['A'],currency:'EUR',window:{from:'2026-09-01',to:'2026-09-30'}}};
+ const first=reconciliationScope(b,c).batch_sha256;
+ const next={...b,sources:[...b.sources,source('two','2026-10')],entries:[...b.entries,entry('obs2',['two'])],observation_batch:{observations:[{observation_id:'obs1'},{observation_id:'obs2'}]}};
+ expect(reconciliationScope(next,c).batch_sha256).toBe(first);
+ next.entries[0].evidence.push({sha256:'two'});
+ expect(reconciliationScope(next,c).sources).toHaveLength(2);
+ expect(reconciliationScope(next,c).batch_sha256).not.toBe(first);
+});

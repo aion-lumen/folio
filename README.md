@@ -14,7 +14,11 @@
 > A campaign as structure.<br>
 > A hearth at the center.
 
-## Memory review · preview.4
+## Monthly reconciliation · preview.5
+
+Folio checks payment evidence against complete monthly account statements, closes supported cases and brings the remaining questions to Memory. Existing mail and Memory workflows continue alongside it. [Setup and upgrade](docs/monthly-reconciliation.md).
+
+## Memory review
 
 Memory separates your decisions from waiting and completed work. Related evidence stays together; each result links to its sources. The knowledge graph remains available from the Memory workspace. [Setup and update notes](docs/memory-review.md).
 
@@ -39,7 +43,7 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 
 ## Status
 
-**Status:** v0.6.0-preview.4 public preview<br>
+**Status:** v0.6.0-preview.5 (prerelease)<br>
 **License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
 
@@ -257,7 +261,7 @@ The new modules extend the mail workflow:
 Mail processing and model assessment remain local; optionally configured connections such as Google Calendar communicate with the respective provider.
 
 Ledger is a preview for imported evidence; projections are estimates. It does not execute bank transactions.
-[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.4)
+[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.5)
 
 ## What is being built next
 

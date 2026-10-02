@@ -2,7 +2,7 @@ import { listCareerDuplicateImports } from '$lib/server/memory/career-duplicates
 import { listApplicationEvidence } from '$lib/server/memory/application-evidence.js';
 import { summarizeProfileGroup,profileGroupDigest,confirmProfileGroup } from '$lib/server/memory/profile-groups.js';
 import { memoryRetentionState, restoreMemoryRetention } from '$lib/server/memory/retention.js';
-import { memoryWorkEnabled, memoryWorkStatus, pauseMemoryWork, resumeMemoryWork } from '$lib/server/memory/work-runtime.js';
+import { memoryWorkEnabled, monthlyPaymentAutomation, memoryWorkStatus, pauseMemoryWork, resumeMemoryWork } from '$lib/server/memory/work-runtime.js';
 import { memoryWorkProjection, paymentReviewStates } from '$lib/server/memory/worklists.js';
 import { listPaymentConfirmedMemory } from '$lib/server/memory/payment-confirmation.js';
 import { listCareerMemoryConfirmations, careerReviewQuestions } from '$lib/server/memory/career-confirmation.js';
@@ -148,7 +148,7 @@ export const load: PageServerLoad = async ({ url, locals }) => {
   retentionCounts:retention.counts,
   historyCount:reviewQueue.counts.historicalFacts+retention.counts.history+retention.counts.profiles,
   retentionGroups:retention.groups.filter(g=>memoryView==='automatic'?g.mode==='discard':memoryView==='history'?g.mode!=='discard':false).slice(0,reviewLimit),
-		workRuntime: locals.user.role==='owner'?{enabled:memoryWorkEnabled(),...runtimeState!,repairs:runtimeState?.repairs??{}}:null,
+		workRuntime: locals.user.role==='owner'?{enabled:memoryWorkEnabled(),...runtimeState!,monthlyAutomation:monthlyPaymentAutomation(),repairs:runtimeState?.repairs??{}}:null,
 		workDomain,workKind,workKinds:work.kinds,workDomains:work.domains,
 		workCounts:{ decision:work.counts.decision+reviewQueue.standalone.filter(f=>!standaloneWaiting(f)).length, processing:work.counts.processing+reviewQueue.standalone.filter(standaloneWaiting).length },
 		automaticCount: applicationEvidence.length + paymentConfirmed.length + careerConfirmed.length + retention.counts.discard + duplicateImports.length,

@@ -1,3 +1,7 @@
+import {findRelatedPaymentReceipt,appendRelatedReceipt} from './payment-related.js';
+import {EXTRACTION_POLICY,validatedCachedClaim,explicitPaymentClaim,paymentSourceRoute} from './payment-extraction.js';
+import {clearedInvoiceText} from './payment-document.js';
+export {clearedInvoiceText} from './payment-document.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chmodSync, existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
@@ -10,6 +14,8 @@ import { atomicPrivateJson,documentBytes,extractSecuredDocument,isolatedProcess,
 import { canonicalHash } from './reconciliation.js';
 import { statementImportConfig } from './manual-import.js';
 import {memoryInvoiceBinding,paymentSenderProfile} from './payment-source-policy.js';
+import { normalizePaymentClaim,normalizeSource,structuredPaymentClaim,PAYMENT_PROFILE,paymentFundingIssue } from './payment-claim-policy.js';
+import { extractPaymentClaim } from './payment-review.js';
 
 const exec=promisify(execFile);
 export const paymentCandidatesRoot=()=>join(dirname(getFolioDbPath()),'ledger-candidates');
@@ -32,7 +38,6 @@ export function discoverPaymentSources(coveredMonths:Set<string>,limit=12,exclud
  for(const fact of facts){
   if(exclude.has(fact.fact_id))continue;
   if(onlyFactIds&&!onlyFactIds.has(fact.fact_id))continue;
-  if(!/vodafone.*(?:kabel|rechnung)|kabel.*vodafone/iu.test(fact.subject)){skipped.unsupported++;continue;}
   const matches=prepared.filter(c=>c.candidate.memory_binding?.fact_id===fact.fact_id);
   if(matches.length>1){skipped.source_unavailable++;continue;}
   const prior=matches[0];
@@ -44,14 +49,57 @@ export function discoverPaymentSources(coveredMonths:Set<string>,limit=12,exclud
  }
  return {selected,skipped,total:facts.length};
 }
-export function clearedInvoiceText(proof:PaymentCandidate):string {
- const receipt=storedSecurityReceipt(proof.receipt_id);
- if(!/^[a-f0-9-]{36}$/.test(proof.extraction_id) || receipt.status!=='clean' || receipt.original_sha256!==proof.original_sha256)throw new Error('invoice_security_binding');
- const base=join(securityRoot(),'extractions',receipt.receipt_id,'pdf',proof.extraction_id);
- const bytes=documentBytes(join(base,'receipt.json'),16384),extraction=JSON.parse(bytes.toString());
- const text=documentBytes(join(base,'text.txt'),512*1024);
- if(sha256(documentBytes(join(securityRoot(),'receipts',receipt.receipt_id+'.json')))!==proof.security_sha256 || sha256(documentBytes(join(securityRoot(),'quarantine',receipt.original_sha256,'original')))!==proof.original_sha256 || sha256(bytes)!==proof.extraction_sha256 || extraction.status!=='extracted' || extraction.original_sha256!==proof.original_sha256 || extraction.security_receipt_sha256!==proof.security_sha256 || extraction.text_sha256!==proof.text_sha256 || sha256(text)!==proof.text_sha256)throw new Error('invoice_extraction_binding');
- return text.toString();
+export function paymentSourceText(mail:MailSource,subject:string){return `Subject: ${subject}\n\n${mail.body}`;}
+async function generalAttachment(selection:PaymentSelection,signal?:AbortSignal){
+ const {fact,mail}=selection;privateDirectory(paymentWorkRoot());
+ const work=mkdtempSync(join(paymentWorkRoot(),'attachment-'));chmodSync(work,0o700);
+ try{
+  const locations=getFolioDb().prepare('SELECT folder,epoch,uid FROM mail_intake_locations WHERE account=? AND feedback_id=?').all(mail.account,mail.feedback_id);
+  atomicPrivateJson(join(work,'fetch.json'),{account:mail.account,body_sha256:sha256(mail.body),locations:locations.length?locations:[{folder:'INBOX',epoch:mail.uidvalidity,uid:mail.uid}]});
+  await exec(getPythonBinPath(),[join(process.cwd(),'scripts/payment_invoice_fetch.py'),'--request',join(work,'fetch.json'),'--worker-root',getAionLumenPath()],{timeout:90000,maxBuffer:4096,signal});
+  const fetched=JSON.parse(documentBytes(join(work,'source.json'),8192).toString());
+  if(fetched.body_sha256!==sha256(mail.body)||fetched.mailbox_mutated!==false||fetched.original_sha256!==sha256(documentBytes(join(work,'invoice.pdf'))))throw Error('payment_fetch_binding');
+  const secured=await secureDocument(join(work,'invoice.pdf'),fact.source_ref!),extracted=await extractSecuredDocument(secured,'pdf');
+  if(!extracted.text_path||extracted.receipt.status!=='extracted')throw Error('payment_attachment_not_cleared');
+  const proof={receipt_id:secured.receipt.receipt_id,security_sha256:sha256(documentBytes(secured.receipt_path)),original_sha256:secured.receipt.original_sha256,extraction_id:basename(dirname(extracted.text_path)),extraction_sha256:sha256(documentBytes(extracted.receipt_path)),text_sha256:extracted.receipt.text_sha256};
+  return {proof,text:clearedInvoiceText(proof)};
+ }finally{rmSync(work,{recursive:true,force:true});}
+}
+export async function prepareGeneralPaymentSource(selection:PaymentSelection,accounts:{ref:string;currency:string}[],token:string,signal?:AbortSignal){
+ const {fact,mail}=selection,metadata=getFeedbackRowById(mail.feedback_id);
+ if(!metadata||metadata.account_id!==mail.account||Number(metadata.imap_uid)!==mail.uid)throw Error('payment_mail_identity');
+ const mailText=paymentSourceText(mail,metadata.subject);let text=mailText;
+ if(!fact.source_excerpt||!normalizeSource(text).includes(normalizeSource(fact.source_excerpt)))throw Error('payment_excerpt_unbound');
+ const route=paymentSourceRoute(mailText,fact.source_excerpt);if(route)throw Error(route);
+ const proposal=getFolioDb().prepare('SELECT * FROM memory_proposals WHERE proposal_id=?').get(fact.proposal_id);
+ if(!proposal)throw Error('payment_proposal_missing');
+ const prior=selection.candidate;
+ if(prior&&!['source-payment/v1',PAYMENT_PROFILE].includes(prior.normalized_invoice?.profile))throw Error('payment_legacy_source_required');
+ const source={ref:fact.source_ref,feedback_id:mail.feedback_id,uidvalidity:mail.uidvalidity,body_sha256:sha256(mail.body),subject_sha256:sha256(metadata.subject)};
+ if(prior&&(prior.memory_binding.fact_sha256!==canonicalHash(fact)||prior.memory_binding.proposal_sha256!==canonicalHash(proposal)||canonicalHash(prior.memory_binding.source)!==canonicalHash(source)))throw Error('payment_source_changed');
+ const draftPath=join(paymentWorkRoot(),'claim-drafts',canonicalHash([source,canonicalHash(fact)])+'.json');
+ let cached:PaymentCandidate|undefined;
+ let attachment:PaymentCandidate|undefined=prior?.invoice_document?.attachment;
+ if(existsSync(draftPath))try{cached=JSON.parse(documentBytes(draftPath,32768).toString());if(cached?.policy===EXTRACTION_POLICY&&cached.fact_sha256===canonicalHash(fact)&&cached.mail_source_sha256===canonicalHash(source))attachment??=cached.attachment;}catch{}
+ if(attachment)text=mailText+'\n\nAttached invoice:\n'+clearedInvoiceText(attachment);
+ const direct=explicitPaymentClaim(text,fact.source_excerpt??'');
+ const relatedReceipt=direct?.kind==='invoice'?findRelatedPaymentReceipt(text,fact.fact_id):undefined;
+ const related=appendRelatedReceipt(text,relatedReceipt,fact.valid_from??'');text=related.text;
+ const fundingIssue=paymentFundingIssue(text);if(fundingIssue)throw Error(fundingIssue);
+ const usable=(draft:unknown)=>{try{normalizePaymentClaim(draft,text,fact.valid_from??'',accounts.filter(a=>a.currency===(draft as any)?.currency?.value).map(a=>a.ref));return true;}catch{return false;}};
+ const cachedDraft=validatedCachedClaim(cached,text,canonicalHash(fact),fact.valid_from??'',accounts);
+ let draft=related.draft??direct??(prior?.source_claim&&usable(prior.source_claim)?prior.source_claim:structuredPaymentClaim(text,fact.source_excerpt??'')??cachedDraft??await extractPaymentClaim(text,token,signal));
+ if(!prior&&!attachment&&(!(draft as any).amount?.value||!(draft as any).counterparty?.value)&&/anhang|anbei|beigefügt|beiliegend|attached|attachment/iu.test(mail.body)){
+  const fetched=await generalAttachment(selection,signal);attachment=fetched.proof;text=mailText+'\n\nAttached invoice:\n'+fetched.text;draft=explicitPaymentClaim(text,fact.source_excerpt??'')??await extractPaymentClaim(text,token,signal);
+ }
+ // Preserve the last attempt for diagnosis; only validated fields can be reused.
+ atomicPrivateJson(draftPath,{policy:EXTRACTION_POLICY,source_sha256:sha256(text),mail_source_sha256:canonicalHash(source),fact_sha256:canonicalHash(fact),draft,attachment});
+ const scoped=accounts.filter(a=>a.currency===(draft as any).currency?.value).map(a=>a.ref);
+ const invoice=normalizePaymentClaim(draft,text,fact.valid_from??'',scoped);
+ const unchanged=prior?.normalized_invoice?.profile===PAYMENT_PROFILE&&canonicalHash(prior.normalized_invoice)===canonicalHash(invoice);
+ const identity=canonicalHash([source.ref,invoice.counterparty,invoice.invoice_number,invoice.amount,invoice.currency,invoice.invoice_date]);
+ const candidate=(unchanged?prior:null)??{schema:'folio/ledger-reconciliation-candidate/v0',created_at:new Date().toISOString(),display_title:`${invoice.counterparty} · ${invoice.amount} ${invoice.currency}`,case:{subject_ref:'folio-case:'+identity.slice(0,32),subject_ref_version:'folio-case-v1',identity_rule_version:PAYMENT_PROFILE,identity_sha256:identity},match_request:invoice.match_request,normalized_invoice:invoice,source_claim:draft,invoice_document:{kind:attachment?'bound-mail-pdf':'bound-mail',original_sha256:sha256(text),text_sha256:sha256(text),attachment,...(relatedReceipt?{related_receipt:relatedReceipt}:{})},memory_binding:{schema:'folio/payment-memory-binding/v1',fact_id:fact.fact_id,fact_sha256:canonicalHash(fact),proposal_id:fact.proposal_id,proposal_sha256:canonicalHash(proposal),episodes:[],source}};
+ return {candidate,previousCandidate:prior??undefined,text,name:selection.name??`invoice-${fact.fact_id}.json`,existing:!!prior};
 }
 export async function normalizeInvoice(text:string,accountRef:string,work:string):Promise<PaymentCandidate>{
  const cfg=statementImportConfig();if(!cfg)throw new Error('statement_account_setup_required');
@@ -111,6 +159,6 @@ export async function preparePaymentSource(selection:PaymentSelection,accountRef
   const identity=canonicalHash([invoice.counterparty,invoice.invoice_number,invoice.match_request.account_refs]);
   // New cases close only the exact paid fact. Other bundle objects retain review.
   const candidate=prior??{schema:'folio/ledger-reconciliation-candidate/v0',created_at:new Date().toISOString(),display_title:`Vodafone · Rechnung ${invoice.invoice_date.slice(0,7)}`,case:{subject_ref:'folio-case:'+identity.slice(0,32),subject_ref_version:'folio-case-v1',identity_rule_version:'invoice-identity/v1',identity_sha256:identity},match_request:invoice.match_request,normalized_invoice:invoice,invoice_document:proof,memory_binding:{schema:'folio/payment-memory-binding/v1',fact_id:fact.fact_id,fact_sha256:canonicalHash(fact),proposal_id:fact.proposal_id,proposal_sha256:canonicalHash(proposal),episodes:[],source}};
-  return {candidate,text,name:selection.name??`invoice-${fact.fact_id}.json`,existing:!!prior};
+  return {candidate,previousCandidate:prior??undefined,text,name:selection.name??`invoice-${fact.fact_id}.json`,existing:!!prior};
  }finally{rmSync(work,{recursive:true,force:true});}
 }

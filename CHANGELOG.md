@@ -5,6 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-preview.5] - 2026-10-02
+
+- Recognize additional invoice date formats and dash-separated amount notes. Refresh monthly-work status immediately after reactivation, retaining completed runs.
+
+- Preserve original invoice roles and search windows when adding a receipt, including undated instalments. Reject conflicting invoice dates and trailing minus signs; keep refund direction independent of quoted deposits. Show deactivated monthly work consistently.
+
+- Separate recurring invoice identities; validate related receipt dates. Preserve amount signs, payment directions and mail-chain context. Deactivated monthly reconciliation releases covered questions for manual review.
+
+- Zahlungsbelege: ungültige Extraktionen neu auswerten, Schweizer Betragsformate erkennen, eigene Transfers korrekt richten und belegte Rechnungskopien gemeinsam prüfen. Vertragswissen und Broker-Geschäfte erhalten eigene Einordnungen.
+
+- Keeps completed statement months processing despite unrelated import retries; exposes blocked imports and allows an owner retry. Pausing no longer consumes a failed attempt.
+- Handles refund notices after the purchase month and bounded booking delays. Undated claims require a reference actually present on the bank transaction.
+- Checks Ledger compatibility before model processing. Remaining questions appear after the complete monthly review.
+
+### Added
+
+- Match source-backed invoices, receipts and refunds against configured monthly account statements, using two local model assessments and deterministic payment checks.
+- Import statements in the background, then continue reconciliation in small batches. Enable or deactivate monthly reconciliation from Ledger Books.
+- Group multiple documents for the same evidenced payment and show relevant bank movements beside unresolved Memory questions.
+- Identify missing PayPal, card and broker evidence with specific questions.
+
+### Fixed
+
+- Separate complete statement-month coverage from the dates eligible to settle a particular receipt, preventing a later recurring payment from settling the previous receipt.
+- Accept an original purchase followed by its refund while keeping ambiguous or reversed payments in review.
+- Recheck older generic payment results with the current rules and fresh local assessments; retain previous evidence in the audit history.
+
+### Upgrade
+
+- Requires the companion Ledger matcher supporting `source-payment/v2` and `claim-transaction-match/v5`. See [monthly reconciliation setup and upgrade](docs/monthly-reconciliation.md).
+
 ## [0.6.0-preview.4] - 2026-09-30
 
 ### Added

@@ -418,7 +418,7 @@
 	{#if ['review','processing'].includes(data.memoryView)}
 		<section class="view-intro"><div><h2>{data.memoryView==='processing'?'Vorbereitung & Warten':'Deine Entscheidung'}</h2><p>{data.memoryView==='processing'?'Zahlungsbelege warten auf den passenden Monatsauszug. Weitere Fälle sind nach der nötigen Nacharbeit geordnet.':'Hier bleiben Zuordnungen, Wissensauswahl und offene Fälle nach dem Kontoabgleich.'}</p></div></section>
 		{#if data.memoryView==='processing' && data.workRuntime}
-			<div class="work-note"><strong>{data.workRuntime.enabled?'Automatische Nacharbeit eingerichtet':'Automatische Nacharbeit pausiert'}</strong><span> · Datumsberichtigungen: {Object.values(data.workRuntime.repairs).filter(r=>r.feedbackId).length} · Zur Entscheidung: {Object.values(data.workRuntime.repairs).filter(r=>r.status==='needs_review').length}</span>{#if data.workRuntime.monthly}<span> · Monatsabgleich: {({pending:'bereit',running:'läuft',completed:'abgeschlossen',retry:'erneuter Versuch folgt'} as Record<string,string>)[data.workRuntime.monthly.status]??data.workRuntime.monthly.status}</span>{/if}{#if data.workRuntime.enabled}<form method="POST" action={memoryFormAction(page.url.search, 'pauseWork')} use:enhance><button class="ghost" type="submit">Nacharbeit pausieren</button></form>{:else}<form method="POST" action={memoryFormAction(page.url.search, 'resumeWork')} use:enhance><button class="ghost" type="submit">Nacharbeit fortsetzen</button></form>{/if}</div>
+			<div class="work-note"><strong>{data.workRuntime.enabled?'Automatische Nacharbeit eingerichtet':'Automatische Nacharbeit pausiert'}</strong><span> · Datumsberichtigungen: {Object.values(data.workRuntime.repairs).filter(r=>r.feedbackId).length} · Zur Entscheidung: {Object.values(data.workRuntime.repairs).filter(r=>r.status==='needs_review').length}</span>{#if data.workRuntime.monthly}<span> · Monatsabgleich: {data.workRuntime.monthlyAutomation.deactivated?'deaktiviert':(({pending:'bereit',running:'läuft',completed:'abgeschlossen',paused:'pausiert',deactivated:'deaktiviert',retry:'erneuter Versuch folgt'} as Record<string,string>)[data.workRuntime.monthly.status]??data.workRuntime.monthly.status)}</span>{/if}{#if data.workRuntime.enabled}<form method="POST" action={memoryFormAction(page.url.search, 'pauseWork')} use:enhance><button class="ghost" type="submit">Nacharbeit pausieren</button></form>{:else}<form method="POST" action={memoryFormAction(page.url.search, 'resumeWork')} use:enhance><button class="ghost" type="submit">Nacharbeit fortsetzen</button></form>{/if}</div>
 		{/if}
 		<form class="work-filters" method="GET">
 			<input type="hidden" name="view" value={data.memoryView}/>
@@ -442,6 +442,13 @@
 							<small>{#if bundle.profileGroup}Gemeinsame Prüfmappe{:else}{bundle.proposal.source_ref}<br/>{bundle.source_date ? `Mail vom ${formatDate(bundle.source_date)}` : 'Quelldatum nicht verfügbar'} · importiert {formatDate(bundle.proposal.created_at)}{/if}</small>
 						</header>
 
+      {#if bundle.work.paymentSuggestions?.length}
+       <details class="bundle-detail"><summary>Passende Kontobewegungen ansehen</summary>
+        {#each bundle.work.paymentSuggestions as movement}
+         <div class="work-note"><strong>{movement.date} · {movement.amount} {movement.currency}</strong><p>{movement.description}</p></div>
+        {/each}
+       </details>
+      {/if}
       {#if bundle.profileGroup}
        {#each bundle.profileGroup.sections as section}
         <details class="bundle-detail" open={section.key==='qualification'}>
