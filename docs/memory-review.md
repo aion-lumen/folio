@@ -14,7 +14,7 @@ Related profile documents are grouped before pagination. Source differences rema
 
 The review interface works without automatic work. The background runtime runs only with `FOLIO_AUTOMAIL_RUNTIME=1`, enabled mail intake and an explicitly enabled Memory policy. Existing approved configurations are retained on upgrade. A new installation starts without a Memory policy.
 
-Operator setup uses `configureMemoryWork(owner, authorizationReference, proposalIds)` in `src/lib/server/memory/work-runtime.ts`. It captures the current statement-import scope, already present files and proposal hashes. Configure statement sources first. The separate opt-ins `enableCareerMemoryWork`, `enableApplicationEvidence` and `enableMemoryRetention` record the owner's authorization reference. This preview has pause/resume controls; initial setup is an operator API, not a settings wizard. Policy and progress live in `memory-work/` beside the Folio database.
+Operator setup uses `configureMemoryWork(owner, authorizationReference, proposalIds)` in `src/lib/server/memory/work-runtime.ts`. It captures the current statement-import scope, already present files and proposal hashes. Configure statement sources first. The separate opt-ins `enableCareerMemoryWork`, `enableApplicationEvidence` and `enableMemoryRetention` record the owner's authorization reference. For monthly payments, enable or pause reconciliation in Ledger Books after configuring statement sources. Other Memory policies use the operator API. Policy and progress live in `memory-work/` beside the Folio database.
 
 - A payment receipt waits for complete monthly coverage for its account. After reconciliation, unresolved matches become a decision. Statement parsing and model checks use the separately configured Ledger runtime.
 - Tracker reconciliation requires an unambiguous employer, role, chronology and source evidence. Organization variants must be supported by the original message. Missing or conflicting evidence stays open.
@@ -23,7 +23,7 @@ Operator setup uses `configureMemoryWork(owner, authorizationReference, proposal
 - **Memory aus Mail** creates proposals without invoking relevance routing. Automatic intake and explicitly authorized model reviews may route proposals when the relevance policy is enabled.
 - Relevance routing preserves the original proposals and sources. Each decision records its policy and evidence; a restored proposal stays in owner review until a human decides. Later model assessments remain in its audit history.
 
-Changing the statement-import scope requires setup again. Pausing stops new automatic work. Source adapters and external helpers are described in [source configuration](source-configuration.md).
+See [monthly reconciliation](monthly-reconciliation.md) for payment timing, historical months and upgrade requirements. Changing the statement-import scope requires setup again. Pausing stops new automatic work. Source adapters and external helpers are described in [source configuration](source-configuration.md).
 
 ## Upgrade and rollback
 
