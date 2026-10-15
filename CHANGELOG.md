@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Configurable single-flight search runs, separate source counts, bounded local selection and revision-bound publication approval.
 - Synthetic retrieval, voice-path, multi-domain, historical-file and search-worker regression tests.
 
+### Security
+- Update source-map-js and override js-yaml’s CLI parser with its compatible argparse 2 release, removing the vulnerable sprintf-js dependency. YAML parsing and CLI conversion are checked alongside the application tests.
+
 ### Compatibility
 - No canonical database migration. Semantic search is opt-in and uses a separate local embedding service; finance retrieval keeps its existing path.
 - No automatic archive rewrite. Historical file omissions still require explicit review; a well-formed extraction is not proof of complete recall.

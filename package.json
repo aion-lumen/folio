@@ -57,6 +57,9 @@
   "overrides": {
     "@sveltejs/kit": {
       "cookie": "^0.7.2"
+    },
+    "js-yaml": {
+      "argparse": "2.0.1"
     }
   }
 }
