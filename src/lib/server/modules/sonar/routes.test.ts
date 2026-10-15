@@ -15,8 +15,22 @@ function routeFiles(root: string): string[] {
 describe('Sonar capability boundary', () => {
 	it('guards the page and every Sonar API handler', () => {
 		const page = readFileSync(join(process.cwd(), 'src/routes/sonar/+page.server.ts'), 'utf8');
-		for (const capability of ['panel.render', 'notes.read', 'reviews.read', 'archive.read']) {
+		for (const capability of [
+			'panel.render',
+			'notes.read',
+			'reviews.read',
+			'archive.read',
+			'placements.read'
+		]) {
 			expect(page).toContain(`requireModuleCapability('sonar', '${capability}')`);
+		}
+
+		const mobilePage = readFileSync(
+			join(process.cwd(), 'src/routes/sonar/mobile/+page.server.ts'),
+			'utf8'
+		);
+		for (const capability of ['panel.render', 'placements.read', 'publish.read']) {
+			expect(mobilePage).toContain(`requireModuleCapability('sonar', '${capability}')`);
 		}
 
 		const files = routeFiles(join(process.cwd(), 'src/routes/api/sonar'));

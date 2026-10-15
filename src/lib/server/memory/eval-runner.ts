@@ -323,9 +323,15 @@ function normalized(value: string): string {
 }
 
 function proposalItems(proposal: ValidatedMailMemoryProposal): Array<Omit<MemoryEvalCandidateView, 'support' | 'model_ids'>> {
+	const facts = proposal.facts.map((fact: ProposedMailMemoryFact) => ({
+		key: `fact:${fact.domain ?? proposal.domain}:${fact.data_class}:${normalized(fact.subject)}:${fact.predicate}:${normalized(fact.value)}:${fact.valid_from ?? ''}`,
+		kind: 'fact' as const, label: `${fact.subject} · ${fact.domain ?? proposal.domain}`, value: fact.value, sensitivity: fact.sensitivity,
+		valid_from: fact.valid_from, evidence: [fact.evidence_quote]
+	}));
 	if (proposal.application) {
 		const application = proposal.application;
 		return [
+			...facts,
 			{
 				key: `application:${normalized(application.organization)}:${normalized(application.role)}:${application.status}`,
 				kind: 'application', label: `${application.role} · ${application.organization}`,
@@ -339,11 +345,7 @@ function proposalItems(proposal: ValidatedMailMemoryProposal): Array<Omit<Memory
 			}] : [])
 		];
 	}
-	return proposal.facts.map((fact: ProposedMailMemoryFact) => ({
-		key: `fact:${fact.data_class}:${fact.predicate}:${normalized(fact.value)}:${fact.valid_from ?? ''}`,
-		kind: 'fact' as const, label: fact.subject, value: fact.value, sensitivity: fact.sensitivity,
-		valid_from: fact.valid_from, evidence: [fact.evidence_quote]
-	}));
+	return facts;
 }
 
 export function buildMemoryEvalView(result: MemoryEvalResult, config = getMemoryEvalRunnerConfig()): MemoryEvalView | null {

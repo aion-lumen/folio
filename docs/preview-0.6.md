@@ -42,3 +42,18 @@ This update needs no new schema migration. It does not invoke a model or change 
 ## Memory review (preview.4)
 
 The Memory entry now opens the review workspace. The update adds `memory_retention` alongside existing tables; stored facts and source references are preserved. See [Memory review](memory-review.md) for the views, optional automation and backup/rollback procedure.
+
+## Memory and Sonar (preview.6)
+
+Semantic search is opt-in and requires a separately configured loopback embedding service.
+The canonical database schema is unchanged; the index is disposable. Configure and evaluate
+exact answer-model IDs before enabling semantic context in the companion. See
+[semantic search](memory-semantic-search.md) and [multi-domain evidence](memory-multidomain.md).
+Historical file processing is an explicit verified-file path; this release does not ship
+the operator's file-reorganisation campaign or automatically reprocess an archive.
+
+Sonar's `/sonar/mobile` surface supports fresh suggestions, draft editing, source opening and
+recorded review. Configure the authenticated X read adapter, bounded worker and optional
+scheduler separately using [the search guide](sonar-placement-search.md). Likes and bookmarks
+are unverified input. The UI does not publish a reply on opening or selecting a candidate;
+[publishing](sonar-placement-publisher.md) requires a separate revision-bound approval.

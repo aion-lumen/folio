@@ -4,7 +4,7 @@ import { getLatestCorrectionForFeedback } from '$lib/server/folio-db/reader.js';
 import { getFeedbackRowById } from '$lib/server/feedback/reader.js';
 import { lookupMailBody } from '$lib/server/hermes/mail-body.js';
 import { requireModuleCapability } from '$lib/server/modules/http.js';
-import { MailRelayError, stageCareerMailRelay } from '$lib/server/relay/mail.js';
+import { MailRelayError, stageCareerMailRelayHybrid } from '$lib/server/relay/mail.js';
 import { RelayStoreError } from '$lib/server/relay/store.js';
 import { loadSessionTargets } from '$lib/server/relay/targets.js';
 import type { RequestHandler } from './$types.js';
@@ -29,7 +29,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const body = extracted.bodyText ?? row.body_excerpt ?? demoBody;
 	const bodyTruncated = extracted.bodyText ? extracted.bodyTruncated : body != null;
 	try {
-		const result = stageCareerMailRelay({
+		const result = await stageCareerMailRelayHybrid({
 			feedback_id: row.id,
 			account_id: row.account_id,
 			imap_uid: row.imap_uid,

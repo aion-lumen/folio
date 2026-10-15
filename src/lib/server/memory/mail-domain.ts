@@ -6,7 +6,8 @@ import { loadRegelwerk } from '../regelwerk/loader.js';
 
 export interface MailDomainDecision {
 	domain: string | null;
-	source: 'human' | 'model_consensus' | 'incomplete' | 'conflict';
+	domains?: string[];
+	source: 'human' | 'model_consensus' | 'model_multidomain' | 'incomplete' | 'conflict';
 	models: string[];
 }
 const DOMAINS = new Set(['job', 'immo', 'finance', 'kontakt', 'shopping', 'system', 'werbung', 'unsorted']);
@@ -18,17 +19,19 @@ export function decideMailDomain(
 	opinions: ValidatorOpinionRow[],
 	models: string[]
 ): MailDomainDecision {
-	if (correction !== null) return { domain: normalize(correction), source: 'human', models: [] };
+	if (correction !== null) return { domain: normalize(correction), domains: [normalize(correction)!], source: 'human', models: [] };
 	const required = [...new Set(models)];
 	const votes = required.map((model) => opinions.find((vote) => vote.validator_model === model
 		&& vote.feedback_id === row.id && vote.account_id === row.account_id && vote.imap_uid === row.imap_uid));
 	if (required.length < 3 || votes.some((vote) => !vote || !DOMAINS.has(normalize(vote.validator_domain) ?? ''))) {
 		return { domain: null, source: 'incomplete', models: required };
 	}
-	const domains = new Set(votes.map((vote) => normalize(vote!.validator_domain)));
-	return domains.size === 1
-		? { domain: [...domains][0], source: 'model_consensus', models: required }
-		: { domain: null, source: 'conflict', models: required };
+	const domains = [...new Set(votes.map((vote) => normalize(vote!.validator_domain)!))];
+	// Classification is a routing hint, not evidence that every proposed fact is true.
+	// Different topic labels can describe the same source. Keep all supported topics.
+	const usable = domains.filter(domain => !['werbung', 'unsorted'].includes(domain));
+	return { domain: usable[0] ?? domains[0], domains: usable.length ? usable : domains,
+		source: domains.length === 1 ? 'model_consensus' : 'model_multidomain', models: required };
 }
 
 export function resolveMailMemoryDomain(row: FeedbackRow): MailDomainDecision {
@@ -39,7 +42,14 @@ export function resolveMailMemoryDomain(row: FeedbackRow): MailDomainDecision {
 	const models = loadRegelwerk().voice_consensus.voices
 		.filter((voice) => voice.enabled !== false && ['primary_llm', 'control_llm'].includes(voice.role))
 		.map((voice) => voice.lm_studio_model).filter((model): model is string => Boolean(model));
-	return decideMailDomain(row, correction?.corrected_domain ?? null, listValidatorOpinionsForFeedback(row.id), models);
+	const decision = decideMailDomain(row, correction?.corrected_domain ?? null, listValidatorOpinionsForFeedback(row.id), models);
+	// Explicit multilabel reviews are already available in the Memory workbench.
+	const review = getFolioDb().prepare('SELECT primary_domain,secondary_domains_json,verdict FROM memory_mail_domain_reviews WHERE feedback_id=? ORDER BY review_id DESC LIMIT 1').get(row.id) as { primary_domain: string; secondary_domains_json: string; verdict: string } | undefined;
+	if (review?.verdict === 'included' && !correction) {
+		const secondary: unknown = JSON.parse(review.secondary_domains_json);
+		if (Array.isArray(secondary) && secondary.every(domain => DOMAINS.has(domain))) return { domain: normalize(review.primary_domain), domains: [...new Set([review.primary_domain, ...secondary].map(normalize))] as string[], source: 'human', models: [] };
+	}
+	return decision;
 }
 
 /** Full triage coverage is required even when the owner has corrected the domain. */

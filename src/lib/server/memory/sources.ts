@@ -68,6 +68,7 @@ export function upsertMemorySourceCandidate(input: UpsertMemorySourceInput): Mem
 			title = excluded.title,
 			relative_path = excluded.relative_path,
 			content_hash = COALESCE(excluded.content_hash, memory_sources.content_hash),
+			sensitivity = CASE WHEN memory_sources.sensitivity = 'sensitive' OR excluded.sensitivity = 'sensitive' THEN 'sensitive' WHEN memory_sources.sensitivity = 'private' OR excluded.sensitivity = 'private' THEN 'private' ELSE 'public' END,
 			origin_run_id = excluded.origin_run_id,
 			origin_document_id = excluded.origin_document_id,
 			status = CASE WHEN memory_sources.status = 'confirmed' THEN 'confirmed' ELSE 'candidate' END,

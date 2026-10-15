@@ -17,7 +17,7 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 	const row = getFeedbackRowById(value.feedback_id);
 	if (!row) throw error(404, 'Mail nicht gefunden.');
 	const decision = resolveMailMemoryDomain(row);
-	if (!decision.domain) return json({ error: 'Die Mail braucht eine vollständige, eindeutige Domänenprüfung.', domain_decision: decision }, { status: 409 });
+	if (!decision.domain) return json({ error: 'Die Modellprüfung dieser Mail ist noch unvollständig. Bitte die fehlenden Prüfungen abschliessen.', domain_decision: decision }, { status: 409 });
 	const body = memoryMailBody(row);
 	if (!body) throw error(409, 'Für diese Mail liegt kein lokaler Inhaltsauszug vor.');
 	try {
@@ -29,10 +29,13 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 			subject: row.subject,
 			body,
 			mail_domain: decision.domain,
+			mail_domains: decision.domains ?? [decision.domain!],
 			received_at: row.mail_date
 		}));
 		return json({
 			domain: result.domain,
+			domains: result.domains ?? [result.domain],
+			proposal_ids: (result.bundles ?? (result.bundle ? [result.bundle] : [])).map(bundle => bundle.proposal.proposal_id),
 			domain_decision: decision,
 			created: result.created,
 			count: result.facts.length,

@@ -1,0 +1,14 @@
+{
+  "schema": "folio/sonar-placement-publisher-config/v1",
+  "candidate_root": "/absolute/path/to/vault/internal/sonar/placements",
+  "review_root": "/absolute/path/to/vault/internal/sonar",
+  "state_root": "/absolute/path/to/private/sonar-publisher-state",
+  "xurl": {
+    "binary": "/absolute/path/to/xurl",
+    "app": "separate-write-enabled-app",
+    "expected_username": "account_name"
+  },
+  "limits": {
+    "max_text_characters": 280
+  }
+}

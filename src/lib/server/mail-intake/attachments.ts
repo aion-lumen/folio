@@ -74,8 +74,8 @@ export function attachmentSummary(id:number) {
      knowledge=record.absence_review?.verdict==='missed_facts'?'missed_facts':record.absence_review?.verdict==='no_personal_fact'?record.status:record.status==='needs_ocr'?'needs_ocr':'not_reviewed';
      if(record.status==='duplicate_only'&&record.duplicate_fact_ids?.length&&record.duplicate_fact_ids.every((factId:string)=>database().prepare("SELECT 1 FROM memory_facts WHERE fact_id=? AND status IN ('candidate','confirmed')").get(factId)))knowledge='duplicate_only';
      if(record.proposal_id){
-      const proposal=database().prepare('SELECT status FROM memory_proposals WHERE proposal_id=?').get(record.proposal_id) as {status:string}|undefined;
-      knowledge=proposal?.status==='confirmed'?'confirmed':proposal?.status==='rejected'?'rejected':'needs_review';proposal_id=record.proposal_id;
+      const statuses=(record.proposal_ids??[record.proposal_id]).map((id:string)=>(database().prepare('SELECT status FROM memory_proposals WHERE proposal_id=?').get(id) as {status:string}|undefined)?.status);
+      knowledge=statuses.length&&statuses.every((s:string)=>s==='confirmed')?'confirmed':statuses.length&&statuses.every((s:string)=>s==='rejected')?'rejected':'needs_review';proposal_id=record.proposal_id;
      }
     }
    }catch{/* A changed binding never inherits an old knowledge status. */}}

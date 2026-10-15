@@ -5,7 +5,7 @@ export type Account = string;
 export interface HistoryWindow { enabled: boolean; time_zone: 'Europe/Zurich'; start_hour: number; end_hour: number; }
 export interface IntakeOptions { career_rejections?:boolean; history_paused?:boolean; unread_first?:boolean; deferred_accounts?:string[]; }
 export interface Config extends IntakeOptions { enabled: boolean; owner: string; authorization_ref: string; authorization_id: string; policy: string; interval_minutes: number; batch_size: number; activated_at: string; history_window: HistoryWindow; }
-export interface Item { diagnostic?: {code:string;reason:string}; attachments?: {status:string;parts:number;ready:number;deferred:number;reason:string|null}; id: number; stage: 'extract' | 'review' | 'done'; outcome?: string; proposal_id?: string; grant_id?: string; }
+export interface Item { diagnostic?: {code:string;reason:string}; attachments?: {status:string;parts:number;ready:number;deferred:number;reason:string|null}; id: number; stage: 'extract' | 'review' | 'done'; outcome?: string; proposal_id?: string; grant_id?: string; proposal_ids?: string[]; reviews?: Record<string, {grant_id?:string; verdict?:string}>; }
 export interface IntakeRun { contracts?:{recorded:number;checkedAt:string}; activity?: {model:string;task:string}; career?:{applied:number;checkedAt:string}; id: string; account: Account; history?: boolean; requested_by?: 'automatic' | 'manual'; batch_size?: number; state: 'pending' | 'running' | 'completed' | 'failed'; phase: 'fetch' | 'validate' | 'memory' | 'career'; worker_id?: string; validator_id?: string; items: Item[]; attempts: number; error?: string; started_at: string; ended_at?: string; }
 export function db() {
  const conn = getFolioDb();

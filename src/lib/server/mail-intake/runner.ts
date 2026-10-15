@@ -160,8 +160,9 @@ async function execute(run: IntakeRun, c: Config, fenceToken:string) {
    if(!body) {item.stage='done';item.outcome='source_incomplete';save(run);continue;}
    try {
     run.activity={model:primary,task:`Memory-Extraktion · Mail #${item.id}`};save(run);
-    const result=await proposeMemoryFromMail({feedback_id:row.id,account_id:row.account_id,imap_uid:row.imap_uid,sender:row.sender,subject:row.subject,body,mail_domain:decision.domain,received_at:row.mail_date},{routeRetention:true});
-    if(result.bundle?.proposal.status==='candidate') {item.proposal_id=result.bundle.proposal.proposal_id;item.stage='review';}
+    const result=await proposeMemoryFromMail({feedback_id:row.id,account_id:row.account_id,imap_uid:row.imap_uid,sender:row.sender,subject:row.subject,body,mail_domain:decision.domain,mail_domains:decision.domains??[decision.domain],received_at:row.mail_date});
+    const pending=(result.bundles??(result.bundle?[result.bundle]:[])).filter(bundle=>bundle.proposal.status==='candidate');
+    if(pending.length) {item.proposal_ids=pending.map(bundle=>bundle.proposal.proposal_id);item.proposal_id=item.proposal_ids[0];item.stage='review';}
     else {item.stage='done';item.outcome=result.facts.length?'already_present':'no_durable_fact';}
    } catch(e) {
     if(e instanceof MailMemoryError && e.code!=='unavailable') {item.stage='done';item.outcome='evidence_clarification';item.diagnostic={code:e.reasonCode,reason:e.message};}
@@ -175,12 +176,23 @@ async function execute(run: IntakeRun, c: Config, fenceToken:string) {
    allowed(c);
    const source=getFeedbackRowById(item.id);
    if(source&&!automaticMemorySourceEligibility(item.id,source.account_id).eligible){item.stage='done';item.outcome='excluded_source_folder';item.diagnostic={code:'spam_or_trash_source',reason:'Automatisches Gedächtnis überspringt bekannte Spam- und Papierkorbquellen.'};save(run);continue;}
-   // Persist before the model call; replay consumes the same completed grant idempotently.
-   if(item.grant_id && !getMemoryDelegationResult(item.grant_id) && Date.parse(getMemoryDelegation(item.grant_id).expires_at)<=Date.now()) item.grant_id=undefined;
-   if(!item.grant_id) {item.grant_id=authorizeMailMemoryReview(item.id,item.proposal_id!,c.owner,c.authorization_ref,{id:c.authorization_id,run_id:run.id,feedback_id:item.id}).grant_id;save(run);}
-   run.activity={model:reviewer,task:`Unabhängige Memory-Prüfung · Mail #${item.id}`};save(run);
-   await reviewDelegatedMailMemory(item.id,item.grant_id);
-   item.outcome=getMemoryProposalBundle(item.proposal_id!).proposal.status;item.stage='done';run.activity=undefined;save(run);
+   // Persist each domain's grant before inference; a retry resumes every unfinished bundle.
+   const ids=item.proposal_ids??(item.proposal_id?[item.proposal_id]:[]);
+   item.reviews??={};
+   for(const proposalId of ids){
+    allowed(c);
+    const review=item.reviews[proposalId]??={grant_id:proposalId===item.proposal_id?item.grant_id:undefined};
+    if(review.verdict)continue;
+    if(review.grant_id&&!getMemoryDelegationResult(review.grant_id)&&Date.parse(getMemoryDelegation(review.grant_id).expires_at)<=Date.now())review.grant_id=undefined;
+    if(!review.grant_id){review.grant_id=authorizeMailMemoryReview(item.id,proposalId,c.owner,c.authorization_ref,{id:c.authorization_id,run_id:run.id,feedback_id:item.id}).grant_id;save(run);}
+    if(proposalId===item.proposal_id)item.grant_id=review.grant_id;
+    run.activity={model:reviewer,task:`Unabhängige Memory-Prüfung · Mail #${item.id}`};save(run);
+    const result=await reviewDelegatedMailMemory(item.id,review.grant_id,()=>{allowed(c);return true;});
+    if(result.verdict!=='accept'&&result.verdict!=='reject')throw Error('invalid_memory_review');
+    review.verdict=result.verdict;save(run);
+   }
+   const states=ids.map(id=>getMemoryProposalBundle(id).proposal.status);
+    item.outcome=states.every(state=>state==='confirmed')?'confirmed':states.every(state=>state==='rejected')?'rejected':'candidate';item.stage='done';run.activity=undefined;save(run);
   }
  } finally { if(run.items.length) {run.activity={model:primary,task:'Primärmodell wiederherstellen'};save(run);await prepareIntakeModel(primary,MAIL_INTAKE_CONTEXT_LENGTH,fenceToken);} run.activity=undefined; }
  if(c.career_rejections&&!run.history){
