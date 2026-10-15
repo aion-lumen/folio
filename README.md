@@ -14,6 +14,10 @@
 > A campaign as structure.<br>
 > A hearth at the center.
 
+## Memory and Sonar · preview.6
+
+Optional local vector search complements full-text retrieval. Mail and file evidence can supply independently reviewed facts in several domains. Historical file passages retain their date and context. Sonar combines bounded X likes, bookmarks and searches with a mobile review queue. [Memory setup](docs/memory-semantic-search.md) · [Multi-domain review](docs/memory-multidomain.md) · [Sonar setup](docs/sonar-placement-search.md)
+
 ## Monthly reconciliation · preview.5
 
 Folio checks payment evidence against complete monthly account statements, closes supported cases and brings the remaining questions to Memory. Existing mail and Memory workflows continue alongside it. [Setup and upgrade](docs/monthly-reconciliation.md).
@@ -43,7 +47,7 @@ part of the record. Plain Markdown remains the portable source of truth. The ful
 
 ## Status
 
-**Status:** v0.6.0-preview.5 (prerelease)<br>
+**Status:** v0.6.0-preview.6 (prerelease)<br>
 **License:** AGPL-3.0<br>
 **Platforms:** Linux / macOS / WSL2
 
@@ -239,7 +243,7 @@ Set `AION_LUMEN_PATH` if the repo is not at `~/Projects/aion-lumen/multi-agent`.
 - Session Relay — provider-neutral handoffs with exact cloud approval and reviewed return paths
 - Mail Relay workflow — a Mail Queue case can return as an editable draft, context question,
   Objective proposal or explicit no-action conclusion; Folio never sends it automatically
-- Sonar preview — local review of X archive and following imports with append-only human decisions
+- Sonar preview — bounded X likes, bookmarks and searches, fresh placement suggestions and mobile review with append-only human decisions
 - Leuchtfeuer — privacy-preserving, visually attributed site and repository resonance from server
   aggregates, without client tracking
 - Isolated demo — fictional fixtures and separate `*-demo.db` state, without IMAP credentials
@@ -261,7 +265,7 @@ The new modules extend the mail workflow:
 Mail processing and model assessment remain local; optionally configured connections such as Google Calendar communicate with the respective provider.
 
 Ledger is a preview for imported evidence; projections are estimates. It does not execute bank transactions.
-[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.5)
+[Setup, upgrade and preview scope](docs/preview-0.6.md) · [Release notes](https://github.com/aion-lumen/folio/releases/tag/v0.6.0-preview.6)
 
 ## What is being built next
 

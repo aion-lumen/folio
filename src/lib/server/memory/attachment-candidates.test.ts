@@ -66,6 +66,12 @@ describe('verified PDF to Memory',()=>{
  it('refuses changed evidence after a grant',async()=>{
   await proposeAttachmentMemory(1,hash);const grant=authorizeAttachmentMemoryReview(hash,'owner:1','test');fake.doc.text+='changed';await expect(reviewAttachmentMemory(hash,grant.grant_id)).rejects.toThrow('document_binding_changed');
  });
+ it('invalidates an outstanding grant when sibling source claims change',async()=>{
+  await proposeAttachmentMemory(1,hash);const grant=authorizeAttachmentMemoryReview(hash,'owner:1','test');
+  proposeMemoryBundle({domain:'projects',source_kind:'attachment',source_ref:fake.doc.source_ref,extractor_id:'memory-attachment-extractor-v1:extractor',actor_id:'test',facts:[{subject:'Architecture',predicate:'has_context',value:'Historical project context',data_class:'context',sensitivity:'private',source_excerpt:'Dies ist ein historisches Zeugnis.'}]});
+  await expect(reviewAttachmentMemory(hash,grant.grant_id)).rejects.toThrow('document_grant_changed');
+  expect(fake.calls).toBe(1);
+ });
  it('does not allow a mail grant or a paid fact through the document path',async()=>{
   const record=await proposeAttachmentMemory(1,hash);
   expect(()=>authorizeMemoryDelegation(record.proposal_id!,'owner:1','test','f'.repeat(64),'reviewer')).toThrow();
@@ -93,4 +99,30 @@ describe('verified PDF to Memory',()=>{
   fake.response=original;const repaired=await proposeAttachmentMemory(1,hash,()=>{},true);expect(repaired).toMatchObject({status:'candidate',facts:1,repair_attempts:1,prior_absence:{status:'example'}});
   await expect(proposeAttachmentMemory(1,hash,()=>{},true)).rejects.toThrow('document_repair_not_authorized_by_evidence');
  });
+ it('splits a mixed PDF into independent page-bound reviews and reports partial confirmation honestly',async()=>{
+  fake.doc.filename='Orion-Vertrag.pdf';fake.doc.text='[Page 1]\nFür Objekt Orion liegt die Freigabe vor.\n[Page 2]\nDie Rechnung über 480 Euro bleibt offen.\n[Page 3]\nNotariat Erlen beantwortet Rückfragen per E-Mail.';
+  fake.response={domain:'immo',disposition:'facts',facts:[
+   {domain:'immo',subject:'Orion',predicate:'has_context',data_class:'context',sensitivity:'private',page:1,start_line:1,end_line:1},
+   {domain:'finance',subject:'Orion-Rechnung',predicate:'has_context',data_class:'context',sensitivity:'private',page:2,start_line:1,end_line:1},
+   {domain:'personal',subject:'Notariat Erlen',predicate:'has_context',data_class:'context',sensitivity:'private',page:3,start_line:1,end_line:1}
+  ]};
+  const record=await proposeAttachmentMemory(1,hash);expect(record.proposal_ids).toHaveLength(3);
+  expect(()=>authorizeAttachmentMemoryReview(hash,'owner:1','multi test')).toThrow('document_domain_proposal_required');
+  const ids=record.proposal_ids!;
+  for(const id of ids){
+   const b=getMemoryProposalBundle(id),grant=authorizeAttachmentMemoryReview(hash,'owner:1','multi test',id);
+   fake.review={verdict:b.proposal.domain==='finance'?'reject':'accept',reason_codes:b.proposal.domain==='finance'?['overinterpretation']:['fully_supported'],checked_object_ids:b.facts.map(f=>f.fact_id),unsupported_object_ids:b.proposal.domain==='finance'?b.facts.map(f=>f.fact_id):[]};
+   await reviewAttachmentMemory(hash,grant.grant_id);
+  }
+  expect(ids.map(id=>getMemoryProposalBundle(id).proposal.status)).toEqual(['confirmed','candidate','confirmed']);
+  const financial=getMemoryProposalBundle(ids[1]).facts[0];expect(financial.sensitivity).toBe('sensitive');expect(record.pages[financial.fact_id]).toBe(2);
+  expect(db().prepare('SELECT count(*) n FROM memory_sources').get()).toEqual({n:1});
+  expect(db().prepare('SELECT count(*) n FROM memory_source_domains').get()).toEqual({n:3});
+  expect((await proposeAttachmentMemory(1,hash)).proposal_ids).toEqual(ids);
+ });
+ it('never copies one exact PDF fact into multiple topic bundles',async()=>{
+  fake.response.facts=[{...fake.response.facts[0],domain:'career'},{...fake.response.facts[0],domain:'personal'}];
+  const record=await proposeAttachmentMemory(1,hash);expect(record.facts).toBe(1);expect(record.proposal_ids).toHaveLength(1);
+ });
+
 });

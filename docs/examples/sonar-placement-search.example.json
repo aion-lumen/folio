@@ -1,0 +1,52 @@
+{
+  "schema": "folio/sonar-placement-search/v1",
+  "target_account": "example_account",
+  "sources": [
+    "example_source",
+    "another_source"
+  ],
+  "focus": "Local AI, open source and human-governed agent workflows.",
+  "voice_context": "The account represents a builder of a local-first open-source system. Use only facts stated here.",
+  "xurl": {
+    "binary": "/absolute/path/to/xurl-readonly",
+    "app": "readonly-app"
+  },
+  "hermes": {
+    "binary": "/absolute/path/to/hermes",
+    "provider": "custom",
+    "model": "local-model-name"
+  },
+  "output_root": "/absolute/path/to/vault/internal/sonar/placements",
+  "thresholds": {
+    "min_impressions": 2000,
+    "min_likes": 20,
+    "min_replies": 2
+  },
+  "budget": {
+    "query_batch_size": 8,
+    "max_results_per_query": 10,
+    "max_liked_results": 20,
+    "max_candidates": 3,
+    "max_post_age_hours": 36,
+    "expires_after_hours": 48,
+    "max_bookmarked_results": 20
+  },
+  "memory": {
+    "domains": [
+      "ai",
+      "career"
+    ],
+    "max_sensitivity": "public",
+    "always_include_data_classes": [
+      "product_fact",
+      "profile",
+      "voice_rule",
+      "voice_example"
+    ]
+  },
+  "notification": {
+    "endpoint": "https://ntfy.example.test/folio-sonar",
+    "token_file": "/absolute/path/to/ntfy-token",
+    "review_url": "https://folio.example.test/sonar/mobile"
+  }
+}

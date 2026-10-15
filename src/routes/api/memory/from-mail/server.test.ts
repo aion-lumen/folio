@@ -22,4 +22,12 @@ describe('mail memory pipeline domain handoff', () => {
 		mocks.decision.mockReturnValue({ domain: null, source: 'conflict', models: ['a','b','c'] });
 		expect((await POST(event())).status).toBe(409); expect(mocks.propose).not.toHaveBeenCalled();
 	});
+ it('passes every topic to extraction and returns every review packet',async()=>{
+  mocks.decision.mockReturnValue({domain:'immo',domains:['immo','finance','kontakt'],source:'model_multidomain',models:['a','b','c']});
+  mocks.propose.mockResolvedValue({domain:'immo',domains:['immo','finance','personal'],created:true,facts:[{status:'candidate'},{status:'candidate'}],bundles:[{proposal:{proposal_id:'immo-1'}},{proposal:{proposal_id:'finance-1'}}]});
+  const response=await POST(event());expect(response.status).toBe(201);
+  expect(mocks.propose).toHaveBeenCalledWith(expect.objectContaining({mail_domains:['immo','finance','kontakt']}));
+  expect(await response.json()).toMatchObject({candidate_count:2,domains:['immo','finance','personal'],proposal_ids:['immo-1','finance-1']});
+ });
+
 });

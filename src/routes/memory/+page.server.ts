@@ -10,7 +10,8 @@ import { calendarMatches, calendarConflicts } from '$lib/server/calendar/plannin
 import { isDemoVaultActive } from '$lib/server/env.js';
 import { error, fail } from '@sveltejs/kit';
 import { randomUUID } from 'node:crypto';
-import { compileMemoryContext } from '$lib/server/memory/compiler.js';
+import { compileMemoryContextHybrid } from '$lib/server/memory/hybrid.js';
+import { semanticMaintenanceStatus } from '$lib/server/memory/semantic-runtime.js';
 import { inspectMemoryQuorum } from '$lib/server/memory/quorum.js';
 import { listMemoryReviewQueue } from '$lib/server/memory/review.js';
 import { isHistoricalAppointment } from '$lib/memory/temporal.js';
@@ -174,8 +175,9 @@ export const load: PageServerLoad = async ({ url, locals }) => {
 		confirmed,
 		inactive: memoryView==='knowledge'?facts.filter((fact) => fact.status === 'rejected' || fact.status === 'superseded'):[],
 		preview: memoryView==='overview'&&query
-			? compileMemoryContext({ consumer_id: 'owner-preview', domain, query, max_sensitivity: maxSensitivity, limit: 10 })
+			? await compileMemoryContextHybrid({ consumer_id: 'owner-preview', domain, query, max_sensitivity: maxSensitivity, limit: 10 })
 			: null,
+		semanticMaintenance: semanticMaintenanceStatus(),
 		previewInput: { domain, query, maxSensitivity }
 	};
 };

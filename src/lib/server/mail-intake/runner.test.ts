@@ -27,10 +27,19 @@ describe('full automatic mail path',()=>{
  it.each(['candidate','confirmed','rejected'])('reports stored proposal status %s after an accepting review',async status=>{
   m.proposalStatus.mockReturnValue(status);
   save({id:'resume-restored',account:'gmail',state:'pending',phase:'memory',items:[{id:7,stage:'review',proposal_id:'p',grant_id:'existing'}],attempts:1,started_at:new Date().toISOString()});
-  await tick();expect(m.review).toHaveBeenCalledWith(7,'existing');
+  await tick();expect(m.review).toHaveBeenCalledWith(7,'existing',expect.any(Function));
   expect(runs()[0]).toMatchObject({state:'completed',items:[{id:7,stage:'done',outcome:status}]});
  });
 
+ it('resumes all remaining domain reviews without re-extracting or confirming rejected siblings',async()=>{
+  configure(true,'owner:1','synthetic multi test');
+  save({id:'mixed-resume',account:'gmail',state:'pending',phase:'memory',attempts:0,started_at:new Date().toISOString(),items:[{id:7,stage:'review',proposal_id:'property',proposal_ids:['property','finance','contact'],reviews:{property:{grant_id:'prior',verdict:'accept'}}}]});
+  m.review.mockResolvedValueOnce({verdict:'reject'}).mockResolvedValueOnce({verdict:'accept'});m.proposalStatus.mockReturnValue('candidate');
+  await tick();const item=runs()[0].items[0];
+  expect(m.start).not.toHaveBeenCalled();expect(m.propose).not.toHaveBeenCalled();expect(m.review).toHaveBeenCalledTimes(2);
+  expect(item.reviews).toMatchObject({property:{verdict:'accept'},finance:{verdict:'reject'},contact:{verdict:'accept'}});
+  expect(item).toMatchObject({stage:'done',outcome:'candidate'});
+ });
  it('reconciles exact contract mails before memory without additional model calls',async()=>{await tick();expect(contracts.sync).toHaveBeenCalledWith(expect.objectContaining({items:expect.arrayContaining([expect.objectContaining({id:7})])}),expect.objectContaining({enabled:true}));expect(contracts.sync.mock.invocationCallOrder[0]).toBeLessThan(m.propose.mock.invocationCallOrder[0]);expect(runs()[0].contracts?.recorded).toBe(1);});
 
  it('retries a failed contract checkpoint without refetching or silently skipping it',async()=>{contracts.sync.mockImplementationOnce(()=>{throw Error('contract_mail_source_unavailable');});await tick();expect(runs()[0]).toMatchObject({state:'failed',phase:'memory'});expect(m.propose).not.toHaveBeenCalled();save({...runs()[0],state:'pending'});m.start.mockClear();await tick();expect(m.start).not.toHaveBeenCalled();expect(runs()[0]).toMatchObject({state:'completed',contracts:{recorded:1}});});
@@ -68,7 +77,7 @@ describe('full automatic mail path',()=>{
  it('keeps stored spam sources out of attachment fetching and automatic memory',async()=>{db().prepare('INSERT INTO mail_intake_locations VALUES (?,?,?,?,?)').run('gmail','[Gmail]/Spam',3,7,7);await tick();expect(m.attachments).toHaveBeenCalledTimes(1);expect(m.propose).toHaveBeenCalledTimes(1);expect(runs()[0].items[0]).toMatchObject({id:7,outcome:'excluded_source_folder',diagnostic:{code:'spam_or_trash_source'}});});
  it('does not call memory when the subprocess exits zero but a model opinion is missing',async()=>{m.decision.mockReturnValue({domain:null,source:'incomplete'});await tick();expect(m.propose).not.toHaveBeenCalled();expect(runs()[0]).toMatchObject({state:'failed',error:'incomplete_model_opinions',attempts:1});expect(runs()[0].validator_id).toBeUndefined();});
  it('preserves conflicts and negative evidence verdicts as open cases',async()=>{m.decision.mockImplementation((row:{id:number})=>row.id===7?{domain:null,source:'conflict'}:{domain:'kontakt',source:'model_consensus'});m.review.mockResolvedValue({verdict:'reject'});m.proposalStatus.mockReturnValue('candidate');await tick();expect(runs()[0].items.map(i=>i.outcome)).toEqual(['domain_conflict','candidate']);expect(m.propose).toHaveBeenCalledTimes(1);});
- it('resumes the review stage without fetching, validating or extracting again',async()=>{save({id:'resume',account:'gmail',state:'pending',phase:'memory',items:[{id:7,stage:'review',proposal_id:'p',grant_id:'existing'}],attempts:0,started_at:new Date().toISOString()});await tick();expect(m.start).not.toHaveBeenCalled();expect(m.validate).not.toHaveBeenCalled();expect(m.propose).not.toHaveBeenCalled();expect(m.review).toHaveBeenCalledWith(7,'existing');expect(runs()[0].state).toBe('completed');});
+ it('resumes the review stage without fetching, validating or extracting again',async()=>{save({id:'resume',account:'gmail',state:'pending',phase:'memory',items:[{id:7,stage:'review',proposal_id:'p',grant_id:'existing'}],attempts:0,started_at:new Date().toISOString()});await tick();expect(m.start).not.toHaveBeenCalled();expect(m.validate).not.toHaveBeenCalled();expect(m.propose).not.toHaveBeenCalled();expect(m.review).toHaveBeenCalledWith(7,'existing',expect.any(Function));expect(runs()[0].state).toBe('completed');});
  it('stops after a pause during extraction, without delegating confirmation',async()=>{m.propose.mockImplementation(async()=>{configure(false,'owner:1','pause');return {facts:[{}],bundle:{proposal:{status:'candidate',proposal_id:'p'}}};});await tick();expect(m.review).not.toHaveBeenCalled();expect(runs()[0].state).toBe('pending');});
 });
 
@@ -109,6 +118,6 @@ describe('hourly unread account priority',()=>{
  });
  it('finishes an interrupted Yahoo memory checkpoint without restarting its import',async()=>{
   policy();save({id:'resume-yahoo',account:'yahoo',state:'pending',phase:'memory',items:[{id:7,stage:'review',proposal_id:'p',grant_id:'existing'}],attempts:0,started_at:new Date().toISOString()});
-  await tick();expect(m.start).not.toHaveBeenCalled();expect(m.review).toHaveBeenCalledWith(7,'existing');expect(runs()[0].state).toBe('completed');
+  await tick();expect(m.start).not.toHaveBeenCalled();expect(m.review).toHaveBeenCalledWith(7,'existing',expect.any(Function));expect(runs()[0].state).toBe('completed');
  });
 });

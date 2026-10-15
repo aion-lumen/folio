@@ -1,10 +1,11 @@
 import { building } from '$app/environment';
+import { startMemorySemanticRuntime } from '$lib/server/memory/semantic-runtime.js';
 import { startMemoryWorkRuntime } from '$lib/server/memory/work-runtime.js';
 import { startIntakeRuntime } from '$lib/server/mail-intake/runner.js';
 import { isLedgerDemo, ledgerDemoRoot, ledgerDemoRequestAllowed, validateLedgerDemoTree } from '$lib/server/ledger-demo.js';
 if (!building) {
  if (isLedgerDemo()) validateLedgerDemoTree();
- else { startIntakeRuntime(); startMemoryWorkRuntime(); }
+ else { startIntakeRuntime(); startMemoryWorkRuntime(); startMemorySemanticRuntime(); }
 }
 // Direktive 6 (council-iteration-1.5): Auth-Layer via Tailscale-Header.
 //

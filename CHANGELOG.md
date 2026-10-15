@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0-preview.6] - 2026-10-15
+
+### Added
+- Optional local semantic retrieval alongside full-text and relationship search, with a disposable vector index, canonical evidence checks and lexical fallback. Companion use requires acceptance of the exact local answer model.
+- Separate, independently reviewed Memory bundles for the topics contained in one mail or verified file. The source and each quotation remain traceable.
+- Dated context for historical file passages, including explicit limits on the current validity of old plans and states.
+- Sonar placement search using bounded X likes, bookmarks and optional public searches; a mobile queue prioritises fresh suggestions and retains older items in history.
+- Configurable single-flight search runs, separate source counts, bounded local selection and revision-bound publication approval.
+- Synthetic retrieval, voice-path, multi-domain, historical-file and search-worker regression tests.
+
+### Security
+- Update source-map-js and override js-yaml’s CLI parser with its compatible argparse 2 release, removing the vulnerable sprintf-js dependency. YAML parsing and CLI conversion are checked alongside the application tests.
+
+### Compatibility
+- No canonical database migration. Semantic search is opt-in and uses a separate local embedding service; finance retrieval keeps its existing path.
+- No automatic archive rewrite. Historical file omissions still require explicit review; a well-formed extraction is not proof of complete recall.
+- X adapters, authentication, schedules and optional notifications require operator setup. Bookmark acquisition covers a bounded recent page, not a complete archive sync.
+- Existing monthly reconciliation and Ledger implementation are unchanged.
+
 ## [0.6.0-preview.5] - 2026-10-02
 
 - Recognize additional invoice date formats and dash-separated amount notes. Refresh monthly-work status immediately after reactivation, retaining completed runs.

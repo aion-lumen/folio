@@ -10,6 +10,8 @@ import {
 } from './store.js';
 import type { MemoryEntityRow, MemoryFactRow, MemorySensitivity } from './types.js';
 import { listSourceConfirmedMemory } from './quorum.js';
+import { projectMemoryFacts } from './semantic-projection.js';
+import type { SemanticSeed } from './semantic.js';
 
 const MAX_QUERY_TERMS = 32;
 const STOPWORDS = new Set([
@@ -76,6 +78,7 @@ export interface MemoryContextEpisode {
 }
 
 export interface MemoryContextBundle {
+	retrieval?: { mode: 'lexical' | 'hybrid'; semantic_status: 'disabled' | 'excluded' | 'missing-index' | 'ready' | 'unavailable'; semantic_fact_ids: string[] };
 	schema: 'folio/memory-context/v1';
 	consumer_id: MemoryConsumerId;
 	domain: string;
@@ -90,6 +93,7 @@ export interface MemoryContextBundle {
 }
 
 export interface CompileMemoryContextInput {
+	semantic_query?: string;
 	consumer_id: MemoryConsumerId;
 	domain: string;
 	query: string;
@@ -148,7 +152,17 @@ function activeAt(validFrom: string | null, validTo: string | null, asOf: string
 	return (!validFrom || validFrom <= asOf) && (!validTo || validTo > asOf);
 }
 
-export function compileMemoryContext(input: CompileMemoryContextInput): MemoryContextBundle {
+/** Keep at most two approved seeds within the first four places and the same fact budget. */
+export function limitMemoryFacts(facts: MemoryContextFact[], limit: number, seedIds: Iterable<string> = []): MemoryContextFact[] {
+	const reserved = [...new Set(seedIds)].slice(0, 2).flatMap(id => facts.filter(fact => fact.fact_id === id));
+	if (!reserved.length) return facts.slice(0, limit);
+	const ids = new Set(reserved.map(fact => fact.fact_id));
+	const rest = facts.filter(fact => !ids.has(fact.fact_id));
+	const head = Math.min(2, Math.max(0, limit - reserved.length));
+	return [...rest.slice(0, head), ...reserved, ...rest.slice(head)].slice(0, limit);
+}
+
+export function compileMemoryContext(input: CompileMemoryContextInput, semanticSeeds: readonly SemanticSeed[] = []): MemoryContextBundle {
 	const consumer = CONSUMERS[input.consumer_id];
 	if (!consumer) throw new Error(`unknown memory consumer: ${input.consumer_id}`);
 	if (consumer.domains !== '*' && !consumer.domains.includes(input.domain)) {
@@ -183,6 +197,21 @@ export function compileMemoryContext(input: CompileMemoryContextInput): MemoryCo
 			const current = scores.get(fact.fact_id);
 			if (current) current.score += 1;
 			else scores.set(fact.fact_id, { fact, score: 1, first: index });
+		}
+	}
+
+	// Semantic candidates enter the same confirmed-fact graph and trust pipeline.
+	// Never bypass policy or allow a stale projection to resurrect a changed fact.
+	const acceptedSeeds: string[] = [];
+	if (semanticSeeds.length && input.domain !== 'finance' && input.consumer_id !== 'ledger-local' && input.consumer_id !== 'relay-career') {
+		const allowed = new Map(projectMemoryFacts({ domain: input.domain, max_sensitivity: input.max_sensitivity, as_of: asOf }).map(p => [p.fact.fact_id, p]));
+		for (const [rank, seed] of semanticSeeds.slice(0, 2).entries()) {
+			const current = allowed.get(seed.fact_id);
+			if (!current || current.hash !== seed.hash || !Number.isFinite(seed.similarity)) continue;
+			acceptedSeeds.push(seed.fact_id);
+			const lexical = scores.get(seed.fact_id);
+			if (lexical) lexical.score += 0.5 / (rank + 1);
+			else scores.set(seed.fact_id, { fact: current.fact, score: 1 / (rank + 1), first: terms.length + rank });
 		}
 	}
 
@@ -257,14 +286,13 @@ export function compileMemoryContext(input: CompileMemoryContextInput): MemoryCo
 		const matches = terms.filter(term => words.some(word => word.startsWith(term))).length;
 		if (matches || pinnedClasses.has(claim.fact.data_class)) scores.set(claim.fact_id,{fact:claim.fact,score:matches || 1000,first:0});
 	}
-	const facts = [...scores.values()]
+	const facts = limitMemoryFacts([...scores.values()]
 		.sort((a, b) => b.score - a.score || a.first - b.first || b.fact.recorded_at.localeCompare(a.fact.recorded_at))
-		.slice(0, limit)
 		.map(({ fact }) => {
 			const claim = sourceById.get(fact.fact_id);
 			const payment = paymentById.get(fact.fact_id);
 			return { ...contextFact(fact), ...(payment ? {verification:'bank_confirmed' as const,payment_result_id:payment.result_id} : {}), ...(claim ? { verification: 'source_confirmed' as const, independent_source_count: claim.source_count, supporting_fact_ids: claim.supporting_fact_ids } : {}) };
-		});
+		}), limit, acceptedSeeds);
 
 	return {
 		schema: 'folio/memory-context/v1',

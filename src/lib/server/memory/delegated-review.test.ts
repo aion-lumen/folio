@@ -67,7 +67,7 @@ describe('local delegated review boundary', () => {
 		const { store, review, bundle, grant, accept } = await setup(); mocks.llm.mockResolvedValue(accept);
 		await review.reviewDelegatedMailMemory(7, grant.grant_id);
 		expect(mocks.llm.mock.calls[0][0]).toContain('Prefers Tuesday.'); expect(mocks.llm.mock.calls[0][1]).toBe('independent');
-		expect(mocks.llm.mock.calls[0][0]).toContain('mail domain kontakt maps to Memory personal');
+		expect(mocks.llm.mock.calls[0][0]).toContain('This bundle contains only personal facts');
 		expect(mocks.llm.mock.calls[0][0]).not.toContain('"derived_from_external"');
 		expect(mocks.llm.mock.calls[0][0]).not.toContain('"task_id"');
 		expect(store.getMemoryProposalBundle(bundle.proposal.proposal_id).proposal.reviewed_by).toBe('local-memory-reviewer:independent');
@@ -114,4 +114,19 @@ describe('local delegated review boundary', () => {
 		expect(() => review.authorizeMailMemoryReview(7, bundle.proposal.proposal_id, 'owner:1', 'new-request')).toThrow(/must differ/);
 		expect(mocks.llm).not.toHaveBeenCalled();
 	});
+ it('binds sibling claims into the review evidence and leaves a real cross-domain contradiction open',async()=>{
+  const {store,review}=await setup();const sources=await import('./sources.js');
+  mocks.body='Prefers Tuesday. Die Rechnung ist bezahlt. Die Rechnung ist nicht bezahlt.';
+  sources.upsertMemorySourceCandidate({source_ref:'mail:test:42',source_kind:'mail',title:'Synthetic Orion',primary_domain:'immo',secondary_domains:['finance','personal'],reviewed_by:'test'});
+  const property=store.proposeMemoryBundle({domain:'immo',source_kind:'mail',source_ref:'mail:test:42',extractor_id:'extractor',actor_id:'test',facts:[{data_class:'context',sensitivity:'sensitive',subject:'Rechnung Orion',predicate:'has_context',value:'Die Rechnung ist bezahlt.',source_excerpt:'Die Rechnung ist bezahlt.'}]});
+  const finance=store.proposeMemoryBundle({domain:'finance',source_kind:'mail',source_ref:'mail:test:42',extractor_id:'extractor',actor_id:'test',facts:[{data_class:'context',sensitivity:'sensitive',subject:'Rechnung Orion',predicate:'has_context',value:'Die Rechnung ist nicht bezahlt.',source_excerpt:'Die Rechnung ist nicht bezahlt.'}]});
+  const grant=review.authorizeMailMemoryReview(7,property.proposal.proposal_id,'owner:1','mixed evidence');
+  mocks.llm.mockResolvedValue({verdict:'reject',reason_codes:['bundle_internal_conflict'],checked_object_ids:[property.facts[0].fact_id],unsupported_object_ids:[property.facts[0].fact_id]});
+  const verdict=await review.reviewDelegatedMailMemory(7,grant.grant_id);expect(verdict.verdict).toBe('reject');
+  expect(mocks.llm.mock.calls[0][0]).toContain('Die Rechnung ist nicht bezahlt.');
+  expect(mocks.llm.mock.calls[0][0]).toContain('related_source_facts');
+  expect(store.getMemoryProposalBundle(property.proposal.proposal_id).proposal.status).toBe('candidate');
+  expect(store.getMemoryProposalBundle(finance.proposal.proposal_id).proposal.status).toBe('candidate');
+ });
+
 });

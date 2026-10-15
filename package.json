@@ -2,7 +2,7 @@
   "name": "folio",
   "homepage": "https://aion-lumen.ch/folio",
   "private": true,
-  "version": "0.6.0-preview.5",
+  "version": "0.6.0-preview.6",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -17,7 +17,15 @@
     "audit:dependencies": "npm audit --audit-level=moderate",
     "test": "vitest run",
     "test:watch": "vitest",
-    "eval:triage": "tsx evals/triage/run.ts"
+    "eval:triage": "tsx evals/triage/run.ts",
+    "memory:index-vectors": "tsx scripts/memory-vectors.ts",
+    "eval:memory-retrieval": "tsx evals/memory-retrieval/run.ts",
+    "eval:memory-export-private": "node --import tsx evals/memory-retrieval/export-private.ts",
+    "eval:memory-replay-private": "node --import tsx evals/memory-retrieval/replay-private.ts",
+    "eval:memory-check": "tsc -p evals/memory-retrieval/tsconfig.json",
+    "sonar:classify-following": "tsx scripts/sonar-classify-following.ts",
+    "sonar:search-placements": "tsx scripts/sonar-placement-search.ts",
+    "sonar:publish-placement": "tsx scripts/sonar-placement-publish.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.60.0",
@@ -49,6 +57,9 @@
   "overrides": {
     "@sveltejs/kit": {
       "cookie": "^0.7.2"
+    },
+    "js-yaml": {
+      "argparse": "2.0.1"
     }
   }
 }

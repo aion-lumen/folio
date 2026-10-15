@@ -337,6 +337,36 @@ export function confirmMemoryFactByHuman(factId: string, actorId: string): Memor
 	return db.transaction(() => confirmMemoryFactInTransaction(factId, actorId))();
 }
 
+/** Retire only superseded machine suggestions; retain their evidence and audit trail.
+ * Called inside the file reassessment transaction, including when no replacement survives. */
+export function supersedeFileMemoryCandidates(sourceRef: string, proposalIds: string[], replacementIds: string[], policy: string): void {
+	const db = getFolioDb();
+	db.transaction(() => {
+		const bundles = proposalIds.map(getMemoryProposalBundle);
+		const replacements = replacementIds.map(getMemoryProposalBundle);
+		for (const bundle of [...bundles, ...replacements]) {
+			if (bundle.proposal.source_kind !== 'file' || bundle.proposal.source_ref !== sourceRef
+				|| !bundle.proposal.extractor_id.startsWith('memory-file-extractor-v1:')
+				|| bundle.proposal.status !== 'candidate' || bundle.facts.some(f => f.status !== 'candidate')
+				|| bundle.entities.length || bundle.relations.length || bundle.episodes.length) throw new MemoryStoreError('file_reassessment_scope_changed');
+		}
+		if (proposalIds.some(id => replacementIds.includes(id))) throw new MemoryStoreError('file_reassessment_requires_new_proposals');
+		const detail = { policy, replacement_proposal_ids: replacementIds, replacement_fact_ids: replacements.flatMap(b => b.facts.map(f => f.fact_id)) };
+		for (const bundle of bundles) {
+			for (const fact of bundle.facts) {
+				db.prepare("UPDATE memory_facts SET status='superseded' WHERE fact_id=?").run(fact.fact_id);
+				indexFact({ ...fact, status: 'superseded' });
+				appendEvent(fact.fact_id, 'superseded', 'system', policy, detail);
+				appendLedger(bundle.proposal.proposal_id, 'fact', fact.fact_id, 'quality_reassessed', 'system', policy, detail);
+			}
+			// Proposal lifecycle has no superseded state. Reject the obsolete bundle
+			// as a system decision; individual facts retain the precise superseded state.
+			db.prepare("UPDATE memory_proposals SET status='rejected', reviewed_at=?, reviewed_by=? WHERE proposal_id=?").run(new Date().toISOString(), policy, bundle.proposal.proposal_id);
+			appendLedger(bundle.proposal.proposal_id, 'proposal', bundle.proposal.proposal_id, 'quality_reassessed', 'system', policy, detail);
+		}
+	})();
+}
+
 export function candidateCorrectionVersion(fact: MemoryFactRow): string | null {
 	if (fact.status !== 'candidate' || fact.subject_entity_id || fact.object_entity_id
 		|| !CORRECTION_KINDS.some((kind) => kind.predicate === fact.predicate)) return null;
@@ -766,6 +796,7 @@ export interface MemoryDelegation {
 
 export const MEMORY_REVIEW_POLICY = 'mail-memory-evidence-v1';
 export const ATTACHMENT_MEMORY_REVIEW_POLICY = 'attachment-memory-evidence-v1';
+export const FILE_MEMORY_REVIEW_POLICY = 'file-memory-evidence-v1';
 
 export function getMemoryReviewSnapshot(proposalId: string) {
 	const bundle = getMemoryProposalBundle(proposalId);
@@ -777,17 +808,20 @@ export function getMemoryReviewSnapshot(proposalId: string) {
 
 function assertDelegatable(bundle: MemoryProposalBundle, policy = MEMORY_REVIEW_POLICY): void {
 	const attachment = policy === ATTACHMENT_MEMORY_REVIEW_POLICY;
-	if (![MEMORY_REVIEW_POLICY,ATTACHMENT_MEMORY_REVIEW_POLICY].includes(policy)) throw new MemoryStoreError('Unknown review policy.');
-	const kind = attachment ? 'attachment' : 'mail';
+	const file = policy === FILE_MEMORY_REVIEW_POLICY;
+	if (![MEMORY_REVIEW_POLICY,ATTACHMENT_MEMORY_REVIEW_POLICY,FILE_MEMORY_REVIEW_POLICY].includes(policy)) throw new MemoryStoreError('Unknown review policy.');
+	const kind = file ? 'file' : attachment ? 'attachment' : 'mail';
 	const objects = [...bundle.facts, ...bundle.entities, ...bundle.relations, ...bundle.episodes];
 	if (attachment && (!/^attachment:sha256:[a-f0-9]{64}$/.test(bundle.proposal.source_ref) || !bundle.proposal.extractor_id.startsWith('memory-attachment-extractor-v1:')
 		|| bundle.entities.length || bundle.relations.length || bundle.episodes.length || bundle.facts.length>5 || bundle.facts.some(f=>f.predicate==='paid'))) throw new MemoryStoreError('Attachment review requires a bounded document-only proposal.');
+	if (file && (!/^file:[a-f0-9]{64}$/.test(bundle.proposal.source_ref) || !bundle.proposal.extractor_id.startsWith('memory-file-extractor-v1:')
+		|| bundle.entities.length || bundle.relations.length || bundle.episodes.length || bundle.facts.length>5 || bundle.facts.some(f=>f.predicate==='paid'))) throw new MemoryStoreError('File review requires a bounded document-only proposal.');
 	if (bundle.proposal.source_kind !== kind || bundle.proposal.status !== 'candidate' || !objects.length
 		|| objects.some((item) => item.status !== 'candidate' || item.domain !== bundle.proposal.domain
 			|| item.source_ref !== bundle.proposal.source_ref || item.source_kind !== kind
 			|| ('supersedes_fact_id' in item && item.supersedes_fact_id)
 			|| ('supersedes_relation_id' in item && item.supersedes_relation_id))) {
-		throw new MemoryStoreError('Only intact, unreviewed mail bundles can be delegated.');
+		throw new MemoryStoreError('Only intact, unreviewed source bundles can be delegated.');
 	}
 }
 
@@ -799,10 +833,15 @@ export function authorizeMemoryDelegation(proposalId: string, ownerId: string, a
 export function authorizeAttachmentMemoryDelegation(proposalId:string,ownerId:string,authorizationRef:string,sourceDigest:string,reviewModel:string):MemoryDelegation {
 	return authorizeDelegation(proposalId,ownerId,authorizationRef,sourceDigest,reviewModel,ATTACHMENT_MEMORY_REVIEW_POLICY);
 }
+/** A separate explicit file selection; never inherited from mail standing grants. */
+export function authorizeFileMemoryDelegation(proposalId:string,ownerId:string,authorizationRef:string,sourceDigest:string,reviewModel:string):MemoryDelegation {
+	return authorizeDelegation(proposalId,ownerId,authorizationRef,sourceDigest,reviewModel,FILE_MEMORY_REVIEW_POLICY);
+}
 function authorizeDelegation(proposalId: string, ownerId: string, authorizationRef: string, sourceDigest: string, reviewModel: string, policy:string, standing?: MemoryDelegation['standing']): MemoryDelegation {
 	const bundle = getMemoryProposalBundle(proposalId);
 	assertDelegatable(bundle,policy);
 	if(policy===ATTACHMENT_MEMORY_REVIEW_POLICY&&bundle.proposal.extractor_id===`memory-attachment-extractor-v1:${reviewModel}`)throw new MemoryStoreError('Reviewer must differ from extraction model.');
+	if(policy===FILE_MEMORY_REVIEW_POLICY&&bundle.proposal.extractor_id===`memory-file-extractor-v1:${reviewModel}`)throw new MemoryStoreError('Reviewer must differ from extraction model.');
 	if (!/^[a-f0-9]{64}$/.test(sourceDigest)) throw new MemoryStoreError('Invalid source digest.');
 	if (standing) assertAuthorization(standing.id, standing.run_id, standing.feedback_id, ownerId);
 	const grant: MemoryDelegation = {
@@ -850,7 +889,7 @@ export function finishDelegatedMemoryReview(grantId: string, sourceDigest: strin
 		if (grant.standing) assertAuthorization(grant.standing.id, grant.standing.run_id, grant.standing.feedback_id, grant.authorized_by);
 		const bundle = getMemoryProposalBundle(grant.proposal_id);
 		assertDelegatable(bundle,grant.review_policy);
-		if ((grant.review_policy===ATTACHMENT_MEMORY_REVIEW_POLICY&&(grant.standing||!diagnostic)) || isMemoryDelegationRevoked(grantId) || Date.parse(grant.expires_at) <= Date.now() || sourceDigest !== grant.source_digest
+		if (([ATTACHMENT_MEMORY_REVIEW_POLICY,FILE_MEMORY_REVIEW_POLICY].includes(grant.review_policy)&&(grant.standing||!diagnostic)) || isMemoryDelegationRevoked(grantId) || Date.parse(grant.expires_at) <= Date.now() || sourceDigest !== grant.source_digest
 			|| memorySnapshotDigest(getMemoryReviewSnapshot(grant.proposal_id)) !== grant.bundle_digest || model !== grant.review_model) {
 			throw new MemoryStoreError('Delegation expired or evidence, proposal or reviewer changed.');
 		}
@@ -858,6 +897,7 @@ export function finishDelegatedMemoryReview(grantId: string, sourceDigest: strin
 			|| (verdict === 'accept' && (reasonCodes.length !== 1 || reasonCodes[0] !== 'fully_supported'))) {
 			throw new MemoryStoreError('Invalid delegated verdict.');
 		}
+		if (grant.review_policy===FILE_MEMORY_REVIEW_POLICY && verdict==='accept' && diagnostic?.stage!=='semantic_review') throw new MemoryStoreError('File confirmation requires independent semantic review.');
 		if(diagnostic){
 			const ids=[...bundle.facts.map(x=>x.fact_id),...bundle.entities.map(x=>x.entity_id),...bundle.relations.map(x=>x.relation_id),...bundle.episodes.map(x=>x.episode_id)];
 			if(diagnostic.stage==='relevance_routing'&&(verdict!=='reject'||reasonCodes.length!==1||reasonCodes[0]!=='transient_or_low_value'))throw new MemoryStoreError('Invalid relevance routing.');

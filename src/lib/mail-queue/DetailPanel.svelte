@@ -151,7 +151,7 @@
 	let relayError = $state<string | null>(null);
 	let memoryLoading = $state(false);
 	let memoryError = $state<string | null>(null);
-	let memoryResult = $state<{ count: number; candidateCount: number; created: boolean } | null>(null);
+	let memoryResult = $state<{ count: number; candidateCount: number; created: boolean; domains: string[] } | null>(null);
 	let stagedRelay = $state<{
 		caseId: string;
 		status: string;
@@ -204,11 +204,12 @@
 				try { const payload = JSON.parse(raw) as { message?: string; error?: string }; message = payload.message ?? payload.error ?? message; } catch { /* plain response */ }
 				throw new Error(message);
 			}
-			const result = await response.json() as { count: number; candidate_count: number; created: boolean };
+			const result = await response.json() as { count: number; candidate_count: number; created: boolean; domains?: string[] };
 			memoryResult = {
 				count: result.count,
 				candidateCount: result.candidate_count,
-				created: result.created
+				created: result.created,
+				domains: result.domains ?? []
 			};
 			if (result.candidate_count > 0) toastStore.show(`${result.candidate_count} Wissenskandidat${result.candidate_count === 1 ? '' : 'en'} vorgeschlagen`, 2600);
 			else toastStore.show('Keine dauerhafte Tatsache gefunden', 2400);
@@ -613,8 +614,9 @@
 							<p>Keine dauerhafte Tatsache gefunden. Die Mail bleibt unverändert.</p>
 						{/if}
 					{:else}
-						<p>Das lokale Modell schlägt höchstens drei belegte Fakten vor. Vorschläge bleiben offen, bis du oder eine von dir freigegebene unabhängige Prüfung sie bestätigt.</p>
+						<p>Das lokale Modell schlägt höchstens drei belegte Fakten vor und ordnet jeden dem passenden Themenbereich zu. Eine Mail kann mehrere Bereiche betreffen. Vorschläge bleiben offen, bis du oder eine von dir freigegebene unabhängige Prüfung sie bestätigt.</p>
 					{/if}
+					{#if memoryResult && memoryResult.domains.length > 1}<small>Themenbereiche: {memoryResult.domains.map(domain => ({career:'Beruf',finance:'Finanzen',immo:'Immobilien',personal:'Persönliches',projects:'Projekte',health:'Gesundheit',knowledge:'Wissen'}[domain] ?? domain)).join(' · ')}</small>{/if}
 					{#if memoryError}<small class="memory-error">{memoryError}</small>{/if}
 				</div>
 				{#if memoryResult?.candidateCount}

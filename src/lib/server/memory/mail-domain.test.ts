@@ -11,9 +11,9 @@ describe('mail to memory domain boundary', () => {
 	it('keeps human corrections ahead of all model votes, including explicit unsorted', () => {
 		expect(decideMailDomain(row, 'unsorted', votes(['finance','finance','finance']), models)).toMatchObject({ domain: 'unsorted', source: 'human' });
 	});
-	it('does not silently fall back on heuristics for incomplete or conflicting opinions', () => {
+	it('blocks incomplete reviews but keeps different supported topics', () => {
 		expect(decideMailDomain(row, null, votes(['finance','finance']), models).source).toBe('incomplete');
-		expect(decideMailDomain(row, null, votes(['finance','job','finance']), models)).toMatchObject({ domain: null, source: 'conflict' });
+		expect(decideMailDomain(row, null, votes(['finance','job','finance']), models)).toMatchObject({ domain: 'finance', domains: ['finance','job'], source: 'model_multidomain' });
 	});
 	it('rejects identity-mismatched opinions and an underspecified roster', () => {
 		const opinions = votes(['finance','finance','finance']); opinions[1].account_id = 'other';

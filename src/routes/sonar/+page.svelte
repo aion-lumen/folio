@@ -1,11 +1,12 @@
 <script lang="ts">
 	import { onDestroy } from 'svelte';
 	import { Archive, ArrowRight, Bookmark, ChevronLeft, ExternalLink, Heart, Landmark, LockKeyhole, Radar, ShieldCheck, Trash2, UserRound, Users } from 'lucide-svelte';
+	import PlacementWorkspace from '$lib/sonar/PlacementWorkspace.svelte';
 	import type { SonarDomain, SonarReviewStatus } from '$lib/server/modules/sonar/store.js';
 	import type { SonarFollowingCategory } from '$lib/server/modules/sonar/following.js';
 
 	let { data } = $props();
-	type View = 'inbox' | 'knowledge' | 'drafts' | 'sources';
+	type View = 'inbox' | 'knowledge' | 'placements' | 'sources';
 	type DomainFilter = 'all' | SonarDomain;
 	type FollowingFilter = 'open' | SonarFollowingCategory;
 
@@ -37,6 +38,9 @@
 		}))
 	);
 	const followingOpenCount = $derived(followingProfiles.filter((profile) => profile.category === null).length);
+	const placementOpenCount = $derived(
+		data.placements.candidates.filter((candidate) => candidate.status === 'open').length
+	);
 	const visibleFollowing = $derived(
 		followingProfiles.filter((profile) =>
 			followingFilter === 'open' ? profile.category === null : profile.category === followingFilter
@@ -172,15 +176,17 @@
 			<h1>Sonar</h1>
 			<p class="subtitle">Relevantes finden, als Wissen behalten, Antworten vorbereiten.</p>
 		</div>
-		<div class="source-state"><i></i><span>X · Altbestand · nur lesen</span></div>
+		<div class="source-state"><i></i><span>Lokal · Wissen + Beitragsradar</span></div>
 	</header>
 
-	{#if data.sonar.skippedNotes > 0 || !data.sonar.ledgerHealthy}
+	{#if data.sonar.skippedNotes > 0 || !data.sonar.ledgerHealthy || !data.placements.healthy || !data.placements.ledgerHealthy}
 		<div class="integrity-notice" role="status">
 			<ShieldCheck size={17} />
 			<span>
 				{#if data.sonar.skippedNotes > 0}{data.sonar.skippedNotes} ungültige Notiz(en) wurden ausgelassen. {/if}
 				{#if !data.sonar.ledgerHealthy}Das Review-Ledger ist nicht vollständig lesbar; Entscheidungen sind gesperrt.{/if}
+				{#if !data.placements.healthy}Der Platzierungseingang wurde wegen eines Integritätsfehlers ausgeblendet.{/if}
+				{#if data.placements.healthy && !data.placements.ledgerHealthy}Das Platzierungsprotokoll ist nicht vollständig lesbar; Änderungen sind gesperrt.{/if}
 			</span>
 		</div>
 	{/if}
@@ -192,7 +198,11 @@
 			<span>{pendingCount}</span>
 		</button>
 		<button type="button" class:active={view === 'knowledge'} aria-current={view === 'knowledge' ? 'page' : undefined} onclick={() => chooseView('knowledge')}>Wissen <span>{knowledgeCount}</span></button>
-		<button type="button" class:active={view === 'drafts'} aria-current={view === 'drafts' ? 'page' : undefined} onclick={() => chooseView('drafts')}>Entwürfe <span>0</span></button>
+		<button type="button" class:active={view === 'placements'} aria-current={view === 'placements' ? 'page' : undefined} onclick={() => chooseView('placements')}>
+			<span class="placements-long">Platzierungen</span><span class="placements-short">Radar</span>
+			{#if placementOpenCount > 0}<span class="tab-indicator" aria-label="Neue Platzierungen"></span>{/if}
+			<span>{placementOpenCount}</span>
+		</button>
 		<button type="button" class:active={view === 'sources'} aria-current={view === 'sources' ? 'page' : undefined} onclick={() => chooseView('sources')}>Quellen</button>
 	</nav>
 
@@ -247,8 +257,13 @@
 		{:else}
 			<div class="empty"><Radar size={24} /><strong>{view === 'inbox' ? 'Eingang ist leer' : 'Noch kein bestätigtes Wissen'}</strong><span>{domain === 'all' ? 'Hier erscheinen lokal aufbereitete Signale.' : 'Für diesen Filter gibt es noch keine Notizen.'}</span></div>
 		{/if}
-	{:else if view === 'drafts'}
-		<div class="empty"><Radar size={24} /><strong>Entwürfe folgen im nächsten Schnitt</strong><span>Vorbereiten ja, veröffentlichen weiterhin nur durch dich.</span></div>
+	{:else if view === 'placements'}
+		<PlacementWorkspace
+			placementState={data.placements}
+			publicationState={data.publications}
+			canReview={data.canReviewPlacements}
+			canApprove={data.canApprovePlacements}
+		/>
 	{:else}
 		{#if sourceMode === 'following'}
 			<section class="following-panel">
@@ -419,6 +434,8 @@
 	.tabs button.active::after { content: ''; position: absolute; left: 0; right: 0; bottom: -1px; height: 2px; background: var(--sonar); }
 	.tabs span { margin-left: 4px; color: var(--color-muted-foreground); }
 	.tabs .tab-indicator { display: inline-block; width: 6px; height: 6px; margin: 0 0 1px 6px; border-radius: 50%; background: var(--sonar); box-shadow: 0 0 0 3px color-mix(in srgb, var(--sonar) 14%, transparent); }
+	.placements-long { margin-left: 0 !important; color: inherit !important; }
+	.placements-short { display: none; margin-left: 0 !important; color: inherit !important; }
 	.toolbar { display: flex; align-items: center; gap: 8px; margin: 18px 0 12px; }
 	.toolbar button { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: 7px; color: var(--color-muted-foreground); background: var(--color-card); cursor: pointer; }
 	.toolbar button.active { color: var(--color-foreground); border-color: var(--sonar); }
@@ -564,6 +581,8 @@
 		.source-state { margin-left: 0; }
 		.tabs { gap: 14px; overflow-x: auto; }
 		.tabs button { white-space: nowrap; }
+		.placements-long { display: none; }
+		.placements-short { display: inline; }
 		.toolbar { flex-wrap: wrap; }
 		.toolbar > span { width: 100%; margin-left: 0; }
 		.workspace { grid-template-columns: 1fr; max-height: none; }

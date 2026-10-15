@@ -68,7 +68,8 @@ function reviewedMailBody(input: CareerMailRelayInput): string {
 
 export function stageCareerMailRelay(
 	input: CareerMailRelayInput,
-	targets: SessionTarget[]
+	targets: SessionTarget[],
+	memoryCompiler: typeof compileMemoryContext = compileMemoryContext
 ): CareerMailRelayResult {
 	if (!Number.isInteger(input.feedback_id) || input.feedback_id < 1) {
 		throw new MailRelayError('feedback_id is invalid');
@@ -87,7 +88,7 @@ export function stageCareerMailRelay(
 	const body = reviewedMailBody(input);
 	const dataClasses = ['mail_metadata', 'mail_body'];
 	const memoryContext = target.allowed_data_classes.includes('memory_context') && target.memory_max_sensitivity
-		? compileMemoryContext({
+		? memoryCompiler({
 			consumer_id: 'relay-career',
 			domain: 'career',
 			query: `${input.subject}\n${body}`,
@@ -108,4 +109,9 @@ export function stageCareerMailRelay(
 		target
 	});
 	return { case: relayCase, target, created: true, body_truncated: input.body_truncated };
+}
+
+/** Compatibility adapter: Relay stays lexical until export relevance is evaluated. */
+export async function stageCareerMailRelayHybrid(input: CareerMailRelayInput, targets: SessionTarget[]): Promise<CareerMailRelayResult> {
+	return stageCareerMailRelay(input, targets);
 }

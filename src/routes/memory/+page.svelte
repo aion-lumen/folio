@@ -389,6 +389,13 @@
 			<div><span>FRAG FOLIO</span><h2>Was weiss Folio dazu?</h2><p>Durchsucht nur bestätigtes Wissen innerhalb der gewählten Domäne und Vertraulichkeit.</p></div>
 			<FileSearch size={24} />
 		</div>
+		{#if data.semanticMaintenance.status === 'ready'}
+			<p class="night-note">Bedeutungssuche: {data.semanticMaintenance.facts} bestätigte Fakten erfasst. Letzte Indexprüfung: {new Date(data.semanticMaintenance.checked_at!).toLocaleString('de-CH')}. Automatische Aktualisierung alle fünf Minuten.</p>
+		{:else if data.semanticMaintenance.status === 'updating' || data.semanticMaintenance.status === 'pending'}
+			<p class="night-note">Die Bedeutungssuche wird vorbereitet. Die Wortsuche ist verfügbar.</p>
+		{:else if data.semanticMaintenance.status === 'unavailable'}
+			<p class="night-note">Der Suchindex konnte zuletzt nicht aktualisiert werden. Folio versucht es erneut; die Wortsuche bleibt verfügbar.</p>
+		{/if}
 		<form method="GET" class="query-form">
 			<label>Domäne<select name="domain">{#each domains as domain}<option value={domain} selected={data.previewInput.domain === domain}>{label(domainLabels, domain)}</option>{/each}</select></label>
 			<label>Bis<select name="sensitivity"><option value="public" selected={data.previewInput.maxSensitivity === 'public'}>öffentlich</option><option value="private" selected={data.previewInput.maxSensitivity === 'private'}>privat</option><option value="sensitive" selected={data.previewInput.maxSensitivity === 'sensitive'}>sensibel</option></select></label>
@@ -398,6 +405,11 @@
 		{#if data.preview}
 			<div class="context-result">
 				<div class="result-head"><Database size={18} /><strong>{data.preview.facts.length} belegte Treffer</strong><span>{data.preview.query_terms.length} Suchbegriffe</span></div>
+				{#if data.preview.retrieval?.mode === 'hybrid'}
+					<p>Wortsuche und Bedeutungsähnlichkeit kombiniert; Quellen und Gültigkeit bleiben massgeblich.</p>
+				{:else if data.preview.retrieval?.semantic_status === 'unavailable' || data.preview.retrieval?.semantic_status === 'missing-index'}
+					<p>Die semantische Ergänzung ist derzeit nicht verfügbar. Angezeigt werden Treffer der bestehenden Wort- und Beziehungssuche.</p>
+				{/if}
 				{#if data.preview.facts.length}
 					<div class="fact-list compact">
 						{#each data.preview.facts as fact}

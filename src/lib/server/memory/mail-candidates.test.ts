@@ -59,6 +59,18 @@ describe('mail-derived memory candidates', () => {
 		llm.setLlmOverride(async()=>{calls++;return JSON.stringify({schema:'folio/memory-candidate-proposals/v1',application:null,facts:[{data_class:'context',subject:'Sam',predicate:'has_context',value:'Unsupported',sensitivity:'private',evidence_quote:'Never in source',valid_from:null}]});});
 		await expect(extractor.proposeMemoryFromMail(input)).rejects.toMatchObject({reasonCode:'quote_not_in_source'});expect(calls).toBe(2);
 	});
+	it('does not report no knowledge when repair drops independently supported facts', async () => {
+		const {llm,extractor}=await setup();let calls=0;
+		llm.setLlmOverride(async(prompt)=>{
+			if(calls++) {expect(prompt).toContain('PREVIOUS CANDIDATE');return JSON.stringify({schema:'folio/memory-candidate-proposals/v2',application:null,facts:[]});}
+			return JSON.stringify({schema:'folio/memory-candidate-proposals/v2',application:null,facts:[
+				{domain:'projects',data_class:'project_fact',subject:'Lichtpfad',predicate:'has_project_fact',value:'Lichtpfad speichert nur Fehlerklassen.',sensitivity:'private',evidence_quote:'Lichtpfad speichert nur Fehlerklassen.',valid_from:null},
+				{domain:'finance',data_class:'transaction',subject:'Lizenz',predicate:'has_context',value:'Die Lizenz kostet 60 Euro.',sensitivity:'sensitive',evidence_quote:'Die Lizenz kostet 60 Euro.',valid_from:null}
+			]});
+		});
+		await expect(extractor.proposeMemoryFromMail({...input,body:'Lichtpfad speichert nur Fehlerklassen. Die Lizenz kostet 60 Euro.'})).rejects.toMatchObject({reasonCode:'repair_dropped_supported_facts'});
+		expect(calls).toBe(2);
+	});
 	it('keeps a dated candidate from a mail without a subject instead of failing its episode write', async () => {
 		const {llm, extractor} = await setup();
 		llm.setLlmOverride(async () => JSON.stringify({
@@ -107,6 +119,28 @@ describe('mail-derived memory candidates', () => {
 			source_ref: 'mail:primary:991', source_excerpt: 'Dienstag um 10 Uhr passt mir gut.'
 		}));
 		expect(memory.searchMemoryFacts('Dienstag', { domain: 'career', max_sensitivity: 'private' })).toEqual([]);
+	});
+
+	it('keeps different subjects and merges an identical claim at the stricter sensitivity', async () => {
+		const { extractor } = await setup();
+		const fact = { data_class: 'profile', subject: 'Sam', predicate: 'has_profile_fact', value: 'Project A', sensitivity: 'private', evidence_quote: 'Sam and Riley work on Project A.', valid_from: null };
+		const envelope = { schema: 'folio/memory-candidate-proposals/v1' as const, application: null, facts: [fact, { ...fact, subject: 'Riley' }, { ...fact, sensitivity: 'sensitive' }] };
+		const result = extractor.validateMailMemoryEnvelope({ ...input, body: fact.evidence_quote }, envelope);
+		expect(result.facts.map(f => [f.subject, f.sensitivity])).toEqual([['Sam', 'sensitive'], ['Riley', 'private']]);
+		expect(extractor.validateMailMemoryEnvelope({ ...input, body: fact.evidence_quote }, { ...envelope, facts: [fact, { ...fact, subject: ' SAM ' }] }).facts).toHaveLength(1);
+	});
+
+	it('recovers a tombstoned subject without confusing a confirmed claim about another person', async () => {
+		const { llm, memory, extractor } = await setup();
+		const facts = ['Sam', 'Riley'].map(subject => ({ data_class: 'profile', subject, predicate: 'has_profile_fact', value: 'Project A', sensitivity: 'private', evidence_quote: 'Sam and Riley work on Project A.', valid_from: null }));
+		llm.setLlmOverride(async () => JSON.stringify({ schema: 'folio/memory-candidate-proposals/v1', application: null, facts }));
+		const mail = { ...input, body: facts[0].evidence_quote };
+		const first = await extractor.proposeMemoryFromMail(mail);
+		memory.confirmMemoryProposalBundle(first.bundle!.proposal.proposal_id, 'owner');
+		memory.tombstoneMemoryFact(first.facts.find(f => f.subject === 'Sam')!.fact_id, 'owner');
+		const retry = await extractor.proposeMemoryFromMail(mail);
+		expect(retry.facts).toHaveLength(1);
+		expect(retry.facts[0]).toMatchObject({ subject: 'Sam', status: 'candidate' });
 	});
 
 	it('is idempotent for the same account and IMAP uid', async () => {
@@ -365,4 +399,59 @@ describe('mail-derived memory candidates', () => {
 			value_text: 'under_review', valid_from: '2026-08-12'
 		}));
 	});
+ it('keeps a synthetic notary source across property, finance and contact without copying facts', async () => {
+  const {llm,memory,extractor}=await setup();let calls=0;
+  const facts=[
+   {domain:'immo',data_class:'context',subject:'Objekt Orion',predicate:'has_context',value:'Die Freigabe für Objekt Orion liegt vor.',sensitivity:'private',evidence_quote:'Die Freigabe für Objekt Orion liegt vor.',valid_from:null},
+   {domain:'finance',data_class:'context',subject:'Rechnung Orion',predicate:'has_context',value:'Die Rechnung über 480 Euro ist noch offen.',sensitivity:'private',evidence_quote:'Die Rechnung über 480 Euro ist noch offen.',valid_from:null},
+   {domain:'personal',data_class:'preference',subject:'Notariat Erlen',predicate:'prefers',value:'Notariat Erlen bevorzugt Rückfragen per E-Mail.',sensitivity:'private',evidence_quote:'Notariat Erlen bevorzugt Rückfragen per E-Mail.',valid_from:null}
+  ];
+  llm.setLlmOverride(async()=>{calls++;return JSON.stringify({schema:'folio/memory-candidate-proposals/v2',application:null,facts});});
+  const mail={...input,mail_domain:'immo',mail_domains:['immo','finance','kontakt'],body:facts.map(f=>f.evidence_quote).join(' ')};
+  const first=await extractor.proposeMemoryFromMail(mail);
+  expect(first.bundles).toHaveLength(3);expect(first.facts).toHaveLength(3);
+  expect(new Set(first.facts.map(f=>f.source_ref)).size).toBe(1);
+  expect(first.facts.find(f=>f.domain==='finance')).toMatchObject({sensitivity:'sensitive',status:'candidate',predicate:'has_context'});
+  expect(memory.listMemoryFacts({status:'confirmed'})).toHaveLength(0);
+  const sources=await import('./sources.js');expect(sources.listActiveMemorySources()).toHaveLength(1);
+  expect(sources.listActiveMemorySources()[0].domains.map(d=>d.domain).sort()).toEqual(['finance','immo','personal']);
+  const again=await extractor.proposeMemoryFromMail(mail);expect(again.created).toBe(false);expect(calls).toBe(1);
+  expect(again.facts.map(f=>f.fact_id)).toEqual(first.facts.map(f=>f.fact_id));
+ });
+ it('adds another domain to an existing source while preserving its first candidate',async()=>{
+  const {llm,memory,extractor}=await setup();
+  const existing=memory.proposeMemoryBundle({domain:'immo',source_kind:'mail',source_ref:'mail:primary:991',extractor_id:'legacy',actor_id:'test',facts:[{data_class:'context',sensitivity:'private',subject:'Orion',predicate:'has_context',value:'Freigabe liegt vor.',source_excerpt:'Freigabe liegt vor.'}]});
+  llm.setLlmOverride(async()=>JSON.stringify({schema:'folio/memory-candidate-proposals/v2',application:null,facts:[{domain:'finance',data_class:'context',subject:'Orion',predicate:'has_context',value:'Rechnung noch offen.',sensitivity:'sensitive',evidence_quote:'Rechnung noch offen.',valid_from:null}]}));
+  const result=await extractor.proposeMemoryFromMail({...input,mail_domain:'immo',mail_domains:['immo','finance'],body:'Freigabe liegt vor. Rechnung noch offen.'});
+  expect(result.bundles).toHaveLength(2);expect(result.bundles![0].proposal.proposal_id).toBe(existing.proposal.proposal_id);
+  expect(result.facts.map(f=>f.domain).sort()).toEqual(['finance','immo']);
+ });
+ it('cannot bypass payment evidence or sensitivity by naming another domain',async()=>{
+  const {extractor}=await setup();const fact={domain:'immo',data_class:'transaction',subject:'Orion',predicate:'paid',value:'480 Euro',sensitivity:'private',evidence_quote:'480 Euro werden morgen überwiesen.',valid_from:'2026-08-13'};
+  expect(()=>extractor.validateMailMemoryEnvelope({...input,body:fact.evidence_quote},{schema:'folio/memory-candidate-proposals/v2',application:null,facts:[fact]})).toThrow(expect.objectContaining({reasonCode:'payment_not_explicit'}));
+  fact.evidence_quote='480 Euro wurden am 2026-08-13 bezahlt.';
+  // Use the supported explicit passive payment phrasing.
+  fact.evidence_quote='Die Rechnung über 480 Euro wurde am 2026-08-13 bezahlt.';
+  const valid=extractor.validateMailMemoryEnvelope({...input,body:fact.evidence_quote},{schema:'folio/memory-candidate-proposals/v2',application:null,facts:[fact]});
+  expect(valid.facts[0]).toMatchObject({domain:'finance',sensitivity:'sensitive'});
+ });
+ it('keeps independent finance facts alongside a named application in v2',async()=>{
+  const {llm,extractor}=await setup();const quote='Bewerbung als Datenanalyst bei Wolkenrad wurde erhalten.';
+  llm.setLlmOverride(async()=>JSON.stringify({schema:'folio/memory-candidate-proposals/v2',application:{role:'Datenanalyst',organization:'Wolkenrad',status:'received',identity_quote:quote,status_quote:quote,contact:null},facts:[{domain:'finance',data_class:'context',subject:'Anfahrt',predicate:'has_context',value:'Die Fahrtkostenpauschale beträgt 25 Euro.',sensitivity:'private',evidence_quote:'Die Fahrtkostenpauschale beträgt 25 Euro.',valid_from:null}]}));
+  const result=await extractor.proposeMemoryFromMail({...input,mail_domains:['job','finance'],body:quote+' Die Fahrtkostenpauschale beträgt 25 Euro.'});
+  expect(result.bundles!.map(b=>b.proposal.domain)).toEqual(['career','finance']);
+  expect(result.bundles![0].entities.some(e=>e.entity_type==='application')).toBe(true);
+  expect(result.bundles![1].facts[0].value_text).toContain('25 Euro');
+ });
+
+ it('prevents duplicate packets if two callers finish extraction for the same source concurrently',async()=>{
+  const {llm,extractor}=await setup();let calls=0;let release!:()=>void;const gate=new Promise<void>(r=>release=r);
+  llm.setLlmOverride(async()=>{if(++calls===2)release();await gate;return JSON.stringify({schema:'folio/memory-candidate-proposals/v2',application:null,facts:[{domain:'immo',data_class:'context',subject:'Orion',predicate:'has_context',value:'Freigabe liegt vor.',sensitivity:'private',evidence_quote:'Freigabe liegt vor.',valid_from:null}]});});
+  const mail={...input,body:'Freigabe liegt vor.',mail_domain:'immo',mail_domains:['immo','finance']};
+  const results=await Promise.allSettled([extractor.proposeMemoryFromMail(mail),extractor.proposeMemoryFromMail(mail)]);
+  expect(results.filter(r=>r.status==='fulfilled')).toHaveLength(1);
+  expect(results.find(r=>r.status==='rejected')).toMatchObject({reason:{reasonCode:'source_changed_during_extraction'}});
+  const db=(await import('../folio-db/init.js')).getFolioDb();expect(db.prepare('SELECT count(*) n FROM memory_proposals').get()).toEqual({n:1});
+ });
+
 });
