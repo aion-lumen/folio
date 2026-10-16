@@ -4,6 +4,7 @@ import type { MemoryFactRow, MemorySensitivity } from './types.js';
 
 export const SEMANTIC_TEXT_VERSION = 'folio-memory-fact-v1';
 export const MAX_SEMANTIC_FACTS = 5000;
+export const MAX_SEMANTIC_TEXT_CHARS = 12000;
 export const sensitivityRank: Record<MemorySensitivity, number> = { public: 0, private: 1, sensitive: 2 };
 export interface ProjectedFact { fact: MemoryFactRow; text: string; hash: string }
 
@@ -33,6 +34,9 @@ export function projectMemoryFacts(policy: { domain?: string; max_sensitivity: M
 		// Also invalidate on source, permission or lifecycle changes, not just wording.
 		const { source_excerpt: _excerpt, ...identity } = fact;
 		const hash = createHash('sha256').update(JSON.stringify([SEMANTIC_TEXT_VERSION, identity, text])).digest('hex');
-		return { fact, text, hash };
+		// A long imported fact must not block otherwise indexable batches. Keep
+		// the full hash above so changes beyond the inference window still invalidate it.
+		const boundedText = text.slice(0, MAX_SEMANTIC_TEXT_CHARS).replace(/[\uD800-\uDBFF]$/u, '');
+		return { fact, text: boundedText, hash };
 	});
 }

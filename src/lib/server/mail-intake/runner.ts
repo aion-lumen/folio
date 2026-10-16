@@ -192,7 +192,7 @@ async function execute(run: IntakeRun, c: Config, fenceToken:string) {
     review.verdict=result.verdict;save(run);
    }
    const states=ids.map(id=>getMemoryProposalBundle(id).proposal.status);
-    item.outcome=states.every(state=>state==='confirmed')?'confirmed':states.every(state=>state==='rejected')?'rejected':'candidate';item.stage='done';run.activity=undefined;save(run);
+    item.outcome=states.every(state=>state==='confirmed')?'confirmed':states.every(state=>state==='rejected')?'rejected':states.some(state=>state==='confirmed')?'partially_confirmed':'candidate';item.stage='done';run.activity=undefined;save(run);
   }
  } finally { if(run.items.length) {run.activity={model:primary,task:'Primärmodell wiederherstellen'};save(run);await prepareIntakeModel(primary,MAIL_INTAKE_CONTEXT_LENGTH,fenceToken);} run.activity=undefined; }
  if(c.career_rejections&&!run.history){

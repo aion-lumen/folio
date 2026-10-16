@@ -2,6 +2,7 @@
 	import { onDestroy, onMount, untrack } from 'svelte';
 	import { Check, Copy, Clock3, ExternalLink, MessageSquareText, Radar, Save, ShieldCheck, Trash2 } from 'lucide-svelte';
 	import SlideToConfirm from '$lib/components/SlideToConfirm.svelte';
+	import { freshPlacementCandidates } from './placement-status.js';
 	import type {
 		SonarPlacementCandidate,
 		SonarPlacementChannel,
@@ -45,8 +46,7 @@
 				: candidate;
 		})
 	);
- const fresh = $derived(candidates.filter(c => c.status === 'open' && Date.parse(c.expiresAt) > now && now-Date.parse(c.source.publishedAt) < 24*3_600_000).sort((a,b) =>
-   Number(Boolean(b.relevance.references?.length)) - Number(Boolean(a.relevance.references?.length)) || Date.parse(b.source.publishedAt) - Date.parse(a.source.publishedAt)));
+ const fresh = $derived(freshPlacementCandidates(candidates, now));
  const visibleCandidates = $derived(showHistory ? candidates : fresh.slice(0, 3));
  const selected = $derived(candidates.find(c => c.id === selectedId && (showHistory || fresh.some(f => f.id === c.id))) ?? visibleCandidates[0] ?? null);
  async function copyDraft() {
@@ -84,7 +84,7 @@
 
 	function remaining(candidate: SonarPlacementCandidate): string {
 		if (candidate.status === 'dismissed') return 'nicht verwendet';
-		if (candidate.status === 'approved') return 'freigegeben';
+		if (candidate.status === 'approved') return Date.parse(candidate.expiresAt) <= now ? 'Freigabe abgelaufen' : 'freigegeben';
 		if (candidate.status === 'expired') return 'abgelaufen';
 		const hours = Math.max(0, (Date.parse(candidate.expiresAt) - Date.now()) / 3_600_000);
 		if (hours < 1) return 'weniger als 1 Stunde';
@@ -366,6 +366,8 @@
 								<a href={selectedPublication.externalUrl} target="_blank" rel="noreferrer">Antwort öffnen <ExternalLink size={12} /></a>
 							{:else if selectedPublication?.status === 'unclear'}
 								<strong>Ergebnis auf X prüfen</strong><span>Die Anfrage wurde gestartet, aber lokal nicht eindeutig bestätigt. Kein automatischer Neuversuch.</span>
+							{:else if Date.parse(selected.expiresAt) <= now && selectedPublication?.status !== 'claimed'}
+								<strong>Freigabe abgelaufen</strong><span>Der Publisher versendet diesen Entwurf nicht mehr. Die frühere Freigabe bleibt im Verlauf.</span>
 							{:else if selectedPublication?.status === 'manual_required'}
 								<strong>In X fertigstellen</strong>
 								<span>X erlaubt diesen API-Reply nicht. Der Entwurf öffnet vorbefüllt; der letzte Klick bleibt bei dir.</span>

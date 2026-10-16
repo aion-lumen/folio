@@ -648,6 +648,7 @@ function writeCandidate(inbox: string, config: PlacementSearchConfig, post: Sear
 }
 
 export interface SearchRunResult {
+	acquired_at?: string;
 	queries: number;
 	fetched: number;
 	liked: number;
@@ -800,7 +801,7 @@ export function runPlacementSearch(
 		return {
 			queries, fetched: new Set(all.map((post) => post.id)).size, liked: likedCount, bookmarked: bookmarkedCount, searched: searchedCount,
 			eligible: eligible.length, selected: 0, created: [], acquisition,
-			estimated_post_read_cost_usd: estimatedCost
+			acquired_at: cache?.acquiredAt ?? now.toISOString(), estimated_post_read_cost_usd: estimatedCost
 		};
 	}
 	const byId = new Map(allEligible.map((post) => [post.id, post]));
@@ -812,7 +813,7 @@ export function runPlacementSearch(
 	return {
 		queries, fetched: new Set(all.map((post) => post.id)).size, liked: likedCount, bookmarked: bookmarkedCount, searched: searchedCount,
 		eligible: eligible.length, selected: selections.length, created, acquisition,
-		estimated_post_read_cost_usd: estimatedCost
+		acquired_at: cache?.acquiredAt ?? now.toISOString(), estimated_post_read_cost_usd: estimatedCost
 	};
 }
 

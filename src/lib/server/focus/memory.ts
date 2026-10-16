@@ -12,7 +12,7 @@ function memoryRequest(question:string,caseTitle='',history?:unknown){
  const vocabulary=memoryVocabulary(query);
  // Suppress only injected terms for other senses. An owner's literal
  // "Assessment" remains ambiguous and must retain those source candidates.
- const explicitTerms=new Set(memoryQueryTerms(semanticQuery));
+ const explicitTerms=new Set(semanticQuery.normalize('NFKC').toLocaleLowerCase('de-CH').match(/[\p{L}\p{N}][\p{L}\p{N}_-]{2,}/gu)??[]);
  const injectedAssessmentTerms=new Set(vocabulary.filter(t=>!explicitTerms.has(t)));
  // Reserve terms before the shared 32-term truncation, even with long history.
  query=vocabulary.join(' ')+' '+query;

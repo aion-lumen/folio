@@ -1,9 +1,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
 	parsePublisherConfig,
+	withPublicationLock,
+	SonarPublicationBusyError,
 	readPublicationState,
 	reconcileManualPublication,
 	reconcileManualReply,
@@ -22,7 +24,10 @@ function tempRoot(): string {
 	return root;
 }
 
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(NOW); });
+
 afterEach(() => {
+	vi.useRealTimers();
 	for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true });
 });
 
@@ -90,6 +95,33 @@ function approve(root: string, text?: string): PlacementPublisherConfig {
 }
 
 describe('Sonar placement publisher', () => {
+ it.each([false, true])('does not publish an expired approval (dry-run=%s)', dryRun => {
+  const value = approve(tempRoot());
+  expect(runPlacementPublisher(value, new Date('2026-08-16T08:00:00Z'), () => { throw Error('must not call X'); }, dryRun)).toEqual({ status: 'idle' });
+  expect(readPublicationState(value.state_root).size).toBe(0);
+ });
+ it('rechecks expiry after identity lookup before claiming or sending', () => {
+  const value = approve(tempRoot()); const calls: string[][] = [];
+  expect(() => runPlacementPublisher(value, NOW, (_binary, args) => {
+   calls.push(args); vi.setSystemTime(new Date('2026-08-16T08:00:00Z'));
+   return JSON.stringify({ data: { username: 'aion_lumen' } });
+  })).toThrow('Approved placement changed');
+  expect(calls).toHaveLength(1); expect(calls[0]).toContain('whoami');
+  expect(readPublicationState(value.state_root).size).toBe(0);
+ });
+ it('serializes withdrawal with the active publisher lock and releases it after errors', () => {
+  const value = approve(tempRoot());
+  expect(() => withPublicationLock(value.state_root, () => { throw Error('withdrawal failed'); })).toThrow('withdrawal failed');
+  const result = runPlacementPublisher(value, NOW, (_binary, args) => {
+   if (args.includes('whoami')) return JSON.stringify({ data: { username: 'aion_lumen' } });
+   let touched = false;
+   expect(() => withPublicationLock(value.state_root, () => { touched = true; })).toThrow(SonarPublicationBusyError);
+   expect(touched).toBe(false);
+   return JSON.stringify({ data: { id: '987654' } });
+  });
+  expect(result.status).toBe('published');
+  expect(withPublicationLock(value.state_root, () => 'released')).toBe('released');
+ });
 	it('parses an exact credential-free publisher config', () => {
 		const root = tempRoot();
 		const value = config(root);

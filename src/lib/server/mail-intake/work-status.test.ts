@@ -4,7 +4,7 @@ const complete:CompletionEvidence={sourceComplete:true,sourceEligible:true,model
 describe('local completion evidence gates',()=>{
  it('requires all processing evidence, not merely an empty Memory result',()=>{
   expect(completionBlock(complete)).toBeNull();
-  for(const [key,value,reason] of [['archiveConsensus',false,'no_archive_consensus'],['modelComplete',false,'models_incomplete'],['sourceComplete',false,'source_incomplete'],['sourceEligible',false,'excluded_source'],['attachmentsComplete',false,'attachments_incomplete'],['pendingMemory',true,'pending_memory'],['pendingCase',true,'open_case'],['humanConflict',true,'human_instruction'],['obligationOpen',true,'unresolved_obligation'],['memoryOutcome','candidate','memory_incomplete']] as const)
+  for(const [key,value,reason] of [['archiveConsensus',false,'no_archive_consensus'],['modelComplete',false,'models_incomplete'],['sourceComplete',false,'source_incomplete'],['sourceEligible',false,'excluded_source'],['attachmentsComplete',false,'attachments_incomplete'],['pendingMemory',true,'pending_memory'],['pendingCase',true,'open_case'],['humanConflict',true,'human_instruction'],['obligationOpen',true,'unresolved_obligation'],['memoryOutcome','candidate','memory_incomplete'],['memoryOutcome','partially_confirmed','memory_incomplete']] as const)
    expect(completionBlock({...complete,[key]:value})).toBe(reason);
  });
  it('recognizes a verified rejection receipt while preserving other open work',()=>{

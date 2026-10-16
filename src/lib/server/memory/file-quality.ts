@@ -81,7 +81,7 @@ function eventDateQuote(raw:string,asOf:string):string|null {
 export function renderArchiveEvidence(e: Omit<ArchiveEvidence,'value'>): string {
  if(e.policy!==FILE_QUALITY_POLICY||!ARCHIVE_CLAIM_KINDS.includes(e.claim_kind)||e.claim_kind==='transient'||!e.raw_value.trim()||e.raw_value.length>500||!isoDate(e.assessed_on))throw Error('invalid_archive_evidence');
  if(e.source_date ? archiveSourceDate(e.date_quote??'',e.assessed_on).date!==e.source_date : e.date_quote!==null||['plan','state'].includes(e.claim_kind))throw Error('invalid_archive_date');
- if(e.event_date_quote!==null && (e.claim_kind!=='event'||eventDateQuote(e.raw_value,e.assessed_on)!==e.event_date_quote))throw Error('invalid_archive_event_date');
+ if(e.event_date_quote!==null && (e.claim_kind!=='event'||eventDateQuote(e.raw_value,e.source_date??e.assessed_on)!==e.event_date_quote))throw Error('invalid_archive_event_date');
  if(e.claim_kind==='event'&&!e.source_date&&!e.event_date_quote)throw Error('invalid_archive_event_date');
  if(e.predicate!=='has_context'||e.data_class!=='context')throw Error('invalid_archive_context_class');
  const label={event:'dokumentiertes Ereignis',state:'damaliger Zustand; heutige Gültigkeit ungeprüft',plan:'damaliger Plan; Umsetzung nicht belegt',rule:'dokumentierte Regel; heutige Gültigkeit ungeprüft'}[e.claim_kind];
@@ -99,7 +99,7 @@ export function assessArchiveFact(fact: ArchiveFact, text: string, asOf = new Da
  // A conservative guard, not a complete linguistic classifier. All accepted
  // archive facts remain context; an event additionally needs temporal evidence.
  const plan=/\b(?:geplant(?:e[rmns]?)?|plan(?:e|en|t|st)|beabsichtigt(?:e[rmns]?)?|beabsichtig(?:e|en|t)|vorgesehen(?:e[rmns]?)?|zukünftig(?:e[rmns]?)?|möchte(?:n|st)?|will|wollen|soll(?:en|te|ten)?|absicht|ziel)\b/iu.test(raw)
-  || /\b(?:werde|werden|wird|wirst|werdet)\b[^.!?;]{0,160}\b[\p{L}]{3,}en\s*[.!?]?$/iu.test(raw)
+  || /\b(?:werde|werden|wird|wirst|werdet)\b(?:[^.!?;]|\.(?=\d)){0,160}\b[\p{L}]{3,}n\s*[.!?]?$/iu.test(raw)
   || /\b(?:plan(?:s|ned|ning)?\s+to|intend(?:s|ed)?(?:\s+to)?|going\s+to|will|shall)\b/iu.test(raw);
  // Modal verbs also express contractual obligations. Preserve a rule's type;
  // an explicit intention cannot establish a rule, even with a dated header.
@@ -109,6 +109,9 @@ export function assessArchiveFact(fact: ArchiveFact, text: string, asOf = new Da
  const kind:ArchiveClaimKind=plan&&['event','state'].includes(fact.claim_kind!)?'plan':fact.claim_kind as ArchiveClaimKind;
  const date=archiveSourceDate(text,asOf);
  const eventDate=kind==='event'?eventDateQuote(raw,asOf):null;
+ // An event after the document date is not evidence of a completed event.
+ // Hold the contradiction instead of inventing an intention or a later update.
+ if(kind==='event'&&date.date&&eventDate&&!eventDateQuote(raw,date.date))return {evidence:null,hold:'historical_context_missing'};
  if(kind==='event' && /\b(?:19|20)\d{2}\b/u.test(raw) && !eventDate)return {evidence:null,hold:'historical_context_missing'};
  if((kind==='plan'||kind==='state')&&!date.date || kind==='event'&&!date.date&&!eventDate)return {evidence:null,hold:'historical_context_missing'};
  const evidence:Omit<ArchiveEvidence,'value'>={policy:FILE_QUALITY_POLICY,claim_kind:kind,assessed_on:asOf,source_date:date.date,date_quote:date.quote,event_date_quote:eventDate,raw_value:raw,predicate:'has_context',data_class:'context'};

@@ -31,7 +31,7 @@ The acquisition is retained locally as `search-latest.json`; after a model-forma
 failure, retry with `--from-cache` to avoid paying for the same X reads again. If the cache already
 contains a validated selection, replay calls neither X nor Hermes. If acquisition completed but the
 selection did not, the same option resumes exactly the missing Hermes step over the fixed cached
-posts and still never calls X again. Remove `--dry-run`
+posts and still never calls X again. A normal retry also resumes an unfinished acquisition automatically when it is less than 30 minutes old. Status and the mobile view identify cached acquisition and its original timestamp; the completed run time does not imply a fresh X fetch. Remove `--dry-run`
 only after reviewing the reported query and eligible-post counts. A normal run
 writes strictly validated `folio/sonar-placement-candidate/v1` files atomically to the configured
 placement inbox. Existing source IDs are never proposed twice.
@@ -51,7 +51,7 @@ The config contains no X token or model credential.
 
 ## Manual mobile run
 
-The owner-only mobile Sonar surface may start the same configured worker through
+Sonar pages, their direct data loads and all review/search API handlers require the authenticated owner as well as module capabilities. The mobile Sonar surface may start the same configured worker through
 `POST /api/sonar/search-run`. Set `FOLIO_SONAR_SEARCH_RUNNER` to an absolute, executable wrapper
 path when starting Folio. The endpoint accepts no query, source or credential input, permits only
 one concurrent run and exposes only aggregate run state. The wrapper remains private and owns the

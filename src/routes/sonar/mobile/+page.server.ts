@@ -1,3 +1,4 @@
+import { error } from '@sveltejs/kit';
 import { hasModuleCapability } from '$lib/server/modules/index.js';
 import { requireModuleCapability } from '$lib/server/modules/http.js';
 import { readSonarPlacementState } from '$lib/server/modules/sonar/placements.js';
@@ -6,6 +7,7 @@ import { readSonarSearchRunStatus } from '$lib/server/modules/sonar/search-runne
 import type { PageServerLoad } from './$types.js';
 
 export const load: PageServerLoad = async ({ url, locals }) => {
+	if (locals.user?.role !== 'owner') throw error(403, 'Owner access required');
 	requireModuleCapability('sonar', 'panel.render');
 	requireModuleCapability('sonar', 'placements.read');
 	requireModuleCapability('sonar', 'publish.read');

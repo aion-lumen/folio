@@ -4,7 +4,7 @@ import { embeddingConfig } from './embedding.js';
 import { semanticCandidates } from './semantic.js';
 
 export function isExactMemoryQuery(query: string): boolean {
-	return /\b[A-Z]{1,8}[-_/]\d{2,}\b|\b\d{4}[-./]\d{1,2}[-./]\d{1,2}\b|\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b|\b\d+[.,]\d{2}\s*(?:CHF|EUR|USD|€)|\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,}|[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(query);
+	return /\b[A-Z]{1,8}[-_/]\d{2,}\b|\b\d{4}[-./]\d{1,2}[-./]\d{1,2}\b|\b\d{1,2}[./]\d{1,2}[./]\d{2,4}\b|\b\d+[.,]\d{2}\s*(?:CHF|EUR|USD|€)|(?:\b(?:CHF|EUR|USD)\s*|€\s*)\d+(?:[\s\u00a0’\x27.,]\d{3})*[.,]\d{2}(?!\d)|\b[A-Z]{2}\d{2}[A-Z0-9 ]{10,}|[\w.+-]+@[\w.-]+\.[a-z]{2,}/i.test(query);
 }
 
 /** Opt-in asynchronous entry point. Existing synchronous/finance consumers stay unchanged. */

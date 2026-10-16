@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- Require the owner role on every Sonar page, direct page-data load and review/search API. Expired approvals cannot publish; withdrawal shares the publisher lock.
+- Preserve literal assessment terms in long questions, recognize currency-prefixed exact amounts and bound oversized embedding passages without weakening full-source hashes.
+- Hold historical events dated after their source and retain dated future intentions as plans. Show partially accepted mail bundles as incomplete work.
+- Show cached Sonar acquisition and bookmark counts, with one fresh-opportunity counter. Allow the semantic-runtime integration test sufficient time on slower systems.
+
 ## [0.6.0-preview.6] - 2026-10-15
 
 ### Added
@@ -16,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Synthetic retrieval, voice-path, multi-domain, historical-file and search-worker regression tests.
 
 ### Security
-- Update source-map-js and override js-yaml’s CLI parser with its compatible argparse 2 release, removing the vulnerable sprintf-js dependency. YAML parsing and CLI conversion are checked alongside the application tests.
+- Update source-map-js and override js-yaml’s CLI parser with argparse 2, removing the vulnerable sprintf-js dependency. YAML library parsing and CLI conversion are checked. The legacy CLI emits deprecation warnings and its version flag is unsupported with this override; Folio uses the library through gray-matter.
 
 ### Compatibility
 - No canonical database migration. Semantic search is opt-in and uses a separate local embedding service; finance retrieval keeps its existing path.

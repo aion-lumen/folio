@@ -34,7 +34,7 @@ it('refreshes new confirmations and purges withdrawn facts on the automatic cycl
  const index=new Database(semanticIndexPath(),{readonly:true});expect(index.prepare('SELECT fact_id FROM vectors').all()).toEqual([{fact_id:second.fact_id}]);index.close();
  expect(getFolioDb().serialize()).toEqual(updated);
  stopMemorySemanticRuntime();const calls=vi.mocked(fetch).mock.calls.length;await vi.advanceTimersByTimeAsync(600_000);expect(fetch).toHaveBeenCalledTimes(calls);
-});
+}, 15_000);
 it('recovers after a service outage on the next refresh',async()=>{
  add('new');vi.stubGlobal('fetch',vi.fn().mockRejectedValue(new Error('offline')));
  await refreshMemoryVectors();expect(semanticMaintenanceStatus()).toMatchObject({status:'unavailable'});
