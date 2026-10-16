@@ -8,7 +8,7 @@ vi.mock('../folio-db/reader.js',()=>({getWorkerRunByUuid:()=>({status:m.workerSt
 vi.mock('../feedback/reader.js',()=>({getFeedbackRowById:(id:number)=>({id,account_id:'gmail',imap_uid:id,sender:'synthetic',subject:'synthetic'})}));
 vi.mock('../memory/mail-domain.js',()=>({resolveMailMemoryDomain:m.decision,hasCompleteMailModelOpinions:(row:unknown)=>m.decision(row).source!=='incomplete'}));
 vi.mock('../memory/mail-candidates.js',()=>({proposeMemoryFromMail:m.propose,memoryDomainForMail:()=> 'personal',MailMemoryError:class extends Error {code='invalid';}}));
-vi.mock('../memory/store.js',()=>({getMemoryProposalBundle:()=>({proposal:{status:m.proposalStatus()}}),getMemoryDelegationResult:()=>null,getMemoryDelegation:()=>({expires_at:new Date(Date.now()+3600000).toISOString()})}));
+vi.mock('../memory/store.js',()=>({getMemoryProposalBundle:(id:string)=>({proposal:{status:m.proposalStatus(id)}}),getMemoryDelegationResult:()=>null,getMemoryDelegation:()=>({expires_at:new Date(Date.now()+3600000).toISOString()})}));
 vi.mock('../memory/delegated-review.js',()=>({authorizeMailMemoryReview:()=>({grant_id:'grant'}),reviewDelegatedMailMemory:m.review}));
 vi.mock('../regelwerk/loader.js',()=>({loadRegelwerk:()=>({voice_consensus:{voices:[{role:'primary_llm',lm_studio_model:'primary'},{role:'conditional_reviewer',lm_studio_model:'reviewer'}]}})}));
 vi.mock('../model-eval/runner.js',()=>({readModelEvalRunStatus:()=>({state:'idle'})}));
@@ -24,6 +24,12 @@ const career=vi.hoisted(()=>({sync:vi.fn()}));
 vi.mock('../career/mail-sync.js',()=>({syncIntakeRejections:career.sync}));
 let dir='';beforeEach(()=>{dir=mkdtempSync(join(tmpdir(),'folio-intake-runner-'));vi.stubEnv('FOLIO_DB_PATH',join(dir,'folio.db'));vi.stubEnv('FOLIO_MAIL_ACCOUNTS_PATH','');writeFileSync(join(dir,'mail-intake-accounts.json'),JSON.stringify(['gmail','work','yahoo'].map(id=>({id,label:id,kind:'imap'}))));vi.clearAllMocks();m.proposalStatus.mockReturnValue('confirmed');m.attachments.mockResolvedValue({status:'checked',parts:0,ready:0,deferred:0,reason:null});m.busy=false;m.workerStatus='completed';m.activeRun=null;m.start.mockReturnValue({uuid:'worker'});m.validate.mockReturnValue({uuid:'validator'});m.decision.mockReturnValue({domain:'kontakt',source:'model_consensus'});m.propose.mockResolvedValue({facts:[{}],bundle:{proposal:{status:'candidate',proposal_id:'proposal'}}});m.review.mockResolvedValue({verdict:'accept'});configure(true,'owner:1','synthetic test');});afterEach(()=>{resetFolioDbForTests();vi.unstubAllEnvs();rmSync(dir,{recursive:true,force:true});});
 describe('full automatic mail path',()=>{
+ it('labels accepted siblings as partial while keeping unresolved bundles open',async()=>{
+  save({id:'partial',account:'gmail',state:'pending',phase:'memory',attempts:0,started_at:new Date().toISOString(),items:[{id:7,stage:'review',proposal_id:'accepted',proposal_ids:['accepted','pending'],reviews:{accepted:{grant_id:'prior',verdict:'accept'},pending:{grant_id:'pending',verdict:'reject'}}}]});
+  m.proposalStatus.mockImplementation((id:string)=>id==='accepted'?'confirmed':'candidate');
+  await tick();expect(runs()[0].items[0]).toMatchObject({outcome:'partially_confirmed',stage:'done'});
+  expect(m.review).not.toHaveBeenCalled();
+ });
  it.each(['candidate','confirmed','rejected'])('reports stored proposal status %s after an accepting review',async status=>{
   m.proposalStatus.mockReturnValue(status);
   save({id:'resume-restored',account:'gmail',state:'pending',phase:'memory',items:[{id:7,stage:'review',proposal_id:'p',grant_id:'existing'}],attempts:1,started_at:new Date().toISOString()});

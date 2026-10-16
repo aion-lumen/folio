@@ -48,3 +48,7 @@ reconciled manually against the account before any new attempt.
 
 `FOLIO_MODULES_DISABLED` and `FOLIO_DISABLED_MODULES=sonar` also disable this executable path through
 the module registry. The publisher does not support original posts, likes, follows, reposts or media.
+
+## Expiry and withdrawal
+
+An approval remains in the audit history after expiry, but does not extend the candidate's deadline. The publisher checks `expires_at` both when selecting a candidate (including dry-run) and immediately before claiming it. Expired approvals are labelled in the workspace and cannot start a new API publication. A receipt for an already attempted manual publication can still be reconciled later. Approval withdrawal shares the publisher lock and refuses withdrawal once the candidate is claimed; an active publisher returns a conflict instead of racing a successful withdrawal.

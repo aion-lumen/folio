@@ -6,7 +6,7 @@ import {
 	type SonarPlacementAction
 } from '$lib/server/modules/sonar/placements.js';
 import type { RequestHandler } from './$types.js';
-import { readSonarPublicationState } from '$lib/server/modules/sonar/publications.js';
+import { readSonarPublicationState, withSonarPublicationLock, SonarPublicationBusyError } from '$lib/server/modules/sonar/publications.js';
 
 function exactKeys(value: object, expected: readonly string[]): boolean {
 	const keys = Object.keys(value).sort();
@@ -14,7 +14,8 @@ function exactKeys(value: object, expected: readonly string[]): boolean {
 	return keys.length === sortedExpected.length && keys.every((key, index) => key === sortedExpected[index]);
 }
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+	if (locals.user?.role !== 'owner') throw error(403, 'Owner access required');
 	requireModuleCapability('sonar', 'placements.read');
 	requireModuleCapability('sonar', 'reviews.read');
 	requireModuleCapability('sonar', 'review.write');
@@ -50,22 +51,24 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 	try {
 		if (action === 'approve' || action === 'revoke') requireModuleCapability('sonar', 'publish.approve');
-		if (action === 'revoke') {
-			requireModuleCapability('sonar', 'publish.read');
-			const publications = readSonarPublicationState();
-			if (!publications.healthy || publications.byCandidate[value.candidate_id]) {
-				throw error(409, 'Die Freigabe wurde bereits vom Publisher übernommen oder ist nicht sicher prüfbar');
-			}
-		}
-		const review = appendSonarPlacementAction(
-			value.candidate_id,
-			value.candidate_hash,
+		const append = () => appendSonarPlacementAction(
+			value.candidate_id as string,
+			value.candidate_hash as string,
 			value.expected_revision as number,
 			action as SonarPlacementAction,
 			value.draft_text as string | undefined
 		);
+		const review = action === 'revoke' ? withSonarPublicationLock(() => {
+			requireModuleCapability('sonar', 'publish.read');
+			const publications = readSonarPublicationState();
+			if (!publications.healthy || publications.byCandidate[value.candidate_id as string]) {
+				throw error(409, 'Die Freigabe wurde bereits vom Publisher übernommen oder ist nicht sicher prüfbar');
+			}
+			return append();
+		}) : append();
 		return json({ ok: true, review });
 	} catch (cause) {
+		if (cause instanceof SonarPublicationBusyError) throw error(409, 'Der Publisher arbeitet gerade. Bitte erneut prüfen.');
 		if (cause instanceof SonarPlacementStoreError) {
 			throw error(409, 'Der Kandidat hat sich verändert oder ist nicht mehr aktuell');
 		}

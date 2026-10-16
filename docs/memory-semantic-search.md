@@ -40,7 +40,7 @@ python3 -m venv /absolute/path/embedding-runtime
 /absolute/path/embedding-runtime/bin/python scripts/memory-embedding-server.py --model-dir /absolute/path/e5-small --port 1235
 ```
 
-The service stays in the foreground. For regular macOS use, run it from a dedicated runtime directory under a user LaunchAgent with `RunAtLoad`, `KeepAlive`, a restart throttle, owner-only log permissions and the same pinned model files. Keep the chat-model service separate. Stopping it restores lexical fallback; it does not stop Folio. It applies the model card's attention-masked mean pooling, normalization and 512-token limit. Folio supplies `query: ` and `passage: ` prefixes, including for non-English text. Long facts are represented only by the model's input window; their full canonical hash still guards against changes.
+The service stays in the foreground. For regular macOS use, run it from a dedicated runtime directory under a user LaunchAgent with `RunAtLoad`, `KeepAlive`, a restart throttle, owner-only log permissions and the same pinned model files. Keep the chat-model service separate. Stopping it restores lexical fallback; it does not stop Folio. It applies the model card's attention-masked mean pooling, normalization and 512-token limit. Folio supplies `query: ` and `passage: ` prefixes, including for non-English text. Projection text is bounded to 12,000 characters before embedding, then to the model's 512-token input window. The full canonical hash still guards against changes, including beyond these windows. A long fact does not block indexing the other facts.
 
 ## Build and refresh the projection
 

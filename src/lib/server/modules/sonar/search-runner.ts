@@ -28,6 +28,7 @@ export interface SonarSearchRunnerConfig {
 }
 
 export interface SonarSearchSummary {
+	acquiredAt?: string;
 	queries: number;
 	fetched: number;
 	liked: number;
@@ -141,6 +142,7 @@ function parseSummary(logPath: string): SonarSearchSummary | null {
 			if (
 				['queries', 'fetched', 'liked', 'searched', 'eligible', 'selected'].every((key) => Number.isSafeInteger(value[key]) && Number(value[key]) >= 0) &&
 				(value.bookmarked === undefined || (Number.isSafeInteger(value.bookmarked) && Number(value.bookmarked) >= 0)) &&
+				(value.acquired_at === undefined || validIso(value.acquired_at)) &&
 				Array.isArray(value.created) &&
 				['likes-only', 'likes+search', 'likes+bookmarks', 'likes+bookmarks+search', 'cache'].includes(String(value.acquisition)) &&
 				typeof value.estimated_post_read_cost_usd === 'number' &&
@@ -149,6 +151,7 @@ function parseSummary(logPath: string): SonarSearchSummary | null {
 				['skipped', 'sent', 'failed'].includes(String(value.notification))
 			) {
 				return {
+					...(value.acquired_at === undefined ? {} : { acquiredAt: value.acquired_at as string }),
 					queries: Number(value.queries), fetched: Number(value.fetched), eligible: Number(value.eligible),
 					liked: Number(value.liked), bookmarked: Number(value.bookmarked ?? 0), searched: Number(value.searched),
 					selected: Number(value.selected), created: value.created.length,

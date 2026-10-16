@@ -5,7 +5,6 @@
 	import PlacementWorkspace from '$lib/sonar/PlacementWorkspace.svelte';
 
 	let { data } = $props();
-	const openCount = $derived(data.placements.candidates.filter((candidate) => candidate.status === 'open').length);
 	let searchStatus = $state(data.searchStatus);
 	let searchError = $state('');
 	let starting = $state(false);
@@ -66,7 +65,6 @@
 		<a class="back" href="/mobile" aria-label="Zur Folio-Zentrale"><ArrowLeft size={21} /></a>
 		<div class="mark"><Radar size={20} /></div>
 		<div class="brand-copy"><strong>Folio</strong><span>Sonar · Prüfung</span></div>
-		<b>{openCount}</b>
 	</header>
 	<main>
 		<section class="search-card" aria-label="Sonar-Suchlauf">
@@ -92,6 +90,8 @@
 				<div class="run-state success">
 					<Check size={18} /> {timeLabel(searchStatus.finishedAt)} · {searchStatus.summary.created} neue Vorschläge
 				</div>
+				<small>{searchStatus.summary.liked} Likes · {searchStatus.summary.bookmarked ?? 0} Lesezeichen · {searchStatus.summary.searched} Suchtreffer</small>
+				{#if searchStatus.summary.acquisition === 'cache'}<small>Aus gespeicherten Quellen{searchStatus.summary.acquiredAt ? ` vom ${timeLabel(searchStatus.summary.acquiredAt)}` : ''} · kein neuer Abruf bei X</small>{/if}
 
 			{:else if searchStatus.state === 'failed'}
 				<div class="run-state failed"><TriangleAlert size={18} />{searchStatus.message ?? 'Letzter Suchlauf fehlgeschlagen. Gespeicherte Treffer bleiben erhalten.'}</div>
@@ -129,7 +129,6 @@
 	.brand-copy { display: flex; flex-direction: column; gap: 1px; }
 	header strong { font-size: 16px; font-weight: 650; }
 	header span { color: var(--color-muted-foreground); font-size: 12px; }
-	header > b { min-width: 25px; margin-left: auto; padding: 4px 7px; border-radius: 999px; color: var(--sonar); background: color-mix(in srgb, var(--sonar) 10%, var(--color-background)); text-align: center; font-size: 11px; font-weight: 600; }
 	main { padding: 14px 12px calc(28px + env(safe-area-inset-bottom)); }
 	.search-card { margin: 0 0 14px; padding: 18px; border: 1px solid color-mix(in srgb, var(--sonar) 24%, var(--color-border)); border-radius: 20px; background: linear-gradient(145deg, color-mix(in srgb, var(--sonar) 7%, white), white 68%); box-shadow: 0 12px 30px hsl(190 20% 20% / .05); }
 	.search-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; color: var(--sonar); }

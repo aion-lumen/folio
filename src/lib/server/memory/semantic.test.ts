@@ -45,6 +45,36 @@ beforeEach(() => {
 afterEach(() => { resetFolioDbForTests(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); rmSync(dir, { recursive: true, force: true }); });
 
 describe('bounded semantic memory', () => {
+ it('indexes a mixed batch containing an oversized legacy fact and hashes its full text', async () => {
+  const large = fact('legacy record');
+  const original = 'A'.repeat(13_000) + ' original suffix';
+  getFolioDb().prepare('UPDATE memory_facts SET value_text=? WHERE fact_id=?').run(original, large.fact_id);
+  for(let i=0;i<12;i++) fact('ordinary synthetic fact '+i);
+  const fetch = embeddings(); const before = getFolioDb().serialize();
+  const projected = projectMemoryFacts({ max_sensitivity: 'private', as_of: new Date().toISOString() }).find(p=>p.fact.fact_id===large.fact_id)!;
+  expect(projected.text.length).toBeLessThanOrEqual(12000);
+  await indexMemoryVectors(config());
+  const index = new Database(semanticIndexPath(), { readonly: true });
+  expect(index.prepare('SELECT COUNT(*) AS count FROM vectors').get()).toEqual({ count: 13 }); index.close();
+  expect(getFolioDb().serialize()).toEqual(before);
+  for (const [,init] of fetch.mock.calls) expect(JSON.parse((init as RequestInit).body as string).input.every((t:string)=>t.length<=12000+'passage: '.length)).toBe(true);
+  getFolioDb().prepare('UPDATE memory_facts SET value_text=? WHERE fact_id=?').run(original.replace('original suffix','changed suffix'),large.fact_id);
+  const changed=projectMemoryFacts({max_sensitivity:'private',as_of:new Date().toISOString()}).find(p=>p.fact.fact_id===large.fact_id)!;
+  expect(changed.text).toBe(projected.text);expect(changed.hash).not.toBe(projected.hash);
+  expect((await indexMemoryVectors(config())).indexed).toBe(1);
+ });
+ it('preserves literal assessment ambiguity beyond the 32-term query limit', async()=>{
+  const access=fact('Assessment erfordert Lernlizenz.',{domain:'projects',subject:'Lernportal'});
+  const center=fact('Assessment-Center befindet sich in Zürich.',{domain:'career',subject:'Auswahl'});
+  embeddings(texts=>texts.map(t=>t.startsWith('query:')?[1,0,0]:[0,1,0]));await indexMemoryVectors(config());
+  const question=Array.from({length:45},(_,i)=>'kontextwort'+i).join(' ')+' Wie war mein Assessment?';
+  for(const results of [companionMemory(question),await companionMemoryHybrid(question)]) expect(results.map(f=>f.fact_id)).toEqual(expect.arrayContaining([access.fact_id,center.fact_id]));
+ });
+ it.each(['CHF 120.50','EUR 120,50','USD 120.50','€ 120,50',"CHF 1’120.50",'120.50 CHF'])('keeps exact amount query lexical: %s', async query=>{
+  fact('Kostenreferenz'); const fetch=embeddings();await indexMemoryVectors(config());fetch.mockClear();
+  const result=await compileMemoryContextHybrid({...input,query});
+  expect(result.retrieval?.semantic_status).toBe('excluded');expect(fetch).not.toHaveBeenCalled();
+ });
  it('preserves both senses when the owner explicitly asks an ambiguous assessment question',async()=>{
   const access=fact('Assessment erfordert Lernlizenz.',{domain:'projects',subject:'Lernportal'});
   const center=fact('Assessment-Center befindet sich in Zürich.',{domain:'career',subject:'Auswahl'});

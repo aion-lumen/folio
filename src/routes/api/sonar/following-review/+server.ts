@@ -7,7 +7,8 @@ import {
 } from '$lib/server/modules/sonar/following.js';
 import type { RequestHandler } from './$types.js';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, locals }) => {
+	if (locals.user?.role !== 'owner') throw error(403, 'Owner access required');
 	requireModuleCapability('sonar', 'archive.read');
 	requireModuleCapability('sonar', 'reviews.read');
 	requireModuleCapability('sonar', 'review.write');

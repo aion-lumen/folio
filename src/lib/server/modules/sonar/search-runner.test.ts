@@ -28,10 +28,10 @@ describe('Sonar manual search runner', () => {
 		expect(() => startSonarSearchRun(config)).toThrow('not configured');
 	});
 
-	it('retains bookmark source counts in the shared completed status', async () => {
+	it('retains bookmark counts and cached acquisition time in the shared completed status', async () => {
 		const stateRoot = root(), runnerPath = join(stateRoot, 'bookmarks.sh');
 		writeFileSync(runnerPath, `#!/bin/sh
-printf '%s\\n' '{"queries":3,"fetched":40,"liked":20,"bookmarked":20,"searched":10,"eligible":2,"selected":0,"created":[],"acquisition":"likes+bookmarks+search","estimated_post_read_cost_usd":0.09,"notification":"skipped"}'
+printf '%s\\n' '{"queries":3,"fetched":40,"liked":20,"bookmarked":20,"searched":10,"eligible":2,"selected":0,"created":[],"acquisition":"cache","acquired_at":"2026-10-15T10:00:00Z","estimated_post_read_cost_usd":0.09,"notification":"skipped"}'
 `, { mode: 0o700 });
 		const config = { stateRoot, runnerPath };
 		startSonarSearchRun(config);
@@ -40,7 +40,7 @@ printf '%s\\n' '{"queries":3,"fetched":40,"liked":20,"bookmarked":20,"searched":
 			await new Promise(resolve => setTimeout(resolve, 25));
 			status = readSonarSearchRunStatus(config);
 		}
-		expect(status).toMatchObject({ state: 'completed', summary: { bookmarked: 20, acquisition: 'likes+bookmarks+search' } });
+		expect(status).toMatchObject({ state: 'completed', summary: { bookmarked: 20, acquisition: 'cache', acquiredAt: '2026-10-15T10:00:00Z' } });
 	});
 
 	it('runs one executable at a time and retains only an aggregate result', async () => {

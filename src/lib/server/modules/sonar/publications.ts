@@ -1,6 +1,7 @@
 import { getModuleDatabasePath } from '../index.js';
 import {
 	readPublicationState,
+	withPublicationLock,
 	type PublicationView
 } from '../../../../../scripts/sonar-placement-publish.js';
 
@@ -17,4 +18,12 @@ export function readSonarPublicationState(rootOverride?: string): SonarPublicati
 	} catch {
 		return { byCandidate: {}, healthy: false };
 	}
+}
+
+export { SonarPublicationBusyError } from '../../../../../scripts/sonar-placement-publish.js';
+
+export function withSonarPublicationLock<T>(operation: () => T, rootOverride?: string): T {
+ const root = rootOverride ?? getModuleDatabasePath('sonar', 'publish-state', 'publish.approve');
+ if (!root) throw new Error('Sonar publication state is not available');
+ return withPublicationLock(root, operation);
 }

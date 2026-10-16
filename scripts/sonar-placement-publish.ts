@@ -505,6 +505,19 @@ function acquireLock(root: string): number {
 	return openSync(path, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
 }
 
+export class SonarPublicationBusyError extends Error {}
+
+/** Use the publisher's lock for approval withdrawal too; no claim may race it. */
+export function withPublicationLock<T>(root: string, operation: () => T): T {
+ let fd: number;
+ try { fd = acquireLock(root); }
+ catch (cause) {
+  if ((cause as NodeJS.ErrnoException).code === 'EEXIST') throw new SonarPublicationBusyError('Publisher is busy');
+  throw cause;
+ }
+ try { return operation(); } finally { releaseLock(root, fd); }
+}
+
 function releaseLock(root: string, fd: number): void {
 	closeSync(fd);
 	const path = join(safeStateRoot(root), 'placement-publisher.lock');
@@ -524,6 +537,7 @@ export function runPlacementPublisher(
 	const publication = readPublicationState(config.state_root);
 	const candidates = placementState.candidates.filter((candidate) =>
 		candidate.status === 'approved' &&
+		Date.parse(candidate.expiresAt) > now.getTime() &&
 		candidate.channel === 'x' &&
 		candidate.targetAccount.replace(/^@/, '').toLowerCase() === config.xurl.expected_username.replace(/^@/, '').toLowerCase() &&
 		!publication.has(candidate.id) &&
@@ -548,6 +562,7 @@ export function runPlacementPublisher(
 		if (
 			!current ||
 			current.status !== 'approved' ||
+			Date.parse(current.expiresAt) <= Date.now() ||
 			current.candidateHash !== candidate.candidateHash ||
 			current.draft.revision !== candidate.draft.revision ||
 			draftHash(current) !== draftHash(candidate)

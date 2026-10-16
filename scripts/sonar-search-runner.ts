@@ -17,7 +17,7 @@ async function main() {
  }
  if (status.state !== 'completed') throw new Error(status.state === 'failed' ? status.message ?? 'Search failed' : 'Missing search result');
  const s = status.summary;
- process.stdout.write(JSON.stringify({queries:s.queries,fetched:s.fetched,liked:s.liked,searched:s.searched,eligible:s.eligible,selected:s.selected,created:s.created,acquisition:s.acquisition,notification:s.notification})+'\n');
+ process.stdout.write(JSON.stringify({queries:s.queries,fetched:s.fetched,liked:s.liked,bookmarked:s.bookmarked,searched:s.searched,eligible:s.eligible,selected:s.selected,created:s.created,acquisition:s.acquisition,acquiredAt:s.acquiredAt,notification:s.notification})+'\n');
 }
 async function notifyFailure() {
  try {

@@ -8,14 +8,14 @@ import {
 import type { RequestHandler } from './$types.js';
 
 export const GET: RequestHandler = async ({ locals }) => {
+	if (locals.user?.role !== 'owner') throw error(403, 'Owner access required');
 	requireModuleCapability('sonar', 'search.read');
-	if (locals.user.role !== 'owner') throw error(403, 'Owner access required');
 	return json(readSonarSearchRunStatus());
 };
 
 export const POST: RequestHandler = async ({ locals }) => {
+	if (locals.user?.role !== 'owner') throw error(403, 'Owner access required');
 	requireModuleCapability('sonar', 'search.execute');
-	if (locals.user.role !== 'owner') throw error(403, 'Owner access required');
 	try {
 		return json(startSonarSearchRun(), { status: 202 });
 	} catch (cause) {

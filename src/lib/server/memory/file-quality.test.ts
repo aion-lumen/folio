@@ -2,6 +2,15 @@ import {describe,it,expect} from 'vitest';
 import {archiveSourceDate,assessArchiveFact,archiveMetadataOnly,type ArchiveFact} from './file-quality.js';
 const fact=(value:string,claim_kind='event'):ArchiveFact=>({subject:'Projekt Morgenlicht',predicate:'has_context',data_class:'context',value,quote:value,claim_kind});
 describe('archive evidence quality',()=>{
+ it.each(['Wir werden die Heizung am 01.03.2026 erneuern.','Wir werden den Bericht am 01.03.2026 ändern.'])('keeps future intent as a plan even with an -ern infinitive: %s',value=>{
+  expect(assessArchiveFact(fact(value),'Stand: 2025-01-01','2026-10-16').evidence).toMatchObject({claim_kind:'plan'});
+ });
+ it.each(['Die Heizung wurde am 01.03.2026 erneuert.','Die Sanierung wurde 2026 abgeschlossen.','Die Arbeiten liefen vom 01.01.2025 bis 01.03.2026.'])('holds an event beyond its document date: %s',value=>{
+  expect(assessArchiveFact(fact(value),'Stand: 2025-06-01','2026-10-16').hold).toBe('historical_context_missing');
+ });
+ it('accepts an event on or before the source date, without asserting present validity',()=>{
+  expect(assessArchiveFact(fact('Die Heizung wurde am 01.03.2026 erneuert.'),'Stand: 2026-03-01','2026-10-16').evidence).toMatchObject({claim_kind:'event',source_date:'2026-03-01'});
+ });
  it.each([
   ['# Audit-Ergebnis Datum: 2024-03-01','[Page 1]\n# Audit-Ergebnis\nDatum: 2024-03-01\nDas Archiv speichert Originaldateien lokal.'],
   ['Datum: 01.08.2024 Uhrzeit: vonbis Anzahl Teilnehmer: 6-7','[Page 1]\nAktivitätsplanung\nDatum: 01.08.2024\nUhrzeit:\nvonbis\nAnzahl Teilnehmer: 6-7\nThema: Malen mit Naturmaterialien.']
